@@ -12,12 +12,15 @@ export async function createSession(formData: FormData) {
   const startedAt = String(formData.get("started_at") ?? "");
   const durationSeconds = Number(formData.get("duration_seconds") ?? 0);
   const pagesRead = Number(formData.get("pages_read") ?? 0);
+  const chapterRaw = String(formData.get("chapter") ?? "").trim();
   const tags = formData.getAll("tags").map(String);
 
   const supabase = await createClient();
 
   let unitStart: number | null = null;
   let unitEnd: number | null = null;
+  let chapterStart: number | null = null;
+  let chapterEnd: number | null = null;
 
   if (itemId) {
     const { data: lastSession } = await supabase
@@ -31,6 +34,20 @@ export async function createSession(formData: FormData) {
     const previousUnitEnd = lastSession?.unit_end ?? 0;
     unitStart = previousUnitEnd;
     unitEnd = previousUnitEnd + (Number.isFinite(pagesRead) ? pagesRead : 0);
+
+    if (chapterRaw) {
+      const { data: lastChapterSession } = await supabase
+        .from("sessions")
+        .select("chapter_end")
+        .eq("item_id", itemId)
+        .not("chapter_end", "is", null)
+        .order("chapter_end", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      chapterStart = lastChapterSession?.chapter_end ?? 0;
+      chapterEnd = Number(chapterRaw);
+    }
   }
 
   await supabase.from("sessions").insert({
@@ -41,6 +58,8 @@ export async function createSession(formData: FormData) {
     duration_seconds: durationSeconds,
     unit_start: unitStart,
     unit_end: unitEnd,
+    chapter_start: chapterStart,
+    chapter_end: chapterEnd,
     quality_tags: tags,
   });
 

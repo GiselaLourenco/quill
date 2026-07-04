@@ -67,6 +67,8 @@ create table public.sessions (
   duration_seconds int,
   unit_start       int,                       -- página/fase inicial
   unit_end         int,                       -- página/fase final (usado na trava de spoiler)
+  chapter_start     int,                      -- capítulo anterior (p/ pílula capítulos/semana)
+  chapter_end       int,                      -- capítulo informado nesta sessão (valor absoluto)
   quality_tags     text[] not null default '{}', -- {'no_distractions','flowed','phone','hard'}
   created_at       timestamptz not null default now()
 );

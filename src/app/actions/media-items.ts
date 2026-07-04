@@ -97,7 +97,13 @@ export async function updateItemStatus(itemId: string, status: string) {
   await requireUserId();
 
   const supabase = await createClient();
-  await supabase.from("media_items").update({ status }).eq("id", itemId);
+  await supabase
+    .from("media_items")
+    .update({
+      status,
+      finished_at: status === "finished" ? new Date().toISOString().slice(0, 10) : null,
+    })
+    .eq("id", itemId);
 
   revalidatePath(`/books/${itemId}`);
   revalidatePath("/estante");

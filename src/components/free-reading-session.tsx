@@ -173,13 +173,25 @@ export function FreeReadingSession({ books }: { books: Book[] }) {
                   </ul>
                 )}
                 {selectedBook && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedBook(null)}
-                    className="mb-2 text-xs text-ink/60 underline"
-                  >
-                    Remover vínculo
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedBook(null)}
+                      className="mb-2 text-xs text-ink/60 underline"
+                    >
+                      Remover vínculo
+                    </button>
+                    <label className="mt-2 block text-sm font-medium">
+                      Capítulo atual{" "}
+                      <span className="font-normal text-ink/60">(opcional)</span>
+                      <input
+                        type="number"
+                        name="chapter"
+                        min={0}
+                        className="mt-1 block w-full rounded border-2 border-ink bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-moss-dark"
+                      />
+                    </label>
+                  </>
                 )}
               </div>
 
