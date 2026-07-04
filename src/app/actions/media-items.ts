@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 import { paletteIndexForTitle } from "@/lib/covers";
@@ -87,4 +88,17 @@ export async function createMediaItem(formData: FormData) {
   }
 
   redirect("/");
+}
+
+const VALID_STATUSES = ["want", "reading", "finished", "abandoned"];
+
+export async function updateItemStatus(itemId: string, status: string) {
+  if (!VALID_STATUSES.includes(status)) return;
+  await requireUserId();
+
+  const supabase = await createClient();
+  await supabase.from("media_items").update({ status }).eq("id", itemId);
+
+  revalidatePath(`/books/${itemId}`);
+  revalidatePath("/");
 }
