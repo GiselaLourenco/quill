@@ -87,7 +87,7 @@ export async function createMediaItem(formData: FormData) {
     redirect("/books/new?error=Não foi possível salvar o livro.");
   }
 
-  redirect("/");
+  redirect("/estante");
 }
 
 const VALID_STATUSES = ["want", "reading", "finished", "abandoned"];
@@ -100,5 +100,6 @@ export async function updateItemStatus(itemId: string, status: string) {
   await supabase.from("media_items").update({ status }).eq("id", itemId);
 
   revalidatePath(`/books/${itemId}`);
+  revalidatePath("/estante");
   revalidatePath("/");
 }

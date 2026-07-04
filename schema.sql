@@ -60,7 +60,7 @@ create index on public.media_items (user_id);
 -- ------------------------------------------------------------
 create table public.sessions (
   id               uuid primary key default gen_random_uuid(),
-  item_id          uuid not null references public.media_items(id) on delete cascade,
+  item_id          uuid references public.media_items(id) on delete cascade, -- null = sessão livre (aba "Ler"), sem livro vinculado
   user_id          uuid not null references auth.users(id) on delete cascade,
   started_at       timestamptz not null default now(),
   ended_at         timestamptz,

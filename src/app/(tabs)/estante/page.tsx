@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
-import { SiteHeader } from "@/components/site-header";
 import { BookCover } from "@/components/book-cover";
 
 const STATUS_BAR: Record<string, string> = {
@@ -18,16 +17,10 @@ const STATUS_LABEL: Record<string, string> = {
   abandoned: "abandonei",
 };
 
-export default async function Home() {
-  const userId = await requireUserId();
+export default async function EstantePage() {
+  await requireUserId();
 
   const supabase = await createClient();
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("display_name")
-    .eq("id", userId)
-    .single();
-
   const { data: items } = await supabase
     .from("media_items")
     .select("id, title, cover_kind, cover_url, cover_palette, status")
@@ -35,8 +28,10 @@ export default async function Home() {
 
   return (
     <>
-      <SiteHeader displayName={profile?.display_name ?? null} />
-      <main className="relative flex-1 px-4 pb-24 pt-6">
+      <header className="border-b-2 border-ink bg-white px-4 py-3">
+        <span className="font-serif text-lg">Estante</span>
+      </header>
+      <main className="relative flex-1 px-4 pb-6 pt-6">
         {items && items.length > 0 ? (
           <div className="grid grid-cols-3 gap-3">
             {items.map((item) => (
@@ -77,7 +72,7 @@ export default async function Home() {
         <Link
           href="/books/new"
           aria-label="Adicionar livro"
-          className="fixed bottom-6 right-6 flex h-[52px] w-[52px] items-center justify-center rounded-full border-2 border-ink bg-moss-dark text-2xl text-paper shadow-hard"
+          className="fixed bottom-20 right-6 flex h-[52px] w-[52px] items-center justify-center rounded-full border-2 border-ink bg-moss-dark text-2xl text-paper shadow-hard"
         >
           +
         </Link>

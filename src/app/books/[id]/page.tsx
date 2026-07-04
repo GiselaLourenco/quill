@@ -64,7 +64,7 @@ export default async function BookPage({
   return (
     <>
       <header className="flex items-center gap-2 border-b-2 border-ink bg-white px-4 py-3">
-        <Link href="/" aria-label="Voltar para a estante" className="text-lg">
+        <Link href="/estante" aria-label="Voltar para a estante" className="text-lg">
           ←
         </Link>
         <span className="font-serif text-lg">Página do livro</span>
@@ -121,13 +121,6 @@ export default async function BookPage({
             loading="lazy"
           />
         )}
-
-        <Link
-          href={`/books/${item.id}/session`}
-          className="mb-5 block rounded-md border-2 border-ink bg-moss-dark px-4 py-3 text-center font-display text-sm text-paper shadow-hard-sm"
-        >
-          Iniciar sessão de leitura
-        </Link>
 
         <section className="mb-5">
           <h2 className="mb-2 text-sm font-medium">Trechos favoritos</h2>

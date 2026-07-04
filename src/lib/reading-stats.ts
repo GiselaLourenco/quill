@@ -32,6 +32,21 @@ export function computeReadingStats(sessions: SessionForStats[]): ReadingStats {
   return { totalSeconds, daysRead, currentPage, pagesPerDay };
 }
 
+export type GlobalStats = { totalSeconds: number; daysRead: number };
+
+// Estatísticas globais (aba "Quill") — não dependem de um livro específico,
+// então não fazem sentido páginas/dia ou posição atual.
+export function computeGlobalStats(
+  sessions: { started_at: string; duration_seconds: number | null }[],
+): GlobalStats {
+  const totalSeconds = sessions.reduce(
+    (sum, s) => sum + (s.duration_seconds ?? 0),
+    0,
+  );
+  const days = new Set(sessions.map((s) => s.started_at.slice(0, 10)));
+  return { totalSeconds, daysRead: days.size };
+}
+
 export function formatDuration(totalSeconds: number): string {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);

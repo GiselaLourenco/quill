@@ -13,7 +13,7 @@ export default async function NewBookPage({
   return (
     <>
       <header className="flex items-center gap-2 border-b-2 border-ink bg-white px-4 py-3">
-        <Link href="/" aria-label="Voltar para a estante" className="text-lg">
+        <Link href="/estante" aria-label="Voltar para a estante" className="text-lg">
           ←
         </Link>
         <span className="font-serif text-lg">Adicionar livro</span>
