@@ -40,7 +40,11 @@ create table public.media_items (
   type        text not null default 'book' check (type in ('book','game')),
   title       text not null,
   creator     text,                          -- autor / estúdio
-  cover_url   text,
+  cover_url   text,                          -- usado quando cover_kind = 'real'
+  cover_kind  text not null default 'illustrated'
+              check (cover_kind in ('real','illustrated')),
+  cover_palette smallint not null default 0
+              check (cover_palette between 0 and 3), -- índice na paleta leve (globals.css)
   total_units int,                           -- páginas / fases
   status      text not null default 'reading'
               check (status in ('want','reading','finished','abandoned','platinum')),

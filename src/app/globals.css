@@ -3,11 +3,22 @@
 :root {
   --color-paper: #f5ecd7;
   --color-ink: #2c2c2a;
+
+  /* Cores "fortes" — usar em botões, CTAs, status: precisam de contraste
+     alto pra texto/ícone em cima. Não usar como fundo de capa ilustrada. */
   --color-coral: #d85a30;
   --color-moss: #1d9e75;
   --color-moss-dark: #0f6e56;
   --color-mustard: #ef9f27;
   --color-navy: #26215c;
+
+  /* Paleta leve das capas ilustradas (Opção A) — só trocar os hex abaixo
+     pra mudar a paleta inteira das capas; lombo e sombra derivam sozinhos. */
+  --color-cover-border: #8a7f6b;
+  --color-cover-1: #e28d6a; /* coral suave */
+  --color-cover-2: #69b997; /* verde-musgo suave */
+  --color-cover-3: #f1ba65; /* mostarda suave */
+  --color-cover-4: #6e6887; /* navy suave */
 }
 
 @theme inline {
@@ -18,6 +29,11 @@
   --color-moss-dark: var(--color-moss-dark);
   --color-mustard: var(--color-mustard);
   --color-navy: var(--color-navy);
+  --color-cover-border: var(--color-cover-border);
+  --color-cover-1: var(--color-cover-1);
+  --color-cover-2: var(--color-cover-2);
+  --color-cover-3: var(--color-cover-3);
+  --color-cover-4: var(--color-cover-4);
   --font-display: var(--font-archivo-black);
   --font-serif: var(--font-fraunces);
   --font-sans: var(--font-inter);
@@ -28,11 +44,31 @@ body {
   color: var(--color-ink);
 }
 
-/* "Sombra dura" — bloco sólido deslocado, sem blur. */
+/* "Sombra dura" — bloco sólido deslocado, sem blur. Usar em botões/CTAs. */
 .shadow-hard {
   box-shadow: 4px 4px 0 0 var(--color-ink);
 }
 
 .shadow-hard-sm {
   box-shadow: 2px 2px 0 0 var(--color-ink);
+}
+
+/* Capa ilustrada (Opção A): borda fina + sombra suave em marrom, nunca preta.
+   O lombo lateral é derivado automaticamente (mais escuro que o fundo),
+   então trocar --color-cover-N já atualiza os dois. */
+.cover-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 6px;
+  border: 1.5px solid var(--color-cover-border);
+  box-shadow: 2px 2px 0 0 var(--color-cover-border);
+}
+
+.cover-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 6px;
+  background: color-mix(in srgb, var(--cover-bg, var(--color-cover-1)) 70%, black);
+  opacity: 0.7;
 }

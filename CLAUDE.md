@@ -5,7 +5,9 @@
 (estilo Forest), gamificação/insights, leitura coletiva e comunidade (estilo TV Time /
 Wattpad), com compartilhamento no Instagram Stories.
 A spec completa está em `docs/PRD-Quill.md` — **consulte o PRD antes de qualquer
-decisão de escopo**. Este arquivo é só o guia de execução.
+decisão de escopo**. Este arquivo é só o guia de execução. Ideias de mascote,
+animação, áudio e mecânica de progressão (ainda não implementadas) estão em
+`MARCA-Quill.md`.
 
 ## Stack
 - **Next.js (App Router) + TypeScript**
