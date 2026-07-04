@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+:root {
+  --color-paper: #f5ecd7;
+  --color-ink: #2c2c2a;
+  --color-coral: #d85a30;
+  --color-moss: #1d9e75;
+  --color-moss-dark: #0f6e56;
+  --color-mustard: #ef9f27;
+  --color-navy: #26215c;
+}
+
+@theme inline {
+  --color-paper: var(--color-paper);
+  --color-ink: var(--color-ink);
+  --color-coral: var(--color-coral);
+  --color-moss: var(--color-moss);
+  --color-moss-dark: var(--color-moss-dark);
+  --color-mustard: var(--color-mustard);
+  --color-navy: var(--color-navy);
+  --font-display: var(--font-archivo-black);
+  --font-serif: var(--font-fraunces);
+  --font-sans: var(--font-inter);
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+/* "Sombra dura" — bloco sólido deslocado, sem blur. */
+.shadow-hard {
+  box-shadow: 4px 4px 0 0 var(--color-ink);
+}
+
+.shadow-hard-sm {
+  box-shadow: 2px 2px 0 0 var(--color-ink);
+}
