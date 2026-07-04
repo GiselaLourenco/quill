@@ -6,6 +6,9 @@ export const PILL_CATALOG = [
   { key: "focus_rate", label: "Taxa de foco" },
   { key: "chapters_per_week", label: "Capítulos / semana" },
   { key: "best_time", label: "Melhor horário de leitura" },
+  { key: "speed_pages_per_hour", label: "Velocidade (pág/hora)" },
+  { key: "max_session_pages", label: "Recorde de páginas numa sessão" },
+  { key: "longest_streak_ever", label: "Maior sequência histórica" },
 ] as const;
 
 export type PillKey = (typeof PILL_CATALOG)[number]["key"];
@@ -29,6 +32,8 @@ export type PillStats = {
   focusRate: number;
   chaptersPerWeek: number;
   bestTime: string | null;
+  speedPagesPerHour: number;
+  maxSessionPages: number;
 };
 
 export function pillDisplay(
@@ -53,5 +58,14 @@ export function pillDisplay(
       return { value: String(stats.chaptersPerWeek), label: "cap. / semana" };
     case "best_time":
       return { value: stats.bestTime ?? "—", label: "melhor horário" };
+    case "speed_pages_per_hour":
+      return { value: String(stats.speedPagesPerHour), label: "pág. / hora" };
+    case "max_session_pages":
+      return { value: String(stats.maxSessionPages), label: "recorde numa sessão" };
+    case "longest_streak_ever":
+      return {
+        value: `${stats.streak.record} ${stats.streak.record === 1 ? "dia" : "dias"}`,
+        label: "maior sequência",
+      };
   }
 }

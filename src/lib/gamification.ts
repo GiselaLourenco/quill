@@ -16,7 +16,7 @@ function dateKey(iso: string): string {
 }
 
 // Segunda-feira da semana daquela data, como chave YYYY-MM-DD.
-function weekKey(iso: string): string {
+export function weekKey(iso: string): string {
   const d = new Date(`${dateKey(iso)}T00:00:00Z`);
   const day = d.getUTCDay(); // 0 = domingo
   const diffToMonday = day === 0 ? 6 : day - 1;
@@ -125,6 +125,27 @@ export function computeMinutesPerDay(sessions: SessionRow[]): number {
   return daysRead > 0 ? Math.round(totalMinutes / daysRead) : 0;
 }
 
+export function computeSpeedPagesPerHour(sessions: SessionRow[]): number {
+  let totalPages = 0;
+  let totalSeconds = 0;
+  for (const s of sessions) {
+    if (s.item_id && s.unit_start != null && s.unit_end != null) {
+      totalPages += Math.max(0, s.unit_end - s.unit_start);
+      totalSeconds += s.duration_seconds ?? 0;
+    }
+  }
+  return totalSeconds > 0 ? Math.round((totalPages / totalSeconds) * 3600) : 0;
+}
+
+export function computeMaxSessionPages(sessions: SessionRow[]): number {
+  return sessions.reduce((max, s) => {
+    if (s.item_id && s.unit_start != null && s.unit_end != null) {
+      return Math.max(max, s.unit_end - s.unit_start);
+    }
+    return max;
+  }, 0);
+}
+
 // % de sessões marcadas (com pelo menos 1 tag) que incluem uma tag positiva
 // ("a leitura fluiu" / "sem distrações"). Sessão com tag positiva E negativa
 // ainda conta como positiva — é uma simplificação proposital.
@@ -164,20 +185,48 @@ export type Goal = {
   type: string;
   target_value: number;
   period_start: string | null;
+  period_end: string | null;
 };
 
 export const GOAL_TYPES = [
   { value: "books_per_year", label: "Livros / ano" },
   { value: "pages_per_day", label: "Páginas / dia" },
   { value: "minutes_per_day", label: "Minutos / dia" },
+  { value: "pages_in_period", label: "Páginas no período" },
 ] as const;
+
+export function pagesReadInRange(
+  sessions: SessionRow[],
+  start: string,
+  end: string,
+): number {
+  return sessions.reduce((sum, s) => {
+    const key = dateKey(s.started_at);
+    if (key < start || key > end) return sum;
+    if (s.item_id && s.unit_start != null && s.unit_end != null) {
+      return sum + Math.max(0, s.unit_end - s.unit_start);
+    }
+    return sum;
+  }, 0);
+}
 
 export function goalProgress(
   goal: Goal,
-  ctx: { pagesPerDay: number; minutesPerDay: number; finishedThisYear: number },
-): { current: number; percent: number; label: string } {
+  ctx: {
+    sessions: SessionRow[];
+    finishedThisYear: number;
+    pagesPerDay: number;
+    minutesPerDay: number;
+  },
+): {
+  current: number;
+  percent: number;
+  label: string;
+  dailyTargetLabel: string | null;
+} {
   let current = 0;
   let label = goal.type;
+  let dailyTargetLabel: string | null = null;
 
   if (goal.type === "books_per_year") {
     current = ctx.finishedThisYear;
@@ -191,6 +240,30 @@ export function goalProgress(
   } else if (goal.type === "minutes_per_day") {
     current = ctx.minutesPerDay;
     label = `${goal.target_value} minutos / dia`;
+  } else if (goal.type === "pages_in_period") {
+    const start = goal.period_start ?? new Date().toISOString().slice(0, 10);
+    const end = goal.period_end ?? start;
+    current = pagesReadInRange(ctx.sessions, start, end);
+    label = `${goal.target_value} páginas até ${end.slice(8, 10)}/${end.slice(5, 7)}`;
+  }
+
+  const remaining = goal.target_value - current;
+  if (remaining > 0 && goal.period_end) {
+    const today = new Date().toISOString().slice(0, 10);
+    const remainingDays = Math.max(
+      1,
+      Math.round(
+        (+new Date(`${goal.period_end}T00:00:00Z`) - +new Date(`${today}T00:00:00Z`)) /
+          86_400_000,
+      ),
+    );
+    if (goal.type === "books_per_year") {
+      const daysPerBook = Math.round(remainingDays / remaining);
+      dailyTargetLabel = `faltam ${remaining} ${remaining === 1 ? "livro" : "livros"} · ≈ 1 a cada ${daysPerBook} dias`;
+    } else if (goal.type === "pages_in_period") {
+      const perDay = Math.ceil(remaining / remainingDays);
+      dailyTargetLabel = `faltam ${remaining} pág · ≈ ${perDay}/dia`;
+    }
   }
 
   const percent =
@@ -198,7 +271,7 @@ export function goalProgress(
       ? Math.min(100, Math.round((current / goal.target_value) * 100))
       : 0;
 
-  return { current, percent, label };
+  return { current, percent, label, dailyTargetLabel };
 }
 
 export const TAG_LABELS: Record<string, string> = {

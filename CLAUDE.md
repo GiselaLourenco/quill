@@ -4,8 +4,9 @@
 **Quill** é um app **mobile-first** de leitura: estante de livros, sessões de leitura
 (estilo Forest), gamificação/insights, leitura coletiva e comunidade (estilo TV Time /
 Wattpad), com compartilhamento no Instagram Stories.
-A spec completa está em `docs/PRD-Quill.md` — **consulte o PRD antes de qualquer
-decisão de escopo**. Este arquivo é só o guia de execução. Ideias de mascote,
+A spec completa está em `PRD-Quill.md` (v2: personagem como pilar, gamificação estilo
+Bookly, desafios estilo GymRats, workflow completo na §7) — **consulte o PRD antes de
+qualquer decisão de escopo**. Este arquivo é só o guia de execução. Ideias de mascote,
 animação, áudio e mecânica de progressão (ainda não implementadas) estão em
 `MARCA-Quill.md`.
 
@@ -52,16 +53,20 @@ animação, áudio e mecânica de progressão (ainda não implementadas) estão 
 - Fluxo: renderizar o card num nó oculto **1080×1920**, gerar PNG com `html-to-image`,
   e chamar `navigator.share({ files: [png] })`. Desktop → fallback de download.
 
-## Ordem de construção (NÃO fazer tudo de uma vez)
-1. Auth + `profiles` + client do Supabase + layout base.
-2. **Estante:** add livro (capa, título, Spotify), grid, status.
-3. **Página do livro:** sessões, tempo, páginas/dia, highlights, comentários.
-4. **Gamificação:** calendário, sequências, metas, pílulas selecionáveis, timer Forest,
-   retrospectiva mensal.
-5. **Social:** comentários por nível + trava de spoiler, notas, GIFs, feed, indicar livro.
-6. **Compartilhar cards** (Stories) — reaproveita dados das fases anteriores.
-7. **Leitura coletiva:** desafio/clube, cronograma, placar opt-in, chat.
-8. **Descoberta** + (futuro) n8n.
+## Ordem de construção (NÃO fazer tudo de uma vez) — v2, alinhada ao PRD §11
+1. ✅ Auth + `profiles` + client do Supabase + layout base.
+2. ✅ **Estante:** add livro (capa, título, Spotify), grid, status.
+3. ✅ **Página do livro** + correção de navegação (tab bar, sessão desacoplada em `/ler`).
+4. **Gamificação individual:** calendário, sequências, metas com alvo diário, pílulas,
+   stats avançadas (pág/hora, previsão de término), relatório semanal, retrospectiva,
+   conquistas com progressão visível, pausa no timer, registro manual.
+5. **Desafios (GymRats):** criar/entrar por código, check-in por timer ou registro manual
+   (foto opcional), feed com reações, ranking opt-in, calendário do desafio, recap.
+6. **Personagem vivo** (pode andar em paralelo — depende de produção de arte, ver MARCA-Quill.md).
+7. **Social ampla:** comentários por nível + trava de spoiler, notas, GIFs, feed, indicar livro.
+8. **Compartilhar cards** (Stories) — reaproveita dados das fases anteriores.
+9. **Clube de leitura:** cronograma, progresso coletivo, chat.
+10. **Descoberta** + (futuro) n8n.
 
 Construir e **testar uma fase antes de ir para a próxima**. Commit por fase.
 

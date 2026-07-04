@@ -10,6 +10,8 @@ import {
   computeFocusRate,
   computeChaptersPerWeek,
   computeBestTimeOfDay,
+  computeSpeedPagesPerHour,
+  computeMaxSessionPages,
   computeDailyMinutes,
   dateRange,
   goalProgress,
@@ -55,7 +57,10 @@ export default async function QuillHomePage() {
       .eq("status", "finished")
       .gte("finished_at", `${year}-01-01`)
       .lte("finished_at", `${year}-12-31`),
-    supabase.from("goals").select("id, type, target_value, period_start").limit(2),
+    supabase
+      .from("goals")
+      .select("id, type, target_value, period_start, period_end")
+      .limit(2),
   ]);
 
   const sessionRows = (sessions ?? []) as SessionRow[];
@@ -68,6 +73,8 @@ export default async function QuillHomePage() {
     focusRate: computeFocusRate(sessionRows),
     chaptersPerWeek: computeChaptersPerWeek(sessionRows),
     bestTime: computeBestTimeOfDay(sessionRows),
+    speedPagesPerHour: computeSpeedPagesPerHour(sessionRows),
+    maxSessionPages: computeMaxSessionPages(sessionRows),
   };
 
   const rawPrefs = Array.isArray(profile?.metrics_prefs)
@@ -85,6 +92,7 @@ export default async function QuillHomePage() {
   }));
 
   const goalCtx = {
+    sessions: sessionRows,
     pagesPerDay: stats.pagesPerDay,
     minutesPerDay: stats.minutesPerDay,
     finishedThisYear: finishedThisYear ?? 0,
@@ -157,6 +165,11 @@ export default async function QuillHomePage() {
                         style={{ width: `${progress.percent}%` }}
                       />
                     </div>
+                    {progress.dailyTargetLabel && (
+                      <div className="mt-1.5 text-[10.5px] text-ink/60">
+                        {progress.dailyTargetLabel}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -171,12 +184,18 @@ export default async function QuillHomePage() {
           )}
         </section>
 
-        <section className="mt-5">
+        <section className="mt-5 flex gap-2">
           <Link
             href="/retrospectiva"
-            className="block rounded-md border-2 border-ink bg-navy px-4 py-3 text-center font-display text-sm text-paper shadow-hard-sm"
+            className="flex-1 rounded-md border-2 border-ink bg-navy px-4 py-3 text-center font-display text-xs text-paper shadow-hard-sm"
           >
             Ver retrospectiva
+          </Link>
+          <Link
+            href="/conquistas"
+            className="flex-1 rounded-md border-2 border-ink bg-mustard px-4 py-3 text-center font-display text-xs text-ink shadow-hard-sm"
+          >
+            Conquistas
           </Link>
         </section>
       </main>

@@ -134,6 +134,17 @@ create table public.goals (
 create index on public.goals (user_id);
 
 -- ------------------------------------------------------------
+-- USER_ACHIEVEMENTS (catálogo de conquistas vive em código, só o
+-- desbloqueio é persistido aqui — ver src/lib/achievements.ts)
+-- ------------------------------------------------------------
+create table public.user_achievements (
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  achievement_key text not null,
+  unlocked_at     timestamptz not null default now(),
+  primary key (user_id, achievement_key)
+);
+
+-- ------------------------------------------------------------
 -- GROUPS (desafio / clube)
 -- ------------------------------------------------------------
 create table public.groups (
@@ -245,6 +256,11 @@ create policy "own ratings - write" on public.ratings for all
 -- goals (privado)
 alter table public.goals enable row level security;
 create policy "own goals - all" on public.goals for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- user_achievements (privado)
+alter table public.user_achievements enable row level security;
+create policy "own achievements - all" on public.user_achievements for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- groups (membros leem; criador gerencia)

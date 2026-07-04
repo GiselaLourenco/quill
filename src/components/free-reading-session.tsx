@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { createSession } from "@/app/actions/sessions";
 import { formatTimer } from "@/lib/reading-stats";
@@ -14,7 +15,9 @@ const TAG_OPTIONS = [
 ];
 
 export function FreeReadingSession({ books }: { books: Book[] }) {
-  const [phase, setPhase] = useState<"idle" | "running" | "stopped">("idle");
+  const [phase, setPhase] = useState<"idle" | "running" | "paused" | "stopped">(
+    "idle",
+  );
   const [startedAt, setStartedAt] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [query, setQuery] = useState("");
@@ -61,6 +64,12 @@ export function FreeReadingSession({ books }: { books: Book[] }) {
         >
           ▶
         </button>
+        <Link
+          href="/ler/manual"
+          className="text-[11.5px] font-medium text-moss-dark underline"
+        >
+          registrar manualmente em vez disso
+        </Link>
       </main>
     );
   }
@@ -82,15 +91,42 @@ export function FreeReadingSession({ books }: { books: Book[] }) {
         {formatTimer(elapsed)}
       </div>
 
-      {phase === "running" && (
-        <button
-          type="button"
-          aria-label="Parar sessão"
-          onClick={() => setPhase("stopped")}
-          className="flex h-[76px] w-[76px] items-center justify-center rounded-full border-2 border-ink bg-coral text-2xl text-paper shadow-hard-sm"
-        >
-          ■
-        </button>
+      {phase === "paused" && (
+        <span className="rounded-full border-2 border-cover-border px-3 py-1 text-xs">
+          pausado
+        </span>
+      )}
+
+      {(phase === "running" || phase === "paused") && (
+        <div className="flex gap-3.5">
+          {phase === "running" ? (
+            <button
+              type="button"
+              aria-label="Pausar sessão"
+              onClick={() => setPhase("paused")}
+              className="flex h-[64px] w-[64px] items-center justify-center rounded-full border-2 border-ink bg-mustard text-xl text-ink shadow-hard-sm"
+            >
+              ❚❚
+            </button>
+          ) : (
+            <button
+              type="button"
+              aria-label="Retomar sessão"
+              onClick={() => setPhase("running")}
+              className="flex h-[64px] w-[64px] items-center justify-center rounded-full border-2 border-ink bg-moss-dark text-xl text-paper shadow-hard-sm"
+            >
+              ▶
+            </button>
+          )}
+          <button
+            type="button"
+            aria-label="Parar sessão"
+            onClick={() => setPhase("stopped")}
+            className="flex h-[64px] w-[64px] items-center justify-center rounded-full border-2 border-ink bg-coral text-xl text-paper shadow-hard-sm"
+          >
+            ■
+          </button>
+        </div>
       )}
 
       {phase === "stopped" && (

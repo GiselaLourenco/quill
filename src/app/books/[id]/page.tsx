@@ -6,7 +6,11 @@ import { BookCover } from "@/components/book-cover";
 import { StatusEditor } from "@/components/status-editor";
 import { AddHighlightForm } from "@/components/add-highlight-form";
 import { createComment } from "@/app/actions/comments";
-import { computeReadingStats, formatDuration } from "@/lib/reading-stats";
+import {
+  computeReadingStats,
+  formatDuration,
+  predictFinish,
+} from "@/lib/reading-stats";
 import { toSpotifyEmbedUrl } from "@/lib/spotify";
 import { getHighlightSignedUrl } from "@/lib/highlights";
 
@@ -26,7 +30,7 @@ export default async function BookPage({
   const { data: item } = await supabase
     .from("media_items")
     .select(
-      "id, title, creator, status, cover_kind, cover_url, cover_palette, spotify_url",
+      "id, title, creator, status, cover_kind, cover_url, cover_palette, spotify_url, total_units",
     )
     .eq("id", id)
     .single();
@@ -53,6 +57,7 @@ export default async function BookPage({
     ]);
 
   const stats = computeReadingStats(sessions ?? []);
+  const prediction = predictFinish(stats, item.total_units);
   const embedUrl = item.spotify_url ? toSpotifyEmbedUrl(item.spotify_url) : null;
   const highlightsWithUrls = await Promise.all(
     (highlights ?? []).map(async (h) => ({
@@ -90,26 +95,40 @@ export default async function BookPage({
           </div>
         </div>
 
-        <div className="mb-4 flex gap-2">
-          <div className="flex-1 rounded-md border-2 border-cover-border py-2 text-center">
+        <div className="mb-4 grid grid-cols-2 gap-2">
+          <div className="rounded-md border-2 border-cover-border py-2 text-center">
             <div className="font-serif text-base font-semibold">
               {formatDuration(stats.totalSeconds)}
             </div>
             <div className="text-[10.5px] text-ink/65">tempo total</div>
           </div>
-          <div className="flex-1 rounded-md border-2 border-cover-border py-2 text-center">
+          <div className="rounded-md border-2 border-cover-border py-2 text-center">
             <div className="font-serif text-base font-semibold">
               {stats.pagesPerDay}
             </div>
             <div className="text-[10.5px] text-ink/65">pág. / dia</div>
           </div>
-          <div className="flex-1 rounded-md border-2 border-cover-border py-2 text-center">
+          <div className="rounded-md border-2 border-cover-border py-2 text-center">
+            <div className="font-serif text-base font-semibold">
+              {stats.pagesPerHour}
+            </div>
+            <div className="text-[10.5px] text-ink/65">pág. / hora</div>
+          </div>
+          <div className="rounded-md border-2 border-cover-border py-2 text-center">
             <div className="font-serif text-base font-semibold">
               {stats.daysRead}
             </div>
             <div className="text-[10.5px] text-ink/65">dias lidos</div>
           </div>
         </div>
+
+        {prediction && (
+          <div className="mb-4 rounded-md border-2 border-moss-dark bg-moss-dark/10 px-3 py-2.5 text-sm">
+            Nesse ritmo, você termina em{" "}
+            <strong>~{prediction.daysRemaining} dias</strong> (
+            {prediction.dateLabel}).
+          </div>
+        )}
 
         {embedUrl && (
           <iframe

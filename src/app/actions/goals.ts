@@ -5,7 +5,12 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 
-const VALID_TYPES = ["books_per_year", "pages_per_day", "minutes_per_day"];
+const VALID_TYPES = [
+  "books_per_year",
+  "pages_per_day",
+  "minutes_per_day",
+  "pages_in_period",
+];
 
 export async function createGoal(formData: FormData) {
   const userId = await requireUserId();
@@ -22,6 +27,13 @@ export async function createGoal(formData: FormData) {
     const year = new Date().getFullYear();
     periodStart = `${year}-01-01`;
     periodEnd = `${year}-12-31`;
+  } else if (type === "pages_in_period") {
+    const endRaw = String(formData.get("period_end") ?? "").trim();
+    if (!endRaw) {
+      redirect("/metas?error=Escolha uma data alvo para a meta de páginas.");
+    }
+    periodStart = new Date().toISOString().slice(0, 10);
+    periodEnd = endRaw;
   }
 
   const supabase = await createClient();

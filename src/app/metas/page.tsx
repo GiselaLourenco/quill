@@ -1,12 +1,11 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
-import { createGoal } from "@/app/actions/goals";
+import { GoalForm } from "@/components/goal-form";
 import {
+  goalProgress,
   computePagesPerDay,
   computeMinutesPerDay,
-  goalProgress,
-  GOAL_TYPES,
   type SessionRow,
 } from "@/lib/gamification";
 
@@ -33,12 +32,13 @@ export default async function MetasPage({
         .lte("finished_at", `${year}-12-31`),
       supabase
         .from("goals")
-        .select("id, type, target_value, period_start")
+        .select("id, type, target_value, period_start, period_end")
         .order("created_at", { ascending: false }),
     ]);
 
   const sessionRows = (sessions ?? []) as SessionRow[];
   const goalCtx = {
+    sessions: sessionRows,
     pagesPerDay: computePagesPerDay(sessionRows),
     minutesPerDay: computeMinutesPerDay(sessionRows),
     finishedThisYear: finishedThisYear ?? 0,
@@ -75,6 +75,11 @@ export default async function MetasPage({
                     style={{ width: `${progress.percent}%` }}
                   />
                 </div>
+                {progress.dailyTargetLabel && (
+                  <div className="mt-1.5 text-[10.5px] text-ink/60">
+                    {progress.dailyTargetLabel}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -83,36 +88,7 @@ export default async function MetasPage({
           )}
         </div>
 
-        <form
-          action={createGoal}
-          className="flex flex-col gap-3 rounded-md border-2 border-dashed border-cover-border p-4"
-        >
-          <span className="text-sm font-medium">Nova meta</span>
-          <select
-            name="type"
-            className="rounded border-2 border-ink bg-white px-3 py-2 text-sm"
-          >
-            {GOAL_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-          <input
-            type="number"
-            name="target_value"
-            required
-            min={1}
-            placeholder="Valor alvo"
-            className="rounded border-2 border-ink bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-moss-dark"
-          />
-          <button
-            type="submit"
-            className="rounded-md border-2 border-ink bg-moss-dark px-4 py-2.5 font-display text-sm text-paper shadow-hard-sm"
-          >
-            Criar meta
-          </button>
-        </form>
+        <GoalForm />
       </main>
     </>
   );

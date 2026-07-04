@@ -76,6 +76,50 @@ bater meta, etc.) — ainda não escolhidos, mas fontes candidatas pra pesquisar
 - **[Mixkit](https://mixkit.co/free-sound-effects)** — efeitos sonoros gratuitos,
   licença simples.
 
+## Proposta de brand v3 — "Quill, a semente com pena" (2026-07-04, aguardando aprovação)
+
+Revisão da proposta v2 após feedback: **menos infantil**. Substitui o tom da seção
+"Mascote" acima onde houver conflito (sai o "oi sem graça com bochechas coradas";
+entra uma entrada confiante-desastrada: tropeça, se recompõe, finge que nada aconteceu).
+
+**Núcleo mantido:** a semente com uma **pena de escrever (quill) como folha** no topo —
+amarra nome ↔ personagem ↔ leitura num único símbolo e é a assinatura de silhueta
+(legível em 24 px).
+
+**Direção visual — "vintage cartoon com atitude"** (refs: mascote da Claude/Anthropic,
+Yoshi, **Cuphead**, **Minions**, Koroks de Zelda, Stardew Valley):
+- Olhos grandes estilo cartoon anos 30 (Cuphead): ovais com pupila "pie-cut" — todo o
+  range de expressão vem de olhos + sobrancelhas, não de fofura.
+- **Sobrancelhas expressivas** = a chave da personalidade adulta (ceticismo, julgamento,
+  drama, tédio).
+- Braços/pernas finos "rubber-hose" com luvinhas (Cuphead/Minions) — dá atitude e
+  linguagem corporal sem complexidade de rig.
+- **Sai:** bochechas coradas como padrão (só em momento raro de vergonha), proporção
+  bebê, olhar desamparado.
+- Paleta do app: corpo creme/marrom-quente, pena verde-musgo, acentos coral/mostarda;
+  flat Memphis com borda fina marrom (padrão "Opção A" — personagem é superfície
+  ilustrada, não UI).
+
+**Personalidade — humor seco e travesso, nunca cobrança:**
+- Comemora dramático (meta batida, livro terminado) — exagero cômico, não fofura.
+- **Julga em silêncio** quando a tag é "parei para olhar o celular" (olhar de lado,
+  sobrancelha reta — a piada é a contenção).
+- Sonolento em sessão de madrugada; cochila se você some por dias (nada de murchar/
+  morrer — anti-Forest, anti-Duolingo-culpa).
+- Travessura tipo Minions nos momentos de marca (login, retrospectiva, empty states).
+
+**Semente → árvore, explorado em duas camadas (decisão de design):**
+1. **O personagem NÃO vira árvore** — mascote precisa de forma fixa pra construir marca
+   (Yoshi não evolui). Ele é o *espírito/jardineiro* do bosque (vibe Korok).
+2. **O Bosque do leitor** é quem cresce: **cada livro cultiva uma árvore** — semente ao
+   começar, broto enquanto lê, árvore jovem com a constância, árvore com frutos ao
+   terminar. O bosque acumula (visão anual = retrospectiva "passeando pelo bosque");
+   a constância (streak) acelera o crescimento da árvore atual. Livro abandonado não
+   mata a árvore — ela fica pequena, parada (sem punição visual).
+
+**Onde aparece** (regra "pontual, não onipresente" mantida): login, cena da sessão de
+leitura, celebrações, retrospectiva, estados vazios, e assinando os cards de Stories.
+
 ## Status
 
 Nada disso está implementado. Este doc é só o registro da visão pra não se perder —

@@ -9,6 +9,7 @@ export type ReadingStats = {
   daysRead: number;
   currentPage: number;
   pagesPerDay: number;
+  pagesPerHour: number;
 };
 
 export function computeReadingStats(sessions: SessionForStats[]): ReadingStats {
@@ -28,8 +29,29 @@ export function computeReadingStats(sessions: SessionForStats[]): ReadingStats {
 
   const daysRead = days.size;
   const pagesPerDay = daysRead > 0 ? Math.round(currentPage / daysRead) : 0;
+  const pagesPerHour =
+    totalSeconds > 0 ? Math.round((currentPage / totalSeconds) * 3600) : 0;
 
-  return { totalSeconds, daysRead, currentPage, pagesPerDay };
+  return { totalSeconds, daysRead, currentPage, pagesPerDay, pagesPerHour };
+}
+
+// "Nesse ritmo, você termina em ~X dias (dd/mm)" — usa o ritmo médio do
+// livro (não só os últimos dias, por simplicidade) e as páginas restantes.
+export function predictFinish(
+  stats: ReadingStats,
+  totalUnits: number | null,
+): { daysRemaining: number; dateLabel: string } | null {
+  if (!totalUnits) return null;
+  const pagesRemaining = totalUnits - stats.currentPage;
+  if (pagesRemaining <= 0 || stats.pagesPerDay <= 0) return null;
+
+  const daysRemaining = Math.ceil(pagesRemaining / stats.pagesPerDay);
+  const target = new Date(Date.now() + daysRemaining * 86_400_000);
+  const dateLabel = `${String(target.getDate()).padStart(2, "0")}/${String(
+    target.getMonth() + 1,
+  ).padStart(2, "0")}`;
+
+  return { daysRemaining, dateLabel };
 }
 
 export type GlobalStats = { totalSeconds: number; daysRead: number };
