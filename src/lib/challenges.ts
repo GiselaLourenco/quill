@@ -1,9 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type ActiveChallenge = { id: string; name: string; emoji: string | null };
+export type ActiveChallenge = {
+  id: string;
+  name: string;
+  emoji: string | null;
+  scoring_metric: string;
+};
 
 // Desafios (format='challenge') dos quais o usuário é membro e que estão
-// dentro do período — usado pro fluxo "publicar como check-in".
+// dentro do período — usado pro bloco "publicar nos desafios" do pós-sessão.
 export async function getActiveChallenges(
   supabase: SupabaseClient,
   userId: string,
@@ -11,7 +16,7 @@ export async function getActiveChallenges(
   const today = new Date().toISOString().slice(0, 10);
   const { data: memberships } = await supabase
     .from("group_members")
-    .select("groups!inner(id, name, emoji, format, starts_at, ends_at)")
+    .select("groups!inner(id, name, emoji, format, starts_at, ends_at, scoring_metric)")
     .eq("user_id", userId);
 
   type GroupRow = {
@@ -21,6 +26,7 @@ export async function getActiveChallenges(
     format: string;
     starts_at: string | null;
     ends_at: string | null;
+    scoring_metric: string | null;
   };
 
   return ((memberships ?? []) as unknown as { groups: GroupRow }[])
@@ -32,7 +38,12 @@ export async function getActiveChallenges(
         (!g.starts_at || g.starts_at <= today) &&
         (!g.ends_at || g.ends_at >= today),
     )
-    .map((g) => ({ id: g.id, name: g.name, emoji: g.emoji }));
+    .map((g) => ({
+      id: g.id,
+      name: g.name,
+      emoji: g.emoji,
+      scoring_metric: g.scoring_metric ?? "active_days",
+    }));
 }
 
 export type ScoringMetric =

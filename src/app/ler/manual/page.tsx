@@ -3,13 +3,8 @@ import { requireUserId } from "@/lib/supabase/auth";
 import { ManualEntryForm } from "@/components/manual-entry-form";
 import { getActiveChallenges } from "@/lib/challenges";
 
-export default async function ManualEntryPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string }>;
-}) {
+export default async function ManualEntryPage() {
   const userId = await requireUserId();
-  const { error } = await searchParams;
 
   const supabase = await createClient();
   const [{ data: books }, activeChallenges] = await Promise.all([
@@ -20,8 +15,8 @@ export default async function ManualEntryPage({
   return (
     <ManualEntryForm
       books={books ?? []}
-      serverError={error}
       activeChallenges={activeChallenges}
+      userId={userId}
     />
   );
 }

@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { createSession } from "@/app/actions/sessions";
-import { CheckinSection } from "@/components/checkin-section";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { createSession, type SessionUnit } from "@/app/actions/sessions";
+import { PostSession } from "@/components/post-session";
+import type { ActiveChallenge } from "@/lib/challenges";
 
 type Book = { id: string; title: string };
-type ActiveChallenge = { id: string; name: string; emoji: string | null };
 
 const TAG_OPTIONS = [
   { value: "flowed", label: "a leitura fluiu" },
@@ -21,18 +22,25 @@ function todayInputValue() {
 
 export function ManualEntryForm({
   books,
-  serverError,
   activeChallenges,
+  userId,
 }: {
   books: Book[];
-  serverError?: string;
   activeChallenges: ActiveChallenge[];
+  userId: string;
 }) {
+  const router = useRouter();
   const [date, setDate] = useState(todayInputValue);
   const [minutes, setMinutes] = useState("");
+  const [unit, setUnit] = useState<SessionUnit>("chapters");
+  const [quantity, setQuantity] = useState("");
+  const [tags, setTags] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [timeOfDay] = useState(() => new Date().toTimeString().slice(0, 8));
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, startSave] = useTransition();
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -42,6 +50,38 @@ export function ManualEntryForm({
 
   const durationSeconds = (Number(minutes) || 0) * 60;
 
+  function toggleTag(value: string) {
+    setTags((prev) => {
+      const next = new Set(prev);
+      if (next.has(value)) next.delete(value);
+      else next.add(value);
+      return next;
+    });
+  }
+
+  function handleSave() {
+    if (durationSeconds <= 0) {
+      setError("Informe quantos minutos você leu.");
+      return;
+    }
+    setError(null);
+    startSave(async () => {
+      const result = await createSession({
+        itemId: selectedBook?.id ?? null,
+        startedAt: `${date}T${timeOfDay}`,
+        durationSeconds,
+        unit,
+        quantity: quantity ? Number(quantity) : null,
+        tags: [...tags],
+      });
+      if (result.error || !result.sessionId) {
+        setError(result.error ?? "Algo deu errado.");
+        return;
+      }
+      setSessionId(result.sessionId);
+    });
+  }
+
   return (
     <>
       <header className="flex items-center gap-2 border-b-2 border-ink bg-white px-4 py-3">
@@ -50,33 +90,34 @@ export function ManualEntryForm({
         </Link>
         <span className="font-serif text-lg">Registro manual</span>
       </header>
-      <main className="mx-auto w-full max-w-sm flex-1 px-4 py-6">
-        {serverError && (
-          <p className="mb-4 text-sm font-medium text-coral">{serverError}</p>
-        )}
-        <form action={createSession} className="flex flex-col gap-4">
-          <input type="hidden" name="item_id" value={selectedBook?.id ?? ""} />
-          <input
-            type="hidden"
-            name="started_at"
-            value={`${date}T${timeOfDay}`}
-          />
-          <input type="hidden" name="duration_seconds" value={durationSeconds} />
 
-          <label className="text-sm font-medium">
-            Data
-            <input
-              type="date"
-              value={date}
-              max={todayInputValue()}
-              onChange={(e) => setDate(e.target.value)}
-              className="mt-1 block w-full rounded border-2 border-ink bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-moss-dark"
-            />
-          </label>
+      {sessionId ? (
+        <PostSession
+          sessionId={sessionId}
+          userId={userId}
+          book={selectedBook}
+          durationSeconds={durationSeconds}
+          quantity={quantity ? Number(quantity) : null}
+          unit={unit}
+          challenges={activeChallenges}
+          onDone={() => router.push("/ler")}
+        />
+      ) : (
+        <main className="mx-auto w-full max-w-sm flex-1 px-4 py-6">
+          <div className="flex flex-col gap-4">
+            <label className="text-sm font-medium">
+              Data
+              <input
+                type="date"
+                value={date}
+                max={todayInputValue()}
+                onChange={(e) => setDate(e.target.value)}
+                className="mt-1 block w-full rounded border-2 border-ink bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-moss-dark"
+              />
+            </label>
 
-          <div className="flex gap-3">
-            <label className="flex-1 text-sm font-medium">
-              Minutos
+            <label className="text-sm font-medium">
+              Minutos lidos
               <input
                 type="number"
                 required
@@ -86,104 +127,116 @@ export function ManualEntryForm({
                 className="mt-1 block w-full rounded border-2 border-ink bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-moss-dark"
               />
             </label>
-            <label className="flex-1 text-sm font-medium">
-              Páginas
+
+            <div>
+              <span className="text-sm font-medium">
+                Quanto você leu?{" "}
+                <span className="font-normal text-ink/60">(opcional)</span>
+              </span>
+              <div className="mt-1.5 flex overflow-hidden rounded-md border-2 border-ink text-center text-sm font-semibold">
+                {(
+                  [
+                    ["chapters", "Capítulos"],
+                    ["pages", "Páginas"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setUnit(value)}
+                    className={`flex-1 py-2 ${unit === value ? "bg-navy font-display text-paper" : "bg-white"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
               <input
                 type="number"
-                name="pages_read"
-                required
                 min={0}
-                className="mt-1 block w-full rounded border-2 border-ink bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-moss-dark"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                placeholder={
+                  unit === "chapters" ? "capítulos lidos" : "páginas lidas"
+                }
+                className="mt-2 block w-full rounded border-2 border-ink bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-moss-dark"
               />
-            </label>
-          </div>
-
-          <fieldset>
-            <legend className="mb-1.5 text-sm font-medium">
-              Tags <span className="font-normal text-ink/60">(opcional)</span>
-            </legend>
-            <div className="flex flex-wrap gap-2">
-              {TAG_OPTIONS.map((tag) => (
-                <label key={tag.value}>
-                  <input
-                    type="checkbox"
-                    name="tags"
-                    value={tag.value}
-                    className="peer sr-only"
-                  />
-                  <span className="block cursor-pointer rounded-full border-2 border-ink bg-white px-3 py-1.5 text-xs font-medium peer-checked:bg-mustard">
-                    {tag.label}
-                  </span>
-                </label>
-              ))}
             </div>
-          </fieldset>
 
-          <div className="border-t-2 border-cover-border pt-3">
-            <label className="text-sm font-medium">
-              Vincular a um livro{" "}
-              <span className="font-normal text-ink/60">(opcional)</span>
-              <input
-                value={selectedBook ? selectedBook.title : query}
-                onChange={(e) => {
-                  setSelectedBook(null);
-                  setQuery(e.target.value);
-                }}
-                placeholder="Buscar na estante..."
-                className="mt-1 mb-2 block w-full rounded border-2 border-ink bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-moss-dark"
-              />
-            </label>
-            {!selectedBook && matches.length > 0 && (
-              <ul className="mb-2 flex flex-col gap-1">
-                {matches.map((b) => (
-                  <li key={b.id}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedBook(b);
-                        setQuery("");
-                      }}
-                      className="w-full rounded border-2 border-ink bg-white px-3 py-1.5 text-left text-sm"
-                    >
-                      {b.title}
-                    </button>
-                  </li>
+            <fieldset>
+              <legend className="mb-1.5 text-sm font-medium">
+                Como foi?{" "}
+                <span className="font-normal text-ink/60">(opcional)</span>
+              </legend>
+              <div className="flex flex-wrap gap-2">
+                {TAG_OPTIONS.map((tag) => (
+                  <button
+                    key={tag.value}
+                    type="button"
+                    onClick={() => toggleTag(tag.value)}
+                    className={`rounded-full border-2 border-ink px-3 py-1.5 text-xs font-medium ${tags.has(tag.value) ? "bg-mustard" : "bg-white"}`}
+                  >
+                    {tag.label}
+                  </button>
                 ))}
-              </ul>
-            )}
-            {selectedBook && (
-              <>
+              </div>
+            </fieldset>
+
+            <div className="border-t-2 border-cover-border pt-3">
+              <label className="text-sm font-medium">
+                Esse tempo foi em qual livro?{" "}
+                <span className="font-normal text-ink/60">(opcional)</span>
+                <input
+                  value={selectedBook ? selectedBook.title : query}
+                  onChange={(e) => {
+                    setSelectedBook(null);
+                    setQuery(e.target.value);
+                  }}
+                  placeholder="Buscar na estante..."
+                  className="mt-1 mb-2 block w-full rounded border-2 border-ink bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-moss-dark"
+                />
+              </label>
+              {!selectedBook && matches.length > 0 && (
+                <ul className="mb-2 flex flex-col gap-1">
+                  {matches.map((b) => (
+                    <li key={b.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedBook(b);
+                          setQuery("");
+                        }}
+                        className="w-full rounded border-2 border-ink bg-white px-3 py-1.5 text-left text-sm"
+                      >
+                        {b.title}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {selectedBook && (
                 <button
                   type="button"
                   onClick={() => setSelectedBook(null)}
-                  className="mb-2 text-xs text-ink/60 underline"
+                  className="text-xs text-ink/60 underline"
                 >
                   Remover vínculo
                 </button>
-                <label className="mt-2 block text-sm font-medium">
-                  Capítulo atual{" "}
-                  <span className="font-normal text-ink/60">(opcional)</span>
-                  <input
-                    type="number"
-                    name="chapter"
-                    min={0}
-                    className="mt-1 block w-full rounded border-2 border-ink bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-moss-dark"
-                  />
-                </label>
-              </>
-            )}
+              )}
+            </div>
+
+            {error && <p className="text-sm font-medium text-coral">{error}</p>}
+
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={isSaving}
+              className="rounded-md border-2 border-ink bg-moss-dark px-4 py-2.5 font-display text-sm text-paper shadow-hard-sm disabled:opacity-60"
+            >
+              {isSaving ? "Salvando…" : "Salvar leitura"}
+            </button>
           </div>
-
-          <CheckinSection challenges={activeChallenges} />
-
-          <button
-            type="submit"
-            className="rounded-md border-2 border-ink bg-moss-dark px-4 py-2.5 font-display text-sm text-paper shadow-hard-sm"
-          >
-            Salvar leitura
-          </button>
-        </form>
-      </main>
+        </main>
+      )}
     </>
   );
 }
