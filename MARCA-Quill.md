@@ -108,14 +108,18 @@ Yoshi, **Cuphead**, **Minions**, Koroks de Zelda, Stardew Valley):
   morrer — anti-Forest, anti-Duolingo-culpa).
 - Travessura tipo Minions nos momentos de marca (login, retrospectiva, empty states).
 
-**Semente → árvore, explorado em duas camadas (decisão de design):**
-1. **O personagem NÃO vira árvore** — mascote precisa de forma fixa pra construir marca
-   (Yoshi não evolui). Ele é o *espírito/jardineiro* do bosque (vibe Korok).
-2. **O Bosque do leitor** é quem cresce: **cada livro cultiva uma árvore** — semente ao
-   começar, broto enquanto lê, árvore jovem com a constância, árvore com frutos ao
-   terminar. O bosque acumula (visão anual = retrospectiva "passeando pelo bosque");
-   a constância (streak) acelera o crescimento da árvore atual. Livro abandonado não
-   mata a árvore — ela fica pequena, parada (sem punição visual).
+**Crescimento — DECISÃO DO USUÁRIO (2026-07-05), supersede a "forma fixa" abaixo:**
+o **Quill evolui em 3 fases dentro do ano — criança → jovem → adulto** — guiado pelo
+**progresso da meta anual de livros** (configurada no Perfil). Implicações de design:
+- As 3 fases compartilham a mesma silhueta-assinatura (semente + pena) mudando
+  proporção/postura: criança = menor, pena curta, mais desengonçado; jovem = a versão
+  atual dos mockups; adulto = mais alto, pena-pluma cheia, postura confiante.
+- Sem regressão no meio do ano; inatividade só faz cochilar. Virada de ano = novo
+  ciclo junto com a nova meta (o "adulto" se despede na retrospectiva anual).
+- **O Bosque do leitor continua**, como camada complementar/cenário da retrospectiva
+  (uma árvore por livro) — não é mais o único crescimento do produto.
+*(Registro histórico da exploração anterior: a v3 original propunha personagem de
+forma fixa como jardineiro do bosque, vibe Korok/Yoshi.)*
 
 **Onde aparece** (regra "pontual, não onipresente" mantida): login, cena da sessão de
 leitura, celebrações, retrospectiva, estados vazios, e assinando os cards de Stories.
