@@ -50,18 +50,37 @@ export async function createSession(formData: FormData) {
     }
   }
 
-  await supabase.from("sessions").insert({
-    item_id: itemId,
-    user_id: userId,
-    started_at: startedAt,
-    ended_at: new Date().toISOString(),
-    duration_seconds: durationSeconds,
-    unit_start: unitStart,
-    unit_end: unitEnd,
-    chapter_start: chapterStart,
-    chapter_end: chapterEnd,
-    quality_tags: tags,
-  });
+  const { data: newSession } = await supabase
+    .from("sessions")
+    .insert({
+      item_id: itemId,
+      user_id: userId,
+      started_at: startedAt,
+      ended_at: new Date().toISOString(),
+      duration_seconds: durationSeconds,
+      unit_start: unitStart,
+      unit_end: unitEnd,
+      chapter_start: chapterStart,
+      chapter_end: chapterEnd,
+      quality_tags: tags,
+    })
+    .select("id")
+    .single();
+
+  const checkinGroupId = String(formData.get("checkin_group_id") ?? "").trim();
+  if (checkinGroupId && newSession) {
+    const checkinNote = String(formData.get("checkin_note") ?? "").trim() || null;
+    const checkinPhotoPath =
+      String(formData.get("checkin_photo_path") ?? "").trim() || null;
+    await supabase.from("challenge_checkins").insert({
+      group_id: checkinGroupId,
+      session_id: newSession.id,
+      user_id: userId,
+      note: checkinNote,
+      photo_path: checkinPhotoPath,
+    });
+    revalidatePath(`/juntos/${checkinGroupId}`);
+  }
 
   revalidatePath("/");
   if (itemId) revalidatePath(`/books/${itemId}`);

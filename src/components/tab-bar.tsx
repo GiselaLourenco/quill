@@ -7,6 +7,7 @@ const TABS = [
   { href: "/", label: "Quill", icon: "home" },
   { href: "/ler", label: "Ler", icon: "play" },
   { href: "/estante", label: "Estante", icon: "books" },
+  { href: "/juntos", label: "Juntos", icon: "juntos" },
 ];
 
 function TabIcon({ icon, active }: { icon: string; active: boolean }) {
@@ -31,20 +32,30 @@ function TabIcon({ icon, active }: { icon: string; active: boolean }) {
       </svg>
     );
   }
+  if (icon === "books") {
+    return (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="4" y="4" width="4.5" height="16" rx="1" stroke={color} strokeWidth="2" />
+        <rect x="10" y="4" width="4.5" height="16" rx="1" stroke={color} strokeWidth="2" />
+        <rect
+          x="15.7"
+          y="5.3"
+          width="4.5"
+          height="16"
+          rx="1"
+          stroke={color}
+          strokeWidth="2"
+          transform="rotate(12 18 13)"
+        />
+      </svg>
+    );
+  }
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="4" y="4" width="4.5" height="16" rx="1" stroke={color} strokeWidth="2" />
-      <rect x="10" y="4" width="4.5" height="16" rx="1" stroke={color} strokeWidth="2" />
-      <rect
-        x="15.7"
-        y="5.3"
-        width="4.5"
-        height="16"
-        rx="1"
-        stroke={color}
-        strokeWidth="2"
-        transform="rotate(12 18 13)"
-      />
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.8" aria-hidden="true">
+      <circle cx="8" cy="9" r="3" stroke={color} />
+      <circle cx="16" cy="9" r="3" stroke={color} />
+      <path d="M3 19c1-3 3-4.5 5-4.5S12 16 13 19" stroke={color} strokeLinecap="round" />
+      <path d="M11 19c1-3 3-4.5 5-4.5s4 1.5 5 4.5" stroke={color} strokeLinecap="round" />
     </svg>
   );
 }
@@ -58,7 +69,8 @@ export function TabBar() {
       className="sticky bottom-0 flex border-t-2 border-ink bg-white"
     >
       {TABS.map((tab) => {
-        const active = pathname === tab.href;
+        const active =
+          tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);
         return (
           <Link
             key={tab.href}

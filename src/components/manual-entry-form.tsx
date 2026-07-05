@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { createSession } from "@/app/actions/sessions";
+import { CheckinSection } from "@/components/checkin-section";
 
 type Book = { id: string; title: string };
+type ActiveChallenge = { id: string; name: string; emoji: string | null };
 
 const TAG_OPTIONS = [
   { value: "flowed", label: "a leitura fluiu" },
@@ -20,9 +22,11 @@ function todayInputValue() {
 export function ManualEntryForm({
   books,
   serverError,
+  activeChallenges,
 }: {
   books: Book[];
   serverError?: string;
+  activeChallenges: ActiveChallenge[];
 }) {
   const [date, setDate] = useState(todayInputValue);
   const [minutes, setMinutes] = useState("");
@@ -169,6 +173,8 @@ export function ManualEntryForm({
               </>
             )}
           </div>
+
+          <CheckinSection challenges={activeChallenges} />
 
           <button
             type="submit"

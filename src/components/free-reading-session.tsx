@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { createSession } from "@/app/actions/sessions";
 import { formatTimer } from "@/lib/reading-stats";
+import { CheckinSection } from "@/components/checkin-section";
 
 type Book = { id: string; title: string };
+type ActiveChallenge = { id: string; name: string; emoji: string | null };
 
 const TAG_OPTIONS = [
   { value: "flowed", label: "a leitura fluiu" },
@@ -14,7 +16,13 @@ const TAG_OPTIONS = [
   { value: "hard", label: "foi difícil" },
 ];
 
-export function FreeReadingSession({ books }: { books: Book[] }) {
+export function FreeReadingSession({
+  books,
+  activeChallenges,
+}: {
+  books: Book[];
+  activeChallenges: ActiveChallenge[];
+}) {
   const [phase, setPhase] = useState<"idle" | "running" | "paused" | "stopped">(
     "idle",
   );
@@ -230,6 +238,8 @@ export function FreeReadingSession({ books }: { books: Book[] }) {
                   </>
                 )}
               </div>
+
+              <CheckinSection challenges={activeChallenges} />
 
               <button
                 type="submit"

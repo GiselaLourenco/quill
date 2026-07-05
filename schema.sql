@@ -95,12 +95,13 @@ create index on public.highlights (item_id);
 -- ------------------------------------------------------------
 create table public.comments (
   id          uuid primary key default gen_random_uuid(),
-  item_id     uuid not null references public.media_items(id) on delete cascade,
+  item_id     uuid references public.media_items(id) on delete cascade, -- null quando scope='checkin'
   user_id     uuid not null references auth.users(id) on delete cascade,
-  scope       text not null default 'item' check (scope in ('item','chapter','passage')),
+  scope       text not null default 'item' check (scope in ('item','chapter','passage','checkin')),
   chapter_ref int,                            -- capítulo (para trava de spoiler)
   passage_ref uuid references public.highlights(id) on delete cascade,
-  content     text,
+  checkin_id  uuid references public.challenge_checkins(id) on delete cascade, -- scope='checkin'
+  content     text,                           -- reação = o próprio emoji; resposta = texto normal
   gif_url     text,
   is_public   boolean not null default false,
   created_at  timestamptz not null default now()
@@ -151,6 +152,7 @@ create table public.groups (
   id             uuid primary key default gen_random_uuid(),
   name           text not null,
   description    text,
+  emoji          text,                       -- "capa" leve do desafio (sem upload), ex.: 🏆
   format         text not null default 'club' check (format in ('challenge','club')),
   item_id        uuid references public.media_items(id) on delete set null,
   scoring_metric text not null default 'pages'
@@ -179,6 +181,21 @@ create table public.group_schedule (
   end_ref   int,
   due_date  date,
   label     text
+);
+
+-- ------------------------------------------------------------
+-- CHALLENGE_CHECKINS (uma sessão publicada num desafio — a "prova" é o
+-- registro de progresso; foto/nota são opcionais)
+-- ------------------------------------------------------------
+create table public.challenge_checkins (
+  id         uuid primary key default gen_random_uuid(),
+  group_id   uuid not null references public.groups(id) on delete cascade,
+  session_id uuid not null references public.sessions(id) on delete cascade,
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  photo_path text,                            -- bucket privado challenge-photos
+  note       text,
+  created_at timestamptz not null default now(),
+  unique (group_id, session_id)
 );
 
 -- ------------------------------------------------------------
@@ -246,6 +263,15 @@ create policy "own comments - all" on public.comments for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "public comments - read" on public.comments for select to authenticated
   using (is_public = true);
+create policy "members read checkin comments" on public.comments for select to authenticated
+  using (
+    scope = 'checkin'
+    and exists (
+      select 1 from public.challenge_checkins c
+      where c.id = comments.checkin_id
+        and public.is_group_member(c.group_id, auth.uid())
+    )
+  );
 
 -- ratings (dono escreve; autenticados leem, p/ média)
 alter table public.ratings enable row level security;
@@ -289,6 +315,15 @@ create policy "owner writes schedule" on public.group_schedule for all
   using (exists (select 1 from public.groups g where g.id = group_id and g.created_by = auth.uid()))
   with check (exists (select 1 from public.groups g where g.id = group_id and g.created_by = auth.uid()));
 
+-- challenge_checkins (membros leem; cada um publica/apaga o próprio)
+alter table public.challenge_checkins enable row level security;
+create policy "members read checkins" on public.challenge_checkins for select to authenticated
+  using (public.is_group_member(group_id, auth.uid()));
+create policy "publish own checkin" on public.challenge_checkins for insert to authenticated
+  with check (user_id = auth.uid() and public.is_group_member(group_id, auth.uid()));
+create policy "delete own checkin" on public.challenge_checkins for delete
+  using (user_id = auth.uid());
+
 -- friendships
 alter table public.friendships enable row level security;
 create policy "read own friendships" on public.friendships for select to authenticated
@@ -315,7 +350,8 @@ create policy "update received rec" on public.recommendations for update
 insert into storage.buckets (id, name, public) values
   ('covers','covers', true),
   ('highlights','highlights', false),
-  ('avatars','avatars', true)
+  ('avatars','avatars', true),
+  ('challenge-photos','challenge-photos', false)
 on conflict (id) do nothing;
 
 create policy "upload to own folder" on storage.objects for insert to authenticated
@@ -329,6 +365,19 @@ create policy "public read covers/avatars" on storage.objects for select
   using (bucket_id in ('covers','avatars'));
 create policy "read own highlights" on storage.objects for select to authenticated
   using (bucket_id = 'highlights' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- challenge-photos: pasta = group_id (não user_id), porque qualquer membro
+-- do desafio precisa ver a foto de check-in de qualquer outro membro.
+create policy "members upload challenge photo" on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'challenge-photos'
+    and public.is_group_member((storage.foldername(name))[1]::uuid, auth.uid())
+  );
+create policy "members read challenge photos" on storage.objects for select to authenticated
+  using (
+    bucket_id = 'challenge-photos'
+    and public.is_group_member((storage.foldername(name))[1]::uuid, auth.uid())
+  );
 
 -- NOTA: para "trechos públicos" (Wattpad-style), highlights públicos precisarão de
 -- leitura pública do arquivo — resolver com bucket público dedicado ou signed URLs
