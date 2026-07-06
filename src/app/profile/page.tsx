@@ -1,7 +1,9 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 import { SiteHeader } from "@/components/site-header";
 import { updateProfile } from "@/app/actions/profile";
+import { quillPhase } from "@/lib/gamification";
 
 export default async function ProfilePage({
   searchParams,
@@ -12,11 +14,37 @@ export default async function ProfilePage({
   const { error, saved } = await searchParams;
 
   const supabase = await createClient();
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("username, display_name")
-    .eq("id", userId)
-    .single();
+  const year = new Date().getFullYear();
+  const [{ data: profile }, { data: annualGoal }, { count: finishedThisYear }] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select("username, display_name")
+        .eq("id", userId)
+        .single(),
+      supabase
+        .from("goals")
+        .select("target_value")
+        .eq("type", "books_per_year")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("media_items")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "finished")
+        .gte("finished_at", `${year}-01-01`)
+        .lte("finished_at", `${year}-12-31`),
+    ]);
+
+  const phase = annualGoal
+    ? quillPhase(
+        Math.min(
+          100,
+          Math.round(((finishedThisYear ?? 0) / annualGoal.target_value) * 100),
+        ),
+      )
+    : null;
 
   return (
     <>
@@ -24,6 +52,33 @@ export default async function ProfilePage({
       <main className="flex flex-1 justify-center px-4 py-10">
         <div className="w-full max-w-sm">
           <h1 className="mb-6 font-serif text-2xl">Seu perfil</h1>
+
+          {/* resumo da meta anual — a casa dela é a tela Metas (PRD §6.4) */}
+          <Link
+            href="/metas"
+            className="mb-4 flex items-center gap-3 rounded-md border-2 border-cover-border bg-white p-3"
+          >
+            <span className="text-2xl">{phase?.emoji ?? "🌱"}</span>
+            <span className="flex-1">
+              <span className="block text-sm font-semibold">
+                {annualGoal
+                  ? `Meta do ano: ${annualGoal.target_value} livros · ${finishedThisYear ?? 0} lidos`
+                  : "Defina sua meta do ano"}
+              </span>
+              <span className="block text-[11px] text-ink/60">
+                {phase ? (
+                  <>
+                    fase do Quill:{" "}
+                    <b className="text-moss-dark">{phase.label}</b> · gerenciar em
+                    Metas
+                  </>
+                ) : (
+                  "é ela que faz o Quill crescer — criar em Metas"
+                )}
+              </span>
+            </span>
+            <span className="font-bold text-ink/50">›</span>
+          </Link>
           <form
             action={updateProfile}
             className="flex flex-col gap-4 rounded-md border-2 border-ink bg-white p-6 shadow-hard"

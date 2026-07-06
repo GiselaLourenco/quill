@@ -195,6 +195,21 @@ export const GOAL_TYPES = [
   { value: "pages_in_period", label: "Páginas no período" },
 ] as const;
 
+// Evolução do personagem (PRD §6.5): o Quill cresce com o progresso da
+// meta anual de livros — criança → jovem → adulto, sem regressão no ano.
+// Os emojis são placeholders até a arte oficial das 3 fases existir.
+export const QUILL_PHASES = [
+  { key: "crianca", label: "criança", emoji: "🌱", range: "0–33%" },
+  { key: "jovem", label: "jovem", emoji: "🪶", range: "34–66%" },
+  { key: "adulto", label: "adulto", emoji: "🌳", range: "67%+" },
+] as const;
+
+export function quillPhase(percent: number): (typeof QUILL_PHASES)[number] {
+  if (percent >= 67) return QUILL_PHASES[2];
+  if (percent >= 34) return QUILL_PHASES[1];
+  return QUILL_PHASES[0];
+}
+
 export function pagesReadInRange(
   sessions: SessionRow[],
   start: string,
