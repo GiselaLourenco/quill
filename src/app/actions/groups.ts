@@ -56,30 +56,24 @@ export async function createChallenge(formData: FormData) {
 }
 
 export async function joinChallengeByCode(formData: FormData) {
-  const userId = await requireUserId();
+  await requireUserId(); // só garante sessão — o uid vem de auth.uid() na RPC
   const code = String(formData.get("code") ?? "").trim().toLowerCase();
   if (!code) redirect("/juntos?error=Digite um código de convite.");
 
+  // RPC security definer: a RLS de groups só deixa membros lerem o grupo,
+  // então a busca por código (feita por quem AINDA não é membro) precisa
+  // passar por dentro. A função também semeia as amizades automáticas.
   const supabase = await createClient();
-  const { data: group } = await supabase
-    .from("groups")
-    .select("id")
-    .eq("invite_code", code)
-    .maybeSingle();
+  const { data: groupId } = await supabase.rpc("join_group_with_code", {
+    invite: code,
+  });
 
-  if (!group) {
+  if (!groupId) {
     redirect("/juntos?error=Código não encontrado.");
   }
 
-  await supabase.from("group_members").insert({
-    group_id: group.id,
-    user_id: userId,
-    role: "member",
-    competes: true,
-  });
-
   revalidatePath("/juntos");
-  redirect(`/juntos/${group.id}`);
+  redirect(`/juntos/${groupId}`);
 }
 
 export async function toggleCompete(groupId: string, competes: boolean) {
