@@ -119,10 +119,12 @@ export function FreeReadingSession({
   if (phase === "idle") {
     return (
       <main className="flex flex-1 flex-col items-center justify-center gap-6 px-6">
-        <p className="max-w-[220px] text-center text-sm text-ink/70">
-          Toque em play pra começar uma sessão de leitura — escolhe o livro
-          só no final, se quiser.
-        </p>
+        {/* eslint-disable-next-line @next/next/no-img-element -- svg estático em /public */}
+        <img
+          src="/quill-lendo.svg"
+          alt="Quill lendo num cantinho aconchegante"
+          className="w-full max-w-[320px] rounded-xl"
+        />
         <button
           type="button"
           aria-label="Começar a ler"
@@ -131,6 +133,10 @@ export function FreeReadingSession({
         >
           ▶
         </button>
+        <p className="max-w-[220px] text-center text-sm text-ink/70">
+          Toque em play pra começar uma sessão de leitura — escolhe o livro
+          só no final, se quiser.
+        </p>
         <Link
           href="/ler/manual"
           className="text-[11.5px] font-medium text-moss-dark underline"
