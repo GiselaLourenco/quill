@@ -19,11 +19,9 @@ const TAG_OPTIONS = [
 export function FreeReadingSession({
   books,
   activeChallenges,
-  userId,
 }: {
   books: Book[];
   activeChallenges: ActiveChallenge[];
-  userId: string;
 }) {
   const [phase, setPhase] = useState<
     "idle" | "running" | "paused" | "stopped" | "saved"
@@ -105,7 +103,6 @@ export function FreeReadingSession({
     return (
       <PostSession
         sessionId={sessionId}
-        userId={userId}
         book={selectedBook}
         durationSeconds={savedElapsed}
         quantity={quantity ? Number(quantity) : null}
@@ -123,7 +120,7 @@ export function FreeReadingSession({
         <img
           src="/quill-lendo.svg"
           alt="Quill lendo num cantinho aconchegante"
-          className="w-full max-w-[320px] rounded-xl"
+          className="w-full max-w-[320px]"
         />
         <button
           type="button"
@@ -321,7 +318,7 @@ export function FreeReadingSession({
                 {isSaving ? "Salvando…" : "Salvar sessão"}
               </button>
               <p className="-mt-2 text-center text-[11px] text-ink/60">
-                só isso — notas, fotos e desafios vêm depois, se você quiser
+                só isso — notas e desafios vêm depois, se você quiser
               </p>
               <button
                 type="button"

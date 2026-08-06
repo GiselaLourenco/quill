@@ -4,15 +4,34 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 import { BookCover } from "@/components/book-cover";
 import { StatusEditor } from "@/components/status-editor";
-import { AddHighlightForm } from "@/components/add-highlight-form";
-import { createComment } from "@/app/actions/comments";
+import { RatingStars } from "@/components/rating-stars";
+import { RecommendButton } from "@/components/recommend-button";
+import { CommentComposer } from "@/components/comment-composer";
+import { getFriends } from "@/lib/friends";
 import {
   computeReadingStats,
   formatDuration,
   predictFinish,
 } from "@/lib/reading-stats";
 import { toSpotifyEmbedUrl } from "@/lib/spotify";
-import { getHighlightSignedUrl } from "@/lib/highlights";
+
+const STATUS_LABEL: Record<string, string> = {
+  want: "quero ler",
+  reading: "lendo",
+  finished: "terminei",
+  recomendado: "recomendado",
+  abandoned: "abandonei",
+  platinum: "platinei",
+};
+
+function StarsStatic({ stars }: { stars: number }) {
+  return (
+    <span aria-label={`${stars} de 5 estrelas`} className="text-lg tracking-tight">
+      <span className="text-mustard">{"★".repeat(stars)}</span>
+      <span className="text-ink/25">{"★".repeat(5 - stars)}</span>
+    </span>
+  );
+}
 
 export default async function BookPage({
   params,
@@ -30,41 +49,42 @@ export default async function BookPage({
   const { data: item } = await supabase
     .from("media_items")
     .select(
-      "id, title, creator, status, cover_kind, cover_url, cover_palette, spotify_url, total_units",
+      "id, user_id, title, creator, status, cover_kind, cover_url, cover_palette, spotify_url, total_units",
     )
     .eq("id", id)
     .single();
 
   if (!item) notFound();
 
-  const [{ data: sessions }, { data: highlights }, { data: comments }] =
+  const isOwner = item.user_id === userId;
+
+  if (!isOwner) {
+    return <FriendBookView item={item} userId={userId} supabase={supabase} />;
+  }
+
+  const [{ data: sessions }, { data: comments }, { data: myRating }] =
     await Promise.all([
       supabase
         .from("sessions")
         .select("started_at, duration_seconds, unit_end")
         .eq("item_id", id),
       supabase
-        .from("highlights")
-        .select("id, image_url, unit_ref, note, created_at")
-        .eq("item_id", id)
-        .order("created_at", { ascending: false }),
-      supabase
         .from("comments")
-        .select("id, content, created_at")
+        .select("id, content, chapter_ref, scope, gif_url, is_public, created_at")
         .eq("item_id", id)
-        .eq("scope", "item")
+        .in("scope", ["item", "chapter"])
         .order("created_at", { ascending: true }),
+      supabase
+        .from("ratings")
+        .select("stars")
+        .eq("item_id", id)
+        .eq("user_id", userId)
+        .maybeSingle(),
     ]);
 
   const stats = computeReadingStats(sessions ?? []);
   const prediction = predictFinish(stats, item.total_units);
   const embedUrl = item.spotify_url ? toSpotifyEmbedUrl(item.spotify_url) : null;
-  const highlightsWithUrls = await Promise.all(
-    (highlights ?? []).map(async (h) => ({
-      ...h,
-      signedUrl: h.image_url ? await getHighlightSignedUrl(supabase, h.image_url) : null,
-    })),
-  );
 
   return (
     <>
@@ -94,6 +114,13 @@ export default async function BookPage({
             </div>
           </div>
         </div>
+
+        <section className="mb-4 rounded-md border-2 border-cover-border bg-white px-3 py-3">
+          <h2 className="mb-2 text-center text-xs font-semibold uppercase tracking-wide text-ink/60">
+            Sua nota
+          </h2>
+          <RatingStars itemId={item.id} initialStars={myRating?.stars ?? 0} />
+        </section>
 
         <div className="mb-4 grid grid-cols-2 gap-2">
           <div className="rounded-md border-2 border-cover-border py-2 text-center">
@@ -141,31 +168,6 @@ export default async function BookPage({
           />
         )}
 
-        <section className="mb-5">
-          <h2 className="mb-2 text-sm font-medium">Trechos favoritos</h2>
-          <div className="flex flex-wrap gap-2">
-            {highlightsWithUrls.map((h) =>
-              h.signedUrl ? (
-                <a
-                  key={h.id}
-                  href={h.signedUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block h-[52px] w-[52px] overflow-hidden rounded-md border-2 border-cover-border"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element -- URL assinada temporária, não vale otimizar */}
-                  <img
-                    src={h.signedUrl}
-                    alt={h.note ?? `Trecho${h.unit_ref ? ` — página ${h.unit_ref}` : ""}`}
-                    className="h-full w-full object-cover"
-                  />
-                </a>
-              ) : null,
-            )}
-            <AddHighlightForm itemId={item.id} userId={userId} />
-          </div>
-        </section>
-
         <section>
           <h2 className="mb-2 text-sm font-medium">Comentários</h2>
           <div className="mb-3 flex flex-col gap-2">
@@ -174,26 +176,144 @@ export default async function BookPage({
                 key={c.id}
                 className="rounded-md border-2 border-cover-border px-3 py-2 text-sm"
               >
-                {c.content}
+                <div className="mb-1 flex items-center gap-1.5 text-[10.5px] text-ink/55">
+                  {c.scope === "chapter" && c.chapter_ref != null && (
+                    <span className="rounded-full border border-cover-border bg-paper px-2 py-0.5">
+                      cap. {c.chapter_ref}
+                    </span>
+                  )}
+                  <span aria-label={c.is_public ? "visível para amigos" : "só você"}>
+                    {c.is_public ? "🌍" : "🔒"}
+                  </span>
+                </div>
+                {c.content && <p>{c.content}</p>}
+                {c.gif_url && (
+                  // eslint-disable-next-line @next/next/no-img-element -- GIF externo do Giphy
+                  <img
+                    src={c.gif_url}
+                    alt="GIF"
+                    className="mt-1.5 max-h-32 rounded border-2 border-cover-border"
+                  />
+                )}
               </div>
             ))}
           </div>
-          <form action={createComment} className="flex gap-2">
-            <input type="hidden" name="item_id" value={item.id} />
-            <input
-              name="content"
-              required
-              placeholder="Escrever um comentário"
-              className="flex-1 rounded border-2 border-ink bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-moss-dark"
-            />
-            <button
-              type="submit"
-              className="rounded border-2 border-ink bg-moss-dark px-3 text-sm font-medium text-paper"
-            >
-              Enviar
-            </button>
-          </form>
+          <CommentComposer itemId={item.id} />
         </section>
+      </main>
+    </>
+  );
+}
+
+type ItemRow = {
+  id: string;
+  user_id: string;
+  title: string;
+  creator: string | null;
+  status: string;
+  cover_kind: string;
+  cover_url: string | null;
+  cover_palette: number;
+};
+
+// Visão de um livro que pertence a um amigo: só leitura (status + nota + comentários
+// públicos do dono) + "Indicar para alguém". Sem trava de spoiler (cortada).
+async function FriendBookView({
+  item,
+  userId,
+  supabase,
+}: {
+  item: ItemRow;
+  userId: string;
+  supabase: Awaited<ReturnType<typeof createClient>>;
+}) {
+  const [{ data: owner }, { data: ownerRating }, { data: comments }, friends] =
+    await Promise.all([
+      supabase.from("profiles").select("display_name").eq("id", item.user_id).maybeSingle(),
+      supabase
+        .from("ratings")
+        .select("stars")
+        .eq("item_id", item.id)
+        .eq("user_id", item.user_id)
+        .maybeSingle(),
+      supabase
+        .from("comments")
+        .select("id, content, chapter_ref, scope, gif_url, created_at")
+        .eq("item_id", item.id)
+        .eq("is_public", true)
+        .in("scope", ["item", "chapter"])
+        .order("created_at", { ascending: true }),
+      getFriends(supabase, userId),
+    ]);
+
+  const ownerName = owner?.display_name ?? "amigo";
+
+  return (
+    <>
+      <header className="flex items-center gap-2 border-b-2 border-ink bg-white px-4 py-3">
+        <Link href="/estante?view=amigos" aria-label="Voltar" className="text-lg">
+          ←
+        </Link>
+        <span className="font-serif text-lg">estante de {ownerName}</span>
+      </header>
+
+      <main className="mx-auto w-full max-w-sm flex-1 px-4 py-6">
+        <div className="mb-4 flex items-start gap-4">
+          <div className="w-[74px] shrink-0" style={{ aspectRatio: "2/3" }}>
+            <BookCover item={item} />
+          </div>
+          <div className="pt-0.5">
+            <h1 className="font-serif text-xl font-semibold leading-tight">
+              {item.title}
+            </h1>
+            {item.creator && (
+              <p className="mt-0.5 text-sm text-ink/65">{item.creator}</p>
+            )}
+            <span className="mt-2 inline-block rounded-full border-2 border-ink bg-white px-3 py-0.5 text-xs font-medium">
+              {STATUS_LABEL[item.status] ?? item.status}
+            </span>
+            <div className="mt-2">
+              {ownerRating?.stars ? (
+                <StarsStatic stars={ownerRating.stars} />
+              ) : (
+                <span className="text-xs text-ink/55">sem nota ainda</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <section className="mb-5">
+          <h2 className="mb-2 text-sm font-medium">Comentários de {ownerName}</h2>
+          {comments && comments.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              {comments.map((c) => (
+                <div
+                  key={c.id}
+                  className="rounded-md border-2 border-cover-border bg-white px-3 py-2 text-sm"
+                >
+                  {c.scope === "chapter" && c.chapter_ref != null && (
+                    <span className="mr-1 rounded-full border border-cover-border bg-paper px-2 py-0.5 text-[10.5px] text-ink/60">
+                      cap. {c.chapter_ref}
+                    </span>
+                  )}
+                  {c.content}
+                  {c.gif_url && (
+                    // eslint-disable-next-line @next/next/no-img-element -- GIF externo do Giphy
+                    <img
+                      src={c.gif_url}
+                      alt="GIF"
+                      className="mt-1.5 max-h-32 rounded border-2 border-cover-border"
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-ink/55">Nenhum comentário público ainda.</p>
+          )}
+        </section>
+
+        <RecommendButton friends={friends} itemRef={item.id} title={item.title} />
       </main>
     </>
   );

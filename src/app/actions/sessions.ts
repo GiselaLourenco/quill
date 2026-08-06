@@ -138,37 +138,26 @@ export async function publishSession(input: {
   revalidatePath("/");
 }
 
-// Pós-sessão: "Pra não esquecer" — texto/foto viram comentário/highlight na
-// página do livro, com visibilidade escolhida (só eu = padrão · amigos).
+// Pós-sessão: "Pra não esquecer" — o texto vira comentário na página do
+// livro, com visibilidade escolhida (só eu = padrão · amigos).
 export async function saveSessionMemory(input: {
   itemId: string;
   text: string | null;
-  imagePath: string | null;
   isPublic: boolean;
 }) {
   const userId = await requireUserId();
   const supabase = await createClient();
 
   const text = input.text?.trim() || null;
-  if (!text && !input.imagePath) return;
+  if (!text) return;
 
-  if (input.imagePath) {
-    await supabase.from("highlights").insert({
-      item_id: input.itemId,
-      user_id: userId,
-      image_url: input.imagePath, // caminho no bucket privado "highlights"
-      note: text,
-      is_public: input.isPublic,
-    });
-  } else {
-    await supabase.from("comments").insert({
-      item_id: input.itemId,
-      user_id: userId,
-      scope: "item",
-      content: text,
-      is_public: input.isPublic,
-    });
-  }
+  await supabase.from("comments").insert({
+    item_id: input.itemId,
+    user_id: userId,
+    scope: "item",
+    content: text,
+    is_public: input.isPublic,
+  });
 
   revalidatePath(`/books/${input.itemId}`);
 }

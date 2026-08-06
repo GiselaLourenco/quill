@@ -23,11 +23,9 @@ function todayInputValue() {
 export function ManualEntryForm({
   books,
   activeChallenges,
-  userId,
 }: {
   books: Book[];
   activeChallenges: ActiveChallenge[];
-  userId: string;
 }) {
   const router = useRouter();
   const [date, setDate] = useState(todayInputValue);
@@ -94,7 +92,6 @@ export function ManualEntryForm({
       {sessionId ? (
         <PostSession
           sessionId={sessionId}
-          userId={userId}
           book={selectedBook}
           durationSeconds={durationSeconds}
           quantity={quantity ? Number(quantity) : null}

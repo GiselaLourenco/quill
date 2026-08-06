@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
-import { getHighlightSignedUrl } from "@/lib/highlights";
 import { toggleReaction, replyToCheckin } from "@/app/actions/checkins";
 import { toggleCompete } from "@/app/actions/groups";
 import {
@@ -72,7 +71,7 @@ export default async function ChallengeDetailPage({
     supabase
       .from("challenge_checkins")
       .select(
-        "id, user_id, note, photo_path, created_at, session:sessions(started_at, duration_seconds, unit_start, unit_end, chapter_start, chapter_end, item_id, media_item:media_items(title))",
+        "id, user_id, note, created_at, session:sessions(started_at, duration_seconds, unit_start, unit_end, chapter_start, chapter_end, item_id, media_item:media_items(title))",
       )
       .eq("group_id", id)
       .order("created_at", { ascending: false }),
@@ -99,7 +98,6 @@ export default async function ChallengeDetailPage({
     id: string;
     user_id: string;
     note: string | null;
-    photo_path: string | null;
     created_at: string;
     session: {
       started_at: string;
@@ -121,13 +119,6 @@ export default async function ChallengeDetailPage({
         .select("id, checkin_id, user_id, content, created_at")
         .in("checkin_id", checkinIds)
     : { data: [] as { id: string; checkin_id: string; user_id: string; content: string | null; created_at: string }[] };
-
-  const photoUrls = new Map<string, string | null>();
-  for (const c of checkinRows) {
-    if (c.photo_path) {
-      photoUrls.set(c.id, await getHighlightSignedUrl(supabase, c.photo_path));
-    }
-  }
 
   const scores = computeScores(
     checkinRows.map((c) => ({ user_id: c.user_id, session: c.session })),
@@ -493,14 +484,6 @@ export default async function ChallengeDetailPage({
                       )}
                     </div>
                     {c.note && <p className="mt-1.5 text-[12.5px]">{c.note}</p>}
-                    {photoUrls.get(c.id) && (
-                      // eslint-disable-next-line @next/next/no-img-element -- URL assinada temporária
-                      <img
-                        src={photoUrls.get(c.id)!}
-                        alt="Foto do check-in"
-                        className="mt-2 h-24 w-full rounded object-cover"
-                      />
-                    )}
                   </div>
                 </div>
 

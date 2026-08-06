@@ -16,7 +16,6 @@ export default async function ManualEntryPage() {
     <ManualEntryForm
       books={books ?? []}
       activeChallenges={activeChallenges}
-      userId={userId}
     />
   );
 }

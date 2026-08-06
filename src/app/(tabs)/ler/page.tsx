@@ -20,7 +20,6 @@ export default async function LerPage() {
       <FreeReadingSession
         books={books ?? []}
         activeChallenges={activeChallenges}
-        userId={userId}
       />
     </>
   );

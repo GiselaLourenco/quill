@@ -222,17 +222,20 @@ gamificação é centrada na jornada individual; qualquer elemento competitivo �
 - **Notificações leves (futuro):** "fulano fez check-in" — nunca cobrança.
 
 ### 6.7 Clube de leitura (contínuo) & comunidade
+> **Decisões 2026-07-06 (Fase 7) — override:** (a) **trava anti-spoiler CORTADA** — não
+> implementar; o caso do não-leitor complica a regra; comentário de capítulo aparece pra
+> qualquer amigo. (b) **Fotos REMOVIDAS do produto (backlog)** — sem highlight/comentário/
+> reação com foto; o nível "passagem" (que dependia de trecho/foto) fica adiado junto.
 - **Clube:** grupo contínuo, sem placar; **cronograma por marcos** (o admin divide o
   livro por **páginas ou capítulos** e o app calcula os marcos: "cap. 1–6 até dom
-  12/jul"), **progresso coletivo** (barra) e discussão **agrupada por marco** — a trava
-  anti-spoiler sai naturalmente (quem não chegou ao marco não vê a conversa dele).
-- **Comentários em três níveis:** livro · capítulo · passagem (trecho/foto).
-- **Trava anti-spoiler:** comentários de um capítulo só aparecem para quem já leu até ali.
+  12/jul"), **progresso coletivo** (barra) e discussão **agrupada por marco**.
+- **Comentários em níveis:** livro · capítulo (o nível *passagem* depende de foto — backlog).
+- ~~**Trava anti-spoiler**~~ — cortada (ver override acima).
 - **Notas / avaliação:** estrelas por livro (separado das reações). **A nota independe
   do status:** dá para avaliar sem terminar — inclusive um livro abandonado pela metade
   pode receber nota (o fluxo vive na página do livro, para o dono e para amigos que o
   veem pela estante dos amigos).
-- **Reações com GIF** (API do Tenor/Giphy), emojis e fotos.
+- **Reações com GIF** (API do Tenor/Giphy) e emojis.
 - **Público/privado** por comentário.
 - **Amizades/seguir**; a atividade dos amigos vive na **estante dos amigos** (§6.1) —
   não há um feed social separado.
@@ -461,8 +464,10 @@ trava de spoiler na camada de aplicação.
 6. **Personagem vivo:** animação de abertura, cena da sessão de leitura, reações e
    estágios de crescimento. *(Pode andar em paralelo às fases 4-5 — depende de produção
    de arte; ver MARCA-Quill.md.)*
-7. **Social ampla:** comentários por nível + trava de spoiler, notas, GIFs, feed de
-   amigos, indicar livro.
+7. ✅ **Social ampla:** comentários por nível livro/capítulo (SEM trava de spoiler —
+   cortada 2026-07-06), notas por estrelas, GIFs (Giphy), estante dos amigos, Meu diário,
+   indicar livro (sino de notificação). Fotos e nível "passagem" ficam no backlog. *(feita
+   2026-07-07)*
 8. **Compartilhar cards** no Instagram Stories (reaproveita relatórios, recaps e conquistas).
 9. **Clube de leitura:** grupo contínuo, cronograma, progresso coletivo, chat.
 10. **Descoberta + (futuro) n8n.**

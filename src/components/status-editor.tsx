@@ -7,6 +7,7 @@ const OPTIONS = [
   { value: "want", label: "quero ler" },
   { value: "reading", label: "lendo" },
   { value: "finished", label: "terminei" },
+  { value: "recomendado", label: "recomendado" },
   { value: "abandoned", label: "abandonei" },
 ];
 

@@ -36,13 +36,21 @@ animação, áudio e mecânica de progressão (ainda não implementadas) estão 
 - Noventinha mas **legível e não poluído** — usar os acentos com parcimônia.
 - Estante = grade de capas; motivo de prateleira sutil. Sem personalização de biblioteca em v1.
 
+## Decisões 2026-07-06 (Fase 7) — SUPERSEDEM o que estiver abaixo/PRD
+- **Trava anti-spoiler: CORTADA.** Não implementar. Motivo: o caso de quem não está
+  lendo o livro (progresso inexistente) complica demais a regra. Comentário de capítulo
+  aparece para qualquer amigo, sem checar progresso. Fica no backlog se um dia voltar.
+- **Upload de foto: REMOVIDO do produto (backlog futuro).** Sem highlights com foto,
+  sem foto no pós-sessão, sem foto no check-in de desafio. Comentário/nota "Pra não
+  esquecer" é só texto. As tabelas/colunas (`highlights`, `comments.gif_url`,
+  `challenge_checkins.photo_path`, bucket `highlights`) continuam no schema mas não são
+  usadas — não migrar (destrutivo); só não referenciar no código.
+
 ## Modelo de dados
 - Definido em `supabase/schema.sql` — aplicar no SQL editor do Supabase.
 - Conceito genérico **`media_items`** (`type` = `book` | `game`) para os jogos
   entrarem no futuro sem migração.
-- **Trava anti-spoiler:** um comentário de capítulo só aparece se o progresso do leitor
-  (maior `unit_end` nas `sessions` daquele item) for >= o `chapter_ref` do comentário.
-  Implementar na camada de query/app, não só no RLS.
+- ~~**Trava anti-spoiler**~~ — cortada (ver Decisões 2026-07-06 acima).
 
 ## Compartilhar no Instagram Stories
 - **Sistema de um template só:** o mesmo quadro 90s (cabeçalho, formas, rodapé),
@@ -63,7 +71,8 @@ animação, áudio e mecânica de progressão (ainda não implementadas) estão 
 5. **Desafios (GymRats):** criar/entrar por código, check-in por timer ou registro manual
    (foto opcional), feed com reações, ranking opt-in, calendário do desafio, recap.
 6. **Personagem vivo** (pode andar em paralelo — depende de produção de arte, ver MARCA-Quill.md).
-7. **Social ampla:** comentários por nível + trava de spoiler, notas, GIFs, feed, indicar livro.
+7. ✅ **Social ampla:** comentários por nível livro/capítulo (sem trava de spoiler), notas,
+   GIFs (Giphy), estante dos amigos + Meu diário, indicar livro (sino). *(feita 2026-07-07)*
 8. **Compartilhar cards** (Stories) — reaproveita dados das fases anteriores.
 9. **Clube de leitura:** cronograma, progresso coletivo, chat.
 10. **Descoberta** + (futuro) n8n.

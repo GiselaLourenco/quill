@@ -90,7 +90,7 @@ export async function createMediaItem(formData: FormData) {
   redirect("/estante");
 }
 
-const VALID_STATUSES = ["want", "reading", "finished", "abandoned"];
+const VALID_STATUSES = ["want", "reading", "finished", "recomendado", "abandoned"];
 
 export async function updateItemStatus(itemId: string, status: string) {
   if (!VALID_STATUSES.includes(status)) return;

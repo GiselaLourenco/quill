@@ -4,31 +4,6 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 
-export async function createCheckin({
-  groupId,
-  sessionId,
-  photoPath,
-  note,
-}: {
-  groupId: string;
-  sessionId: string;
-  photoPath?: string | null;
-  note?: string | null;
-}) {
-  const userId = await requireUserId();
-  const supabase = await createClient();
-
-  await supabase.from("challenge_checkins").insert({
-    group_id: groupId,
-    session_id: sessionId,
-    user_id: userId,
-    photo_path: photoPath || null,
-    note: note || null,
-  });
-
-  revalidatePath(`/juntos/${groupId}`);
-}
-
 const REACTION_EMOJIS = ["🔥", "👏", "☕", "😮"];
 
 export async function toggleReaction(formData: FormData) {

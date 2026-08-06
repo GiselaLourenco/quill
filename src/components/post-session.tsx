@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import imageCompression from "browser-image-compression";
-import { createClient } from "@/lib/supabase/client";
 import { publishSession, saveSessionMemory } from "@/app/actions/sessions";
 import type { ActiveChallenge } from "@/lib/challenges";
 import { SCORING_METRIC_OPTIONS } from "@/lib/challenges";
@@ -17,11 +15,10 @@ function metricLabel(metric: string) {
 }
 
 // Tela pós-sessão (passo 2 do fluxo de encerramento): celebração + duas seções
-// opcionais — "Pra não esquecer" (vira comentário/highlight do livro) e
+// opcionais — "Pra não esquecer" (vira comentário do livro) e
 // "Publicar nos desafios" (só renderiza pra quem participa de algum).
 export function PostSession({
   sessionId,
-  userId,
   book,
   durationSeconds,
   quantity,
@@ -30,7 +27,6 @@ export function PostSession({
   onDone,
 }: {
   sessionId: string;
-  userId: string;
   book: Book | null;
   durationSeconds: number;
   quantity: number | null;
@@ -39,8 +35,6 @@ export function PostSession({
   onDone: () => void;
 }) {
   const [memoryText, setMemoryText] = useState("");
-  const [imagePath, setImagePath] = useState<string | null>(null);
-  const [photoName, setPhotoName] = useState<string | null>(null);
   const [isPublic, setIsPublic] = useState(false);
   const [checked, setChecked] = useState<Set<string>>(
     () => new Set(challenges.map((c) => c.id)),
@@ -48,7 +42,6 @@ export function PostSession({
   const [pagesExtra, setPagesExtra] = useState("");
   const [showNote, setShowNote] = useState(false);
   const [note, setNote] = useState("");
-  const [isUploading, startUpload] = useTransition();
   const [isSaving, startSave] = useTransition();
 
   const minutes = Math.max(1, Math.round(durationSeconds / 60));
@@ -69,37 +62,12 @@ export function PostSession({
     });
   }
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    startUpload(async () => {
-      try {
-        const compressed = await imageCompression(file, {
-          maxSizeMB: 0.6,
-          maxWidthOrHeight: 1600,
-        });
-        const path = `${userId}/${crypto.randomUUID()}.jpg`;
-        const supabase = createClient();
-        const { error } = await supabase.storage
-          .from("highlights")
-          .upload(path, compressed, { contentType: "image/jpeg" });
-        if (!error) {
-          setImagePath(path);
-          setPhotoName(file.name);
-        }
-      } catch {
-        // foto é opcional — falha não bloqueia o pós-sessão
-      }
-    });
-  }
-
   function handleDone() {
     startSave(async () => {
-      if (book && (memoryText.trim() || imagePath)) {
+      if (book && memoryText.trim()) {
         await saveSessionMemory({
           itemId: book.id,
           text: memoryText,
-          imagePath,
           isPublic,
         });
       }
@@ -153,19 +121,6 @@ export function PostSession({
             rows={3}
             className="block w-full resize-none rounded border-2 border-ink bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-moss-dark"
           />
-          <label className="mt-2 block cursor-pointer rounded border-2 border-cover-border bg-paper px-3 py-2 text-center text-xs font-medium text-ink/70">
-            {isUploading
-              ? "Enviando…"
-              : photoName
-                ? `📷 ${photoName} ✓`
-                : "📷 adicionar foto"}
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="sr-only"
-            />
-          </label>
           <div className="mt-3 flex items-center justify-between border-t-2 border-dashed border-cover-border pt-2.5">
             <span className="text-xs font-semibold">Quem pode ver</span>
             <div className="flex items-center gap-2 text-[11px] font-medium">
@@ -261,7 +216,7 @@ export function PostSession({
       <button
         type="button"
         onClick={handleDone}
-        disabled={isSaving || isUploading}
+        disabled={isSaving}
         className="w-full rounded-md border-2 border-ink bg-coral px-4 py-3 font-display text-sm text-paper shadow-hard disabled:opacity-60"
       >
         {isSaving ? "Salvando…" : "Concluir"}

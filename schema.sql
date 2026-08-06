@@ -344,6 +344,24 @@ create policy "send rec" on public.recommendations for insert to authenticated
 create policy "update received rec" on public.recommendations for update
   using (to_user_id = auth.uid());
 
+-- ------------------------------------------------------------
+-- FASE 7 (social): amigos leem itens/sessões uns dos outros
+-- (migration friends_read_items_and_sessions). ratings já é legível por
+-- todos os autenticados; comentários públicos idem (is_public=true).
+-- ------------------------------------------------------------
+create or replace function public.are_friends(a uuid, b uuid)
+returns boolean language sql security definer set search_path = public stable as $$
+  select exists (
+    select 1 from public.friendships f
+    where f.status = 'accepted'
+      and ((f.user_id = a and f.friend_id = b) or (f.user_id = b and f.friend_id = a))
+  );
+$$;
+create policy "friends read items" on public.media_items for select to authenticated
+  using (public.are_friends(auth.uid(), user_id));
+create policy "friends read sessions" on public.sessions for select to authenticated
+  using (public.are_friends(auth.uid(), user_id));
+
 -- ============================================================
 -- STORAGE (buckets + policies; arquivos organizados por pasta = user_id)
 -- ============================================================

@@ -64,6 +64,14 @@ body {
   box-shadow: 2px 2px 0 0 var(--color-cover-border);
 }
 
+/* Esconde a barra de rolagem (filtros horizontais da estante). */
+.scrollbar-hide {
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 .cover-card::before {
   content: "";
   position: absolute;
