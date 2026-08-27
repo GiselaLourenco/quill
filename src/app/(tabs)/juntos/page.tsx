@@ -3,6 +3,13 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 import { joinChallengeByCode } from "@/app/actions/groups";
 import { computeScores, daysRemaining, periodProgress } from "@/lib/challenges";
+import { BookCoverLovable } from "@/components/book-cover-lovable";
+import {
+  desafiosAtivos,
+  desafiosEncerrados,
+  type Desafio,
+  type MembroDesafio,
+} from "@/lib/mock-desafios";
 
 type GroupRow = {
   id: string;
@@ -12,6 +19,133 @@ type GroupRow = {
   starts_at: string | null;
   ends_at: string | null;
 };
+
+/* ---------- helpers ---------- */
+
+const SOMBRA: Record<Desafio["acentoSombra"], string> = {
+  navy: "shadow-[6px_6px_0_0_var(--color-navy)]",
+  moss: "shadow-[6px_6px_0_0_var(--color-moss)]",
+  mustard: "shadow-[6px_6px_0_0_var(--color-mustard)]",
+  coral: "shadow-[6px_6px_0_0_var(--color-coral)]",
+};
+
+const SOMBRA_CAPA: Record<Desafio["acentoCapa"], string> = {
+  mustard: "shadow-[4px_4px_0_0_var(--color-mustard)]",
+  navy: "shadow-[4px_4px_0_0_var(--color-navy)]",
+  coral: "shadow-[4px_4px_0_0_var(--color-coral)]",
+  moss: "shadow-[4px_4px_0_0_var(--color-moss)]",
+};
+
+const BARRA_FILL: Record<Desafio["acentoBarra"], string> = {
+  moss: "bg-moss",
+  coral: "bg-coral",
+  mustard: "bg-mustard",
+  navy: "bg-navy",
+};
+
+const BARRA_TEXTO: Record<Desafio["acentoBarra"], string> = {
+  moss: "text-moss",
+  coral: "text-coral",
+  mustard: "text-mustard",
+  navy: "text-navy",
+};
+
+const MEMBRO_BG: Record<MembroDesafio["cor"], string> = {
+  coral: "bg-coral text-paper",
+  moss: "bg-moss text-paper",
+  mustard: "bg-mustard text-ink",
+  navy: "bg-navy text-paper",
+  "cover-1": "bg-cover-1 text-ink",
+  "cover-2": "bg-cover-2 text-ink",
+  "cover-3": "bg-cover-3 text-ink",
+  "cover-4": "bg-cover-4 text-paper",
+};
+
+/* ---------- card ---------- */
+
+function DesafioCard({ desafio }: { desafio: Desafio }) {
+  const progresso =
+    desafio.diasTotais === 0
+      ? 0
+      : Math.min(100, Math.round((desafio.diasDecorridos / desafio.diasTotais) * 100));
+  const diasRestantes = Math.max(0, desafio.diasTotais - desafio.diasDecorridos);
+
+  return (
+    <article className={`relative border-2 border-ink bg-paper ${SOMBRA[desafio.acentoSombra]}`}>
+      {desafio.destaqueTexto && (
+        <span className="absolute -top-3 -right-2 rotate-2 border-2 border-ink bg-coral px-3 py-1 font-display text-[10px] uppercase tracking-wider text-paper">
+          {desafio.destaqueTexto}
+        </span>
+      )}
+
+      <div className="flex gap-4 p-4">
+        {desafio.livro && (
+          <div className={SOMBRA_CAPA[desafio.acentoCapa]}>
+            <BookCoverLovable livro={desafio.livro} size="md" />
+          </div>
+        )}
+
+        <div className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
+          <div>
+            <h3 className="font-serif text-[19px] font-black italic leading-tight text-ink">
+              {desafio.emoji} {desafio.nome}
+            </h3>
+            <p className="mt-1 font-display text-[9px] uppercase tracking-widest text-ink/60">
+              {desafio.clube}
+            </p>
+
+            <div className="mt-3 flex -space-x-2">
+              {desafio.membros.map((m) => (
+                <span
+                  key={m.id}
+                  className={`flex h-7 w-7 items-center justify-center rounded-full border-2 border-ink text-[10px] font-black ${MEMBRO_BG[m.cor]}`}
+                >
+                  {m.inicial}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {desafio.cta === "participar" ? (
+            <button className="mt-4 w-full border-2 border-ink bg-ink py-2 font-display text-xs uppercase tracking-widest text-paper active:translate-x-[1px] active:translate-y-[1px]">
+              Participar
+            </button>
+          ) : (
+            <div className="mt-4">
+              <div className="mb-1 flex items-end justify-between">
+                <span className="font-display text-[9px] uppercase tracking-wider text-ink">
+                  {diasRestantes}d restantes
+                </span>
+                <span className={`font-display text-[11px] ${BARRA_TEXTO[desafio.acentoBarra]}`}>
+                  {progresso}%
+                </span>
+              </div>
+              <div className="h-4 w-full border-2 border-ink bg-paper">
+                <div
+                  className={`h-full ${BARRA_FILL[desafio.acentoBarra]}`}
+                  style={{ width: `${progresso}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {desafio.cta !== "participar" && (
+        <div className="flex items-center justify-between border-t-2 border-ink bg-paper px-4 py-2">
+          <span className="font-display text-[10px] uppercase tracking-widest text-ink">
+            {desafio.minhaPosicao > 0
+              ? `${desafio.minhaPosicao}º de ${desafio.totalMembros}`
+              : `${desafio.totalMembros} membros`}
+          </span>
+          <span className="truncate pl-3 text-[11px] italic text-ink-soft">
+            {desafio.ultimaAtividade}
+          </span>
+        </div>
+      )}
+    </article>
+  );
+}
 
 export default async function JuntosPage({
   searchParams,
@@ -40,10 +174,7 @@ export default async function JuntosPage({
   const challengeCards = await Promise.all(
     active.map(async (g) => {
       const [{ data: members }, { data: checkins }] = await Promise.all([
-        supabase
-          .from("group_members")
-          .select("user_id, competes")
-          .eq("group_id", g.id),
+        supabase.from("group_members").select("user_id, competes").eq("group_id", g.id),
         supabase
           .from("challenge_checkins")
           .select(
@@ -54,10 +185,7 @@ export default async function JuntosPage({
 
       const memberIds = (members ?? []).map((m) => m.user_id);
       const { data: profiles } = memberIds.length
-        ? await supabase
-            .from("profiles")
-            .select("id, display_name")
-            .in("id", memberIds)
+        ? await supabase.from("profiles").select("id, display_name").in("id", memberIds)
         : { data: [] as { id: string; display_name: string | null }[] };
       const nameById = new Map((profiles ?? []).map((p) => [p.id, p.display_name]));
 
@@ -85,108 +213,169 @@ export default async function JuntosPage({
   );
 
   return (
-    <>
-      <header className="flex items-center justify-between border-b-2 border-ink bg-white px-4 py-3">
-        <span className="font-serif text-lg">Juntos</span>
+    <div className="min-h-full bg-paper px-4 pt-5 pb-8">
+      {/* Header */}
+      <header className="mb-6 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="font-display text-3xl uppercase leading-none text-ink">Juntos</h1>
+          <p className="mt-2 text-[13px] font-medium text-ink/75">
+            Desafios coletivos e clubes de leitura
+          </p>
+        </div>
         <Link
           href="/juntos/novo"
-          className="rounded border-2 border-ink bg-navy px-3 py-1.5 text-xs font-medium text-paper"
+          aria-label="Criar desafio"
+          className="flex h-11 w-11 shrink-0 items-center justify-center border-2 border-ink bg-mustard font-display text-2xl leading-none text-ink shadow-hard-sm active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
         >
-          + Criar desafio
+          +
         </Link>
       </header>
-      <main className="mx-auto w-full max-w-sm flex-1 px-4 py-6">
-        {error && <p className="mb-4 text-sm font-medium text-coral">{error}</p>}
 
-        <div className="flex flex-col gap-3">
-          {challengeCards.map(({ group, members, myRank }) => {
-            const remaining = daysRemaining(group.ends_at);
-            const progress = periodProgress(group.starts_at, group.ends_at);
-            return (
-              <Link
-                key={group.id}
-                href={`/juntos/${group.id}`}
-                className="block rounded-md border-2 border-navy px-3 py-3 shadow-hard-sm"
-              >
+      {error && <p className="mb-4 text-sm font-medium text-coral">{error}</p>}
+
+      {/* Entrar com código */}
+      <CodigoInput />
+
+      {/* Desafios do Lovable (mock) */}
+      {desafiosAtivos.length > 0 && (
+        <ul className="mt-6 space-y-7">
+          {desafiosAtivos.map((d) => (
+            <li key={d.id}>
+              {d.cta === "participar" ? (
+                <DesafioCard desafio={d} />
+              ) : (
+                <Link
+                  href={`/juntos/${d.id}`}
+                  className="block active:translate-x-[1px] active:translate-y-[1px]"
+                >
+                  <DesafioCard desafio={d} />
+                </Link>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Desafios reais do Supabase */}
+      {challengeCards.length > 0 && (
+        <>
+          <h2 className="mt-8 mb-3 font-display text-[11px] uppercase tracking-widest text-ink-soft">
+            Seus desafios
+          </h2>
+          <div className="flex flex-col gap-3">
+            {challengeCards.map(({ group, members, myRank }) => {
+              const remaining = daysRemaining(group.ends_at);
+              const progress = periodProgress(group.starts_at, group.ends_at);
+              return (
+                <Link
+                  key={group.id}
+                  href={`/juntos/${group.id}`}
+                  className="block rounded-md border-2 border-navy px-3 py-3 shadow-hard-sm"
+                >
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-serif text-base font-semibold">
+                      {group.emoji} {group.name}
+                    </h3>
+                    {remaining !== null && (
+                      <span className="rounded-full border-2 border-ink px-2 py-0.5 text-[10px] font-medium">
+                        {remaining} dias restantes
+                      </span>
+                    )}
+                  </div>
+                  <div className="my-2 h-1.5 overflow-hidden rounded-full border border-cover-border bg-white">
+                    <div className="h-full bg-mustard" style={{ width: `${progress}%` }} />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex">
+                      {members.slice(0, 5).map((m, i) => (
+                        <div
+                          key={m.user_id}
+                          className="-ml-2 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-coral text-[10px] font-semibold text-paper first:ml-0"
+                          style={{ zIndex: 5 - i }}
+                        >
+                          {m.display_name?.[0]?.toUpperCase() ?? "?"}
+                        </div>
+                      ))}
+                    </div>
+                    {myRank && (
+                      <span className="text-xs font-bold text-navy">
+                        Você está em {myRank}º ›
+                      </span>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
+
+            {ended.map((g) => (
+              <div key={g.id} className="rounded-md border-2 border-cover-border px-3 py-3 opacity-75">
                 <div className="flex items-center justify-between">
                   <h3 className="font-serif text-base font-semibold">
-                    {group.emoji} {group.name}
+                    {g.emoji} {g.name}
                   </h3>
-                  {remaining !== null && (
-                    <span className="rounded-full border-2 border-ink px-2 py-0.5 text-[10px] font-medium">
-                      {remaining} dias restantes
-                    </span>
-                  )}
+                  <span className="text-[10.5px] text-ink/60">encerrado</span>
                 </div>
-                <div className="my-2 h-1.5 overflow-hidden rounded-full border border-cover-border bg-white">
-                  <div
-                    className="h-full bg-mustard"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex">
-                    {members.slice(0, 5).map((m, i) => (
-                      <div
-                        key={m.user_id}
-                        className="-ml-2 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-coral text-[10px] font-semibold text-paper first:ml-0"
-                        style={{ zIndex: 5 - i }}
-                      >
-                        {m.display_name?.[0]?.toUpperCase() ?? "?"}
-                      </div>
-                    ))}
-                  </div>
-                  {myRank && (
-                    <span className="text-xs font-bold text-navy">
-                      Você está em {myRank}º ›
-                    </span>
-                  )}
-                </div>
-              </Link>
-            );
-          })}
-
-          {ended.map((g) => (
-            <div key={g.id} className="rounded-md border-2 border-cover-border px-3 py-3 opacity-75">
-              <div className="flex items-center justify-between">
-                <h3 className="font-serif text-base font-semibold">
-                  {g.emoji} {g.name}
-                </h3>
-                <span className="text-[10.5px] text-ink/60">encerrado</span>
+                <Link href={`/juntos/${g.id}`} className="mt-1.5 block text-xs text-moss-dark">
+                  ver detalhes ›
+                </Link>
               </div>
-              <Link href={`/juntos/${g.id}`} className="mt-1.5 block text-xs text-moss-dark">
-                ver detalhes ›
-              </Link>
-            </div>
-          ))}
-
-          {challenges.length === 0 && (
-            <p className="text-sm text-ink/65">
-              Você ainda não participa de nenhum desafio.
-            </p>
-          )}
-        </div>
-
-        <form
-          action={joinChallengeByCode}
-          className="mt-4 rounded-md border-2 border-cover-border bg-white/60 px-3 py-3"
-        >
-          <h3 className="mb-2 font-serif text-sm font-semibold">Tem um convite?</h3>
-          <div className="flex gap-2">
-            <input
-              name="code"
-              placeholder="CÓDIGO"
-              className="flex-1 rounded border-2 border-ink bg-white px-3 py-2 text-sm uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-moss-dark"
-            />
-            <button
-              type="submit"
-              className="rounded border-2 border-ink bg-moss-dark px-4 text-sm font-medium text-paper"
-            >
-              Entrar
-            </button>
+            ))}
           </div>
-        </form>
-      </main>
-    </>
+        </>
+      )}
+
+      {/* Desafios encerrados (mock) */}
+      {desafiosEncerrados.length > 0 && (
+        <section className="mt-10">
+          <h2 className="mb-3 font-display text-[11px] uppercase tracking-widest text-ink-soft">
+            Encerrados
+          </h2>
+          <ul className="space-y-3">
+            {desafiosEncerrados.map((d) => (
+              <li
+                key={d.id}
+                className="flex items-center justify-between border-2 border-ink bg-paper px-3 py-2 opacity-80"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-serif text-sm font-bold italic text-ink">
+                    {d.emoji} {d.nome}
+                  </p>
+                  <p className="text-[11px] text-ink-soft">
+                    🏆 {d.vencedor} · {d.recap}
+                  </p>
+                </div>
+                <button className="shrink-0 border-2 border-ink bg-paper px-2 py-1 font-display text-[9px] uppercase tracking-widest text-ink">
+                  Recap
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function CodigoInput() {
+  return (
+    <form action={joinChallengeByCode}>
+      <label className="mb-2 block font-display text-[10px] uppercase tracking-widest text-ink-soft">
+        Entrar com código
+      </label>
+      <div className="flex items-stretch gap-2">
+        <input
+          name="code"
+          placeholder="6 caracteres"
+          maxLength={6}
+          className="flex-1 border-2 border-ink bg-paper px-3 py-3 font-mono text-sm uppercase tracking-[0.3em] text-ink shadow-hard-sm placeholder:text-ink/30 focus:outline-none focus:shadow-hard"
+        />
+        <button
+          type="submit"
+          className="border-2 border-ink bg-ink px-4 font-display text-xs uppercase tracking-widest text-paper shadow-hard-sm active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+        >
+          Entrar
+        </button>
+      </div>
+    </form>
   );
 }

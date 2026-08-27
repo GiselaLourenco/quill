@@ -1,204 +1,480 @@
+"use client";
+
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
-import { requireUserId } from "@/lib/supabase/auth";
-import { SiteHeader } from "@/components/site-header";
-import { HeatmapGrid } from "@/components/heatmap-grid";
-import {
-  computeStreak,
-  computePagesPerDay,
-  computeMinutesPerDay,
-  computeFocusRate,
-  computeChaptersPerWeek,
-  computeBestTimeOfDay,
-  computeSpeedPagesPerHour,
-  computeMaxSessionPages,
-  computeDailyMinutes,
-  dateRange,
-  goalProgress,
-  type SessionRow,
-} from "@/lib/gamification";
-import { DEFAULT_PILLS, isPillKey, pillDisplay, type PillStats } from "@/lib/pills";
+import { useMemo, useState } from "react";
 
-export default async function QuillHomePage() {
-  const userId = await requireUserId();
-  const supabase = await createClient();
+/* ------------------------------------------------------------------ */
+/*  Mock data                                                          */
+/* ------------------------------------------------------------------ */
 
-  const now = new Date();
-  const today = now.toISOString().slice(0, 10);
-  const fourteenDaysAgo = new Date(now.getTime() - 13 * 86_400_000)
-    .toISOString()
-    .slice(0, 10);
-  const year = now.getFullYear();
+const user = { nome: "Gisela", data: "sexta, 4 de julho" };
+const hoje = { lidos: 38, meta: 45 };
 
-  const [
-    { data: profile },
-    { data: sessions },
-    { count: booksFinished },
-    { count: finishedThisYear },
-    { data: goals },
-  ] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("display_name, metrics_prefs")
-      .eq("id", userId)
-      .single(),
-    supabase
-      .from("sessions")
-      .select(
-        "started_at, duration_seconds, unit_start, unit_end, chapter_start, chapter_end, quality_tags, item_id",
-      ),
-    supabase
-      .from("media_items")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "finished"),
-    supabase
-      .from("media_items")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "finished")
-      .gte("finished_at", `${year}-01-01`)
-      .lte("finished_at", `${year}-12-31`),
-    supabase
-      .from("goals")
-      .select("id, type, target_value, period_start, period_end")
-      .limit(2),
-  ]);
+const semana = [
+  { d: "S", min: 42 },
+  { d: "D", min: 68 },
+  { d: "S", min: 22 },
+  { d: "T", min: 95 },
+  { d: "Q", min: 60 },
+  { d: "Q", min: 8 },
+  { d: "S", min: 38, hoje: true },
+];
 
-  const sessionRows = (sessions ?? []) as SessionRow[];
+const mesInfo = { nome: "Julho", ano: 2026, diasNoMes: 31, primeiroDiaSemana: 3, hoje: 4 };
+const diasComLeitura = new Set([1, 2, 3, 4]);
+const diasDestaque = new Set([2]);
 
-  const stats: PillStats = {
-    streak: computeStreak(sessionRows),
-    pagesPerDay: computePagesPerDay(sessionRows),
-    minutesPerDay: computeMinutesPerDay(sessionRows),
-    booksFinished: booksFinished ?? 0,
-    focusRate: computeFocusRate(sessionRows),
-    chaptersPerWeek: computeChaptersPerWeek(sessionRows),
-    bestTime: computeBestTimeOfDay(sessionRows),
-    speedPagesPerHour: computeSpeedPagesPerHour(sessionRows),
-    maxSessionPages: computeMaxSessionPages(sessionRows),
-  };
+type MetaTipo = "minutos" | "paginas" | "livros";
+type MetaAtiva = {
+  tipo: MetaTipo;
+  label: string;
+  atual: number;
+  total: number;
+  unidade: string;
+  periodo: string;
+};
 
-  const rawPrefs = Array.isArray(profile?.metrics_prefs)
-    ? (profile!.metrics_prefs as string[])
-    : [];
-  const selectedPills = (rawPrefs.filter(isPillKey).length > 0
-    ? rawPrefs.filter(isPillKey)
-    : DEFAULT_PILLS
-  ) as (typeof DEFAULT_PILLS)[number][];
+const metasAtivas: MetaAtiva[] = [
+  { tipo: "minutos", label: "Minutos hoje", atual: 38, total: 45, unidade: "min", periodo: "hoje" },
+  { tipo: "paginas", label: "Páginas hoje", atual: 23, total: 30, unidade: "pág", periodo: "hoje" },
+  { tipo: "livros",  label: "Livros no ano", atual: 11, total: 24, unidade: "livros", periodo: "2026" },
+];
 
-  const dailyMinutes = computeDailyMinutes(sessionRows, fourteenDaysAgo, today);
-  const heatDays = dateRange(fourteenDaysAgo, today).map((date) => ({
-    date,
-    minutes: dailyMinutes.get(date) ?? 0,
-  }));
+type Desafio = {
+  id: string;
+  nome: string;
+  posicao: string;
+  totalParticipantes: number;
+  diasRestantes: number;
+  progresso: number;
+  tone: "coral" | "moss" | "mustard";
+};
 
-  const goalCtx = {
-    sessions: sessionRows,
-    pagesPerDay: stats.pagesPerDay,
-    minutesPerDay: stats.minutesPerDay,
-    finishedThisYear: finishedThisYear ?? 0,
-  };
+const desafios: Desafio[] = [
+  { id: "ferias",  nome: "Férias Literárias", posicao: "2º", totalParticipantes: 8,  diasRestantes: 27, progresso: 62, tone: "coral" },
+  { id: "clube",   nome: "Clube das Cinco",   posicao: "1º", totalParticipantes: 5,  diasRestantes: 12, progresso: 78, tone: "moss" },
+  { id: "maratona",nome: "Maratona Sci-Fi",   posicao: "4º", totalParticipantes: 12, diasRestantes: 41, progresso: 35, tone: "mustard" },
+];
+
+type PilulaTone = "coral" | "paper" | "mustard" | "moss" | "navy";
+type Pilula = {
+  id: string;
+  label: string;
+  valor: string;
+  unidade: string;
+  tone: PilulaTone;
+};
+
+const PILULAS: Pilula[] = [
+  { id: "sequencia",   label: "Sequência",  valor: "12",   unidade: "dias",     tone: "moss" },
+  { id: "media-dia",   label: "Média/dia",  valor: "23",   unidade: "pág",      tone: "paper" },
+  { id: "velocidade",  label: "Velocidade", valor: "31",   unidade: "p/h",      tone: "navy" },
+  { id: "min-semana",  label: "Semana",     valor: "3h42", unidade: "lidas",    tone: "paper" },
+  { id: "livros-mes",  label: "Livros/mês", valor: "2",    unidade: "no jul",   tone: "mustard" },
+  { id: "melhor-hora", label: "Melhor hora",valor: "22h",  unidade: "pico",     tone: "coral" },
+];
+
+/* ------------------------------------------------------------------ */
+/*  Página                                                             */
+/* ------------------------------------------------------------------ */
+
+export default function HomePage() {
+  return (
+    <div className="flex flex-col gap-5 px-5 pb-8 pt-6">
+      <Header />
+      <MetasHero />
+      <PilulasGrid />
+      <CalendarioCard />
+      <DesafiosCard />
+      <CompartilharBtn />
+    </div>
+  );
+}
+
+/* ---------- Header ------------------------------------------------- */
+
+function Header() {
+  return (
+    <header className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <h1 className="font-serif text-3xl italic font-bold leading-tight text-ink underline decoration-mustard decoration-4 underline-offset-4">
+          Olá, {user.nome}
+        </h1>
+        <p className="mt-1 text-[11px] font-semibold uppercase tracking-widest text-ink/60">
+          {user.data}
+        </p>
+      </div>
+      <div className="shrink-0">
+        <div className="shadow-hard-sm relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-2 border-ink bg-coral">
+          <span className="text-2xl" aria-hidden>📖</span>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+/* ---------- Metas -------------------------------------------------- */
+
+const TONE_META: Record<MetaTipo, { bg: string; ring: string; accent: string }> = {
+  minutos: { bg: "bg-moss",   ring: "var(--color-mustard)", accent: "text-mustard" },
+  paginas: { bg: "bg-navy",   ring: "var(--color-coral)",   accent: "text-coral" },
+  livros:  { bg: "bg-coral",  ring: "var(--color-ink)",     accent: "text-ink" },
+};
+
+function MetasHero() {
+  const [ativa, setAtiva] = useState<MetaTipo>("minutos");
+  const m = metasAtivas.find((x) => x.tipo === ativa) ?? metasAtivas[0];
+  const pct = Math.min(100, Math.round((m.atual / m.total) * 100));
+  const t = TONE_META[m.tipo];
+  const restante = Math.max(0, m.total - m.atual);
+  const escuro = m.tipo !== "livros";
 
   return (
-    <>
-      <SiteHeader displayName={profile?.display_name ?? null} />
-      <main className="mx-auto w-full max-w-sm flex-1 px-4 py-6">
-        <div className="mb-3 flex items-center justify-between">
-          <span className="text-sm text-ink/65">Seu progresso de leitura</span>
-          <Link
-            href="/personalizar"
-            className="text-[11.5px] font-medium text-moss-dark"
-          >
-            Personalizar
-          </Link>
+    <section aria-label="Suas metas" className="space-y-3">
+      <div className={`shadow-hard relative overflow-hidden rounded-2xl border-2 border-ink p-5 ${t.bg} ${escuro ? "text-paper" : "text-ink"}`}>
+        <div className={`pointer-events-none absolute -right-6 -top-6 h-24 w-24 rotate-12 border-2 ${escuro ? "border-paper/20" : "border-ink/15"}`} />
+
+        <div className="relative z-10 flex items-center gap-4">
+          <ProgressoAnel pct={pct} ring={t.ring} escuro={escuro} />
+          <div className="min-w-0 flex-1">
+            <p className={`font-display text-[10px] uppercase tracking-widest ${escuro ? "text-paper/70" : "text-ink/60"}`}>
+              {m.label} · {m.periodo}
+            </p>
+            <p className="mt-1 font-display text-3xl leading-none">
+              {m.atual}
+              <span className={`ml-1 font-serif text-base italic ${t.accent}`}>
+                /{m.total} {m.unidade}
+              </span>
+            </p>
+            <p className={`mt-2 font-serif text-[12px] italic ${escuro ? "text-paper/90" : "text-ink/70"}`}>
+              {pct >= 100 ? "meta batida — bora dobrar? 🔥" : `faltam ${restante} ${m.unidade} pra bater`}
+            </p>
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          {selectedPills.map((key) => {
-            const { value, label } = pillDisplay(key, stats);
+        <div className={`relative z-10 mt-4 grid grid-cols-3 gap-1.5 rounded-full border-2 border-ink p-1 ${escuro ? "bg-ink/30" : "bg-paper/60"}`}>
+          {metasAtivas.map((x) => {
+            const on = x.tipo === ativa;
             return (
-              <div
-                key={key}
-                className="rounded-md border-2 border-cover-border py-3 text-center"
+              <button
+                key={x.tipo}
+                type="button"
+                onClick={() => setAtiva(x.tipo)}
+                aria-pressed={on}
+                className={`rounded-full py-1.5 font-display text-[10px] uppercase tracking-tight transition-colors ${
+                  on ? "bg-paper text-ink" : escuro ? "text-paper/80" : "text-ink/70"
+                }`}
               >
-                <div className="font-serif text-lg font-semibold">{value}</div>
-                <div className="text-[10.5px] text-ink/65">{label}</div>
-              </div>
+                {x.tipo === "minutos" ? "Minutos" : x.tipo === "paginas" ? "Páginas" : "Livros"}
+              </button>
             );
           })}
         </div>
+      </div>
+    </section>
+  );
+}
 
-        <section className="mt-5">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-sm font-medium">Calendário</span>
-            <Link href="/calendario" className="text-[11.5px] font-medium text-moss-dark">
-              ver completo
-            </Link>
-          </div>
-          <HeatmapGrid days={heatDays} todayKey={today} />
-        </section>
+function ProgressoAnel({ pct, ring, escuro }: { pct: number; ring: string; escuro: boolean }) {
+  const size = 84;
+  const stroke = 8;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const off = c - (Math.min(100, pct) / 100) * c;
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} stroke={escuro ? "var(--color-paper)" : "var(--color-ink)"} strokeOpacity="0.2" strokeWidth={stroke} fill="none" />
+        <circle cx={size / 2} cy={size / 2} r={r} stroke={ring} strokeWidth={stroke} strokeLinecap="butt" fill="none" strokeDasharray={c} strokeDashoffset={off} />
+      </svg>
+      <div className="absolute inset-1.5 flex items-center justify-center overflow-hidden rounded-full border-2 border-ink bg-paper">
+        <span className="text-2xl" aria-hidden>{pct >= 100 ? "🎉" : "📖"}</span>
+      </div>
+    </div>
+  );
+}
 
-        <section className="mt-5">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-sm font-medium">Metas</span>
-            <Link href="/metas" className="text-[11.5px] font-medium text-moss-dark">
-              ver todas
-            </Link>
-          </div>
-          {goals && goals.length > 0 ? (
-            <div className="flex flex-col gap-2">
-              {goals.map((g) => {
-                const progress = goalProgress(g, goalCtx);
-                return (
-                  <div
-                    key={g.id}
-                    className="rounded-md border-2 border-cover-border px-3 py-2.5"
-                  >
-                    <div className="mb-1.5 flex justify-between text-xs">
-                      <span>{progress.label}</span>
-                      <span className="text-ink/65">
-                        {progress.current} / {g.target_value}
-                      </span>
-                    </div>
-                    <div className="h-1.5 overflow-hidden rounded-full border border-cover-border bg-white">
-                      <div
-                        className="h-full bg-moss-dark"
-                        style={{ width: `${progress.percent}%` }}
-                      />
-                    </div>
-                    {progress.dailyTargetLabel && (
-                      <div className="mt-1.5 text-[10.5px] text-ink/60">
-                        {progress.dailyTargetLabel}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+/* ---------- Pílulas ------------------------------------------------ */
+
+const TONE_BG: Record<PilulaTone, string> = {
+  coral: "bg-coral text-ink",
+  paper: "bg-paper text-ink",
+  mustard: "bg-mustard text-ink",
+  moss: "bg-moss text-paper",
+  navy: "bg-navy text-paper",
+};
+
+function PilulasGrid() {
+  const [expandido, setExpandido] = useState(false);
+  const visiveis = expandido ? PILULAS : PILULAS.slice(0, 4);
+  return (
+    <section aria-label="Suas estatísticas" className="space-y-2">
+      <div className="flex items-baseline justify-between">
+        <h3 className="font-display text-sm uppercase tracking-tight text-ink">
+          Seus números
+        </h3>
+        <button
+          type="button"
+          onClick={() => setExpandido((v) => !v)}
+          className="text-[11px] font-bold uppercase tracking-widest text-ink/60 underline underline-offset-2 hover:text-ink"
+        >
+          {expandido ? "menos" : `ver todas (${PILULAS.length})`}
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {visiveis.map((p) => (
+          <PilulaCard key={p.id} p={p} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function PilulaCard({ p }: { p: Pilula }) {
+  const dark = p.tone === "moss" || p.tone === "navy";
+  return (
+    <div className={`shadow-hard-sm rounded-xl border-2 border-ink p-3 ${TONE_BG[p.tone]}`}>
+      <p className={`font-display text-[10px] uppercase leading-none ${dark ? "text-paper/70" : "text-ink/60"}`}>
+        {p.label}
+      </p>
+      <div className="mt-2 flex items-baseline gap-1">
+        <span className="font-display text-2xl leading-none">{p.valor}</span>
+        <span className={`text-[10px] font-bold uppercase ${dark ? "text-paper/70" : "text-ink/60"}`}>
+          {p.unidade}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Calendário --------------------------------------------- */
+
+type Vista = "semana" | "mes";
+
+function CalendarioCard() {
+  const [vista, setVista] = useState<Vista>("semana");
+  const totalDias = diasComLeitura.size;
+  return (
+    <section className="shadow-hard overflow-hidden rounded-2xl border-2 border-ink bg-paper">
+      <div className="grid grid-cols-2 border-b-2 border-ink">
+        <button
+          type="button"
+          onClick={() => setVista("semana")}
+          className={`py-3 font-display text-[11px] uppercase tracking-widest transition-colors ${
+            vista === "semana" ? "bg-ink text-paper" : "bg-paper text-ink/50"
+          }`}
+          aria-pressed={vista === "semana"}
+        >
+          Semana
+        </button>
+        <button
+          type="button"
+          onClick={() => setVista("mes")}
+          className={`border-l-2 border-ink py-3 font-display text-[11px] uppercase tracking-widest transition-colors ${
+            vista === "mes" ? "bg-ink text-paper" : "bg-paper text-ink/50"
+          }`}
+          aria-pressed={vista === "mes"}
+        >
+          Mês
+        </button>
+      </div>
+
+      <div className="p-4">
+        {vista === "semana" ? <VistaSemana /> : <VistaMes />}
+
+        <p className="mt-4 text-center font-serif text-[11px] italic text-ink/70">
+          {vista === "semana" ? (
+            <>
+              3h42 lidas · <span className="font-bold not-italic text-moss">+18% esta semana</span>
+            </>
           ) : (
-            <Link
-              href="/metas"
-              className="block rounded-md border-2 border-dashed border-cover-border px-3 py-3 text-center text-xs text-ink/65"
-            >
-              Criar sua primeira meta
-            </Link>
+            <>
+              {totalDias} dias lidos em {mesInfo.nome} · <span className="font-bold not-italic text-moss">recorde: 21 dias seguidos</span>
+            </>
           )}
-        </section>
+        </p>
+      </div>
+    </section>
+  );
+}
 
-        <section className="mt-5 flex gap-2">
-          <Link
-            href="/retrospectiva"
-            className="flex-1 rounded-md border-2 border-ink bg-navy px-4 py-3 text-center font-display text-xs text-paper shadow-hard-sm"
-          >
-            Ver retrospectiva
-          </Link>
-          <Link
-            href="/conquistas"
-            className="flex-1 rounded-md border-2 border-ink bg-mustard px-4 py-3 text-center font-display text-xs text-ink shadow-hard-sm"
-          >
-            Conquistas
-          </Link>
-        </section>
-      </main>
+function VistaSemana() {
+  const max = useMemo(() => Math.max(...semana.map((s) => s.min)), []);
+  return (
+    <>
+      <div className="flex items-end justify-between gap-2 h-24">
+        {semana.map((s, i) => {
+          const h = Math.max(6, Math.round((s.min / max) * 96));
+          return (
+            <div key={i} className="flex flex-1 flex-col items-center gap-1.5">
+              <div
+                className={`w-full border-2 border-ink ${s.hoje ? "bg-coral" : "bg-moss/70"}`}
+                style={{ height: `${h}px` }}
+                aria-label={`${s.d}: ${s.min} minutos`}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-2 flex justify-between text-[10px] font-bold uppercase text-ink/60">
+        {semana.map((s, i) => (
+          <span key={i} className={s.hoje ? "text-coral" : ""}>{s.d}</span>
+        ))}
+      </div>
     </>
+  );
+}
+
+function VistaMes() {
+  const cells: Array<number | null> = [];
+  for (let i = 0; i < mesInfo.primeiroDiaSemana; i++) cells.push(null);
+  for (let d = 1; d <= mesInfo.diasNoMes; d++) cells.push(d);
+  const labels = ["D", "S", "T", "Q", "Q", "S", "S"];
+
+  return (
+    <div>
+      <div className="mb-2 flex items-baseline justify-between">
+        <h4 className="font-display text-base uppercase text-ink">
+          {mesInfo.nome}
+        </h4>
+        <span className="text-[10px] font-bold uppercase text-ink/50">{mesInfo.ano}</span>
+      </div>
+      <div className="mb-1 grid grid-cols-7 gap-1 text-center text-[9px] font-bold uppercase text-ink/40">
+        {labels.map((l, i) => (
+          <span key={i}>{l}</span>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {cells.map((d, i) => {
+          if (d === null) return <div key={i} className="aspect-square" />;
+          const leu = diasComLeitura.has(d);
+          const destaque = diasDestaque.has(d);
+          const eHoje = d === mesInfo.hoje;
+          return (
+            <div
+              key={i}
+              className={[
+                "relative flex aspect-square items-center justify-center border-2 border-ink font-display text-[11px]",
+                leu
+                  ? destaque
+                    ? "bg-moss text-paper"
+                    : "bg-moss/40 text-ink"
+                  : "bg-paper text-ink/60",
+                eHoje ? "shadow-[0_0_0_2px_var(--color-coral)]" : "",
+              ].join(" ")}
+              aria-label={`Dia ${d}${leu ? ", com leitura" : ""}`}
+            >
+              {d}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Desafios ----------------------------------------------- */
+
+const TONE_DESAFIO = {
+  coral: { bg: "bg-coral", title: "text-paper", chip: "bg-ink text-paper", accent: "bg-mustard" },
+  moss: { bg: "bg-moss", title: "text-paper", chip: "bg-paper text-ink", accent: "bg-mustard" },
+  mustard: { bg: "bg-mustard", title: "text-ink", chip: "bg-ink text-paper", accent: "bg-coral" },
+} as const;
+
+function DesafiosCard() {
+  const [ativo, setAtivo] = useState(desafios[0].id);
+  const d = desafios.find((x) => x.id === ativo) ?? desafios[0];
+  const t = TONE_DESAFIO[d.tone];
+
+  return (
+    <section aria-label="Meus desafios" className="space-y-2">
+      <div className="flex items-baseline justify-between">
+        <h3 className="font-display text-sm uppercase tracking-tight text-ink">
+          Meus desafios
+        </h3>
+        <span className="text-[11px] font-bold uppercase tracking-widest text-ink/50">
+          {desafios.length} ativos
+        </span>
+      </div>
+
+      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+        {desafios.map((x) => {
+          const on = x.id === ativo;
+          return (
+            <button
+              key={x.id}
+              type="button"
+              onClick={() => setAtivo(x.id)}
+              aria-pressed={on}
+              className={`shrink-0 rounded-full border-2 border-ink px-3 py-1.5 font-display text-[10px] uppercase tracking-tight transition-transform ${
+                on
+                  ? "shadow-hard-sm bg-ink text-paper"
+                  : "bg-paper text-ink/70 hover:-translate-y-px"
+              }`}
+            >
+              {x.nome}
+            </button>
+          );
+        })}
+      </div>
+
+      <Link
+        href="/juntos"
+        className={`shadow-hard relative block overflow-hidden rounded-2xl border-2 border-ink p-5 transition-transform active:translate-x-1 active:translate-y-1 active:shadow-none ${t.bg}`}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className={`font-display text-[10px] uppercase tracking-widest ${d.tone === "mustard" ? "text-ink/70" : "text-ink/80"}`}>
+              Você está no
+            </p>
+            <h3 className={`mt-1 font-serif text-2xl font-bold italic leading-tight ${t.title}`}>
+              {d.nome}
+            </h3>
+          </div>
+          <div className={`shadow-hard-sm shrink-0 rounded-full border-2 border-ink px-3 py-1 text-center ${t.chip}`}>
+            <p className="font-display text-lg leading-none">{d.posicao}</p>
+            <p className="mt-0.5 font-display text-[8px] uppercase tracking-widest opacity-80">
+              de {d.totalParticipantes}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className={`font-serif text-[11px] italic ${d.tone === "mustard" ? "text-ink/80" : "text-paper/90"}`}>
+              {d.diasRestantes} dias restantes
+            </span>
+            <span className={`font-display text-[11px] ${d.tone === "mustard" ? "text-ink" : "text-paper"}`}>
+              {d.progresso}%
+            </span>
+          </div>
+          <div className="h-2.5 w-full overflow-hidden rounded-full border-2 border-ink bg-ink/20">
+            <div className={`h-full ${t.accent}`} style={{ width: `${d.progresso}%` }} />
+          </div>
+        </div>
+      </Link>
+    </section>
+  );
+}
+
+/* ---------- Compartilhar ------------------------------------------- */
+
+function CompartilharBtn() {
+  return (
+    <button
+      type="button"
+      className="shadow-hard flex w-full items-center justify-between rounded-xl border-2 border-ink bg-navy px-6 py-4 text-paper transition-transform active:translate-x-1 active:translate-y-1 active:shadow-none"
+    >
+      <span className="font-display text-xs uppercase tracking-widest">
+        Compartilhar minhas metas
+      </span>
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="18" cy="5" r="3" />
+        <circle cx="6" cy="12" r="3" />
+        <circle cx="18" cy="19" r="3" />
+        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+      </svg>
+    </button>
   );
 }

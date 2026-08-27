@@ -1,9 +1,8 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
-import { SiteHeader } from "@/components/site-header";
 import { updateProfile } from "@/app/actions/profile";
 import { quillPhase } from "@/lib/gamification";
+import { PerfilClient } from "./perfil-client";
 
 export default async function ProfilePage({
   searchParams,
@@ -15,107 +14,74 @@ export default async function ProfilePage({
 
   const supabase = await createClient();
   const year = new Date().getFullYear();
-  const [{ data: profile }, { data: annualGoal }, { count: finishedThisYear }] =
-    await Promise.all([
-      supabase
-        .from("profiles")
-        .select("username, display_name")
-        .eq("id", userId)
-        .single(),
-      supabase
-        .from("goals")
-        .select("target_value")
-        .eq("type", "books_per_year")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from("media_items")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "finished")
-        .gte("finished_at", `${year}-01-01`)
-        .lte("finished_at", `${year}-12-31`),
-    ]);
+
+  const [
+    { data: profile },
+    { data: annualGoal },
+    { count: finishedThisYear },
+    { count: totalBooks },
+    { count: totalFriends },
+    { data: sessionRows },
+  ] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("username, display_name")
+      .eq("id", userId)
+      .single(),
+    supabase
+      .from("goals")
+      .select("target_value")
+      .eq("type", "books_per_year")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("media_items")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "finished")
+      .gte("finished_at", `${year}-01-01`)
+      .lte("finished_at", `${year}-12-31`),
+    supabase
+      .from("media_items")
+      .select("id", { count: "exact", head: true }),
+    supabase
+      .from("friendships")
+      .select("id", { count: "exact", head: true })
+      .or(`user_a.eq.${userId},user_b.eq.${userId}`),
+    supabase
+      .from("sessions")
+      .select("duration_seconds"),
+  ]);
+
+  const totalFinished = finishedThisYear ?? 0;
+  const annualTarget = annualGoal?.target_value ?? 0;
 
   const phase = annualGoal
     ? quillPhase(
-        Math.min(
-          100,
-          Math.round(((finishedThisYear ?? 0) / annualGoal.target_value) * 100),
-        ),
+        Math.min(100, Math.round((totalFinished / annualGoal.target_value) * 100)),
       )
     : null;
 
-  return (
-    <>
-      <SiteHeader displayName={profile?.display_name ?? null} />
-      <main className="flex flex-1 justify-center px-4 py-10">
-        <div className="w-full max-w-sm">
-          <h1 className="mb-6 font-serif text-2xl">Seu perfil</h1>
+  const totalSeconds = (sessionRows ?? []).reduce(
+    (acc, s) => acc + (s.duration_seconds ?? 0),
+    0,
+  );
+  const totalHours = Math.round(totalSeconds / 3600);
 
-          {/* resumo da meta anual — a casa dela é a tela Metas (PRD §6.4) */}
-          <Link
-            href="/metas"
-            className="mb-4 flex items-center gap-3 rounded-md border-2 border-cover-border bg-white p-3"
-          >
-            <span className="text-2xl">{phase?.emoji ?? "🌱"}</span>
-            <span className="flex-1">
-              <span className="block text-sm font-semibold">
-                {annualGoal
-                  ? `Meta do ano: ${annualGoal.target_value} livros · ${finishedThisYear ?? 0} lidos`
-                  : "Defina sua meta do ano"}
-              </span>
-              <span className="block text-[11px] text-ink/60">
-                {phase ? (
-                  <>
-                    fase do Quill:{" "}
-                    <b className="text-moss-dark">{phase.label}</b> · gerenciar em
-                    Metas
-                  </>
-                ) : (
-                  "é ela que faz o Quill crescer — criar em Metas"
-                )}
-              </span>
-            </span>
-            <span className="font-bold text-ink/50">›</span>
-          </Link>
-          <form
-            action={updateProfile}
-            className="flex flex-col gap-4 rounded-md border-2 border-ink bg-white p-6 shadow-hard"
-          >
-            <label className="flex flex-col gap-1 text-sm font-medium">
-              Nome de exibição
-              <input
-                name="display_name"
-                defaultValue={profile?.display_name ?? ""}
-                className="rounded border-2 border-ink bg-paper px-3 py-2 focus:outline-none focus:ring-2 focus:ring-moss"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-sm font-medium">
-              Username
-              <input
-                name="username"
-                defaultValue={profile?.username ?? ""}
-                className="rounded border-2 border-ink bg-paper px-3 py-2 focus:outline-none focus:ring-2 focus:ring-moss"
-              />
-            </label>
-            {error && (
-              <p className="text-sm font-medium text-coral">{error}</p>
-            )}
-            {saved && !error && (
-              <p className="text-sm font-medium text-moss-dark">
-                Perfil salvo.
-              </p>
-            )}
-            <button
-              type="submit"
-              className="mt-2 rounded-md bg-moss px-4 py-2 font-display text-sm text-paper shadow-hard-sm"
-            >
-              Salvar
-            </button>
-          </form>
-        </div>
-      </main>
-    </>
+  return (
+    <PerfilClient
+      displayName={profile?.display_name ?? null}
+      username={profile?.username ?? null}
+      totalLivros={totalBooks ?? 0}
+      totalHoras={totalHours}
+      totalAmigos={totalFriends ?? 0}
+      totalFinished={totalFinished}
+      annualTarget={annualTarget}
+      phaseLabel={phase?.label ?? null}
+      phaseEmoji={phase?.emoji ?? null}
+      updateProfileAction={updateProfile}
+      formError={error ?? null}
+      formSaved={!!saved && !error}
+    />
   );
 }

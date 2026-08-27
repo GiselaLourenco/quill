@@ -2,7 +2,9 @@
 
 :root {
   --color-paper: #f5ecd7;
+  --color-card: #ffffff;
   --color-ink: #2c2c2a;
+  --color-ink-soft: #6b6152;
 
   /* Cores "fortes" — usar em botões, CTAs, status: precisam de contraste
      alto pra texto/ícone em cima. Não usar como fundo de capa ilustrada. */
@@ -23,7 +25,9 @@
 
 @theme inline {
   --color-paper: var(--color-paper);
+  --color-card: var(--color-card);
   --color-ink: var(--color-ink);
+  --color-ink-soft: var(--color-ink-soft);
   --color-coral: var(--color-coral);
   --color-moss: var(--color-moss);
   --color-moss-dark: var(--color-moss-dark);

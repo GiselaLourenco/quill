@@ -6,9 +6,13 @@ export default function TabsLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-full flex-1 flex-col">
-      <div className="flex-1">{children}</div>
-      <TabBar />
+    <div className="h-dvh bg-paper">
+      <div className="mx-auto flex h-dvh w-full max-w-[390px] flex-col bg-paper">
+        <main className="flex-1 overflow-y-auto">
+          {children}
+        </main>
+        <TabBar />
+      </div>
     </div>
   );
 }

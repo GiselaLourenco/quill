@@ -24,12 +24,38 @@ const STATUS_LABEL: Record<string, string> = {
   platinum: "platinei",
 };
 
+const STATUS_STYLE: Record<string, string> = {
+  want: "bg-mustard text-ink",
+  reading: "bg-coral text-paper",
+  finished: "bg-moss text-paper",
+  recomendado: "bg-navy text-paper",
+  abandoned: "bg-ink-soft text-paper",
+  platinum: "bg-navy text-paper",
+};
+
 function StarsStatic({ stars }: { stars: number }) {
   return (
     <span aria-label={`${stars} de 5 estrelas`} className="text-lg tracking-tight">
       <span className="text-mustard">{"★".repeat(stars)}</span>
       <span className="text-ink/25">{"★".repeat(5 - stars)}</span>
     </span>
+  );
+}
+
+function PencilIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+    </svg>
   );
 }
 
@@ -86,74 +112,76 @@ export default async function BookPage({
   const prediction = predictFinish(stats, item.total_units);
   const embedUrl = item.spotify_url ? toSpotifyEmbedUrl(item.spotify_url) : null;
 
+  const statusStyle = STATUS_STYLE[item.status] ?? "bg-paper text-ink";
+  const statusLabel = STATUS_LABEL[item.status] ?? item.status;
+
   return (
-    <>
-      <header className="flex items-center gap-2 border-b-2 border-ink bg-white px-4 py-3">
-        <Link href="/estante" aria-label="Voltar para a estante" className="text-lg">
-          ←
+    <div className="flex min-h-full flex-col bg-paper">
+      {/* Header mustard — Lovable style */}
+      <header className="sticky top-0 z-10 flex items-center gap-3 border-b-2 border-ink bg-mustard px-3 py-3">
+        <Link
+          href="/estante"
+          aria-label="Voltar para a estante"
+          className="flex h-9 w-9 items-center justify-center border-2 border-ink bg-paper shadow-hard-sm"
+        >
+          ‹
         </Link>
-        <span className="font-serif text-lg">Página do livro</span>
+        <h1 className="font-display text-lg uppercase tracking-tight text-ink">
+          Meu livro
+        </h1>
       </header>
 
-      <main className="mx-auto w-full max-w-sm flex-1 px-4 py-6">
-        {error && <p className="mb-4 text-sm font-medium text-coral">{error}</p>}
+      <div className="space-y-6 p-6">
+        {error && <p className="text-sm font-medium text-coral">{error}</p>}
 
-        <div className="mb-4 flex items-start gap-4">
-          <div className="w-[74px] shrink-0" style={{ aspectRatio: "2/3" }}>
+        {/* Hero: capa + info */}
+        <section className="flex gap-5">
+          <div className="w-[90px] shrink-0 shadow-[4px_4px_0_0_var(--color-ink)]">
             <BookCover item={item} />
           </div>
-          <div className="pt-0.5">
-            <h1 className="font-serif text-xl font-semibold leading-tight">
+          <div className="flex min-w-0 flex-1 flex-col justify-center gap-2">
+            <div>
+              <span
+                className={`inline-flex items-center border-2 border-ink px-2 py-0.5 font-display text-[10px] uppercase tracking-wider ${statusStyle}`}
+              >
+                {statusLabel}
+              </span>
+            </div>
+            <h2 className="font-display text-xl uppercase leading-tight text-ink">
               {item.title}
-            </h1>
+            </h2>
             {item.creator && (
-              <p className="mt-0.5 text-sm text-ink/65">{item.creator}</p>
+              <p className="font-serif text-sm italic text-ink-soft">{item.creator}</p>
             )}
-            <div className="mt-2">
-              <StatusEditor itemId={item.id} status={item.status} />
+            <div className="mt-1">
+              <RatingStars itemId={item.id} initialStars={myRating?.stars ?? 0} />
             </div>
           </div>
-        </div>
-
-        <section className="mb-4 rounded-md border-2 border-cover-border bg-white px-3 py-3">
-          <h2 className="mb-2 text-center text-xs font-semibold uppercase tracking-wide text-ink/60">
-            Sua nota
-          </h2>
-          <RatingStars itemId={item.id} initialStars={myRating?.stars ?? 0} />
         </section>
 
-        <div className="mb-4 grid grid-cols-2 gap-2">
-          <div className="rounded-md border-2 border-cover-border py-2 text-center">
-            <div className="font-serif text-base font-semibold">
-              {formatDuration(stats.totalSeconds)}
-            </div>
-            <div className="text-[10.5px] text-ink/65">tempo total</div>
-          </div>
-          <div className="rounded-md border-2 border-cover-border py-2 text-center">
-            <div className="font-serif text-base font-semibold">
-              {stats.pagesPerDay}
-            </div>
-            <div className="text-[10.5px] text-ink/65">pág. / dia</div>
-          </div>
-          <div className="rounded-md border-2 border-cover-border py-2 text-center">
-            <div className="font-serif text-base font-semibold">
-              {stats.pagesPerHour}
-            </div>
-            <div className="text-[10.5px] text-ink/65">pág. / hora</div>
-          </div>
-          <div className="rounded-md border-2 border-cover-border py-2 text-center">
-            <div className="font-serif text-base font-semibold">
-              {stats.daysRead}
-            </div>
-            <div className="text-[10.5px] text-ink/65">dias lidos</div>
-          </div>
-        </div>
+        {/* Status editor */}
+        <section className="border-2 border-ink bg-paper p-3 shadow-hard-sm">
+          <p className="mb-2 font-display text-[10px] uppercase tracking-widest text-ink-soft">
+            Mudar status
+          </p>
+          <StatusEditor itemId={item.id} status={item.status} />
+        </section>
+
+        {/* Stats */}
+        <section className="grid grid-cols-2 gap-2">
+          <StatBox label="Tempo total" value={formatDuration(stats.totalSeconds)} />
+          <StatBox label="Pág. / dia" value={String(stats.pagesPerDay)} />
+          <StatBox label="Pág. / hora" value={String(stats.pagesPerHour)} />
+          <StatBox label="Dias lidos" value={String(stats.daysRead)} />
+        </section>
 
         {prediction && (
-          <div className="mb-4 rounded-md border-2 border-moss-dark bg-moss-dark/10 px-3 py-2.5 text-sm">
-            Nesse ritmo, você termina em{" "}
-            <strong>~{prediction.daysRemaining} dias</strong> (
-            {prediction.dateLabel}).
+          <div className="border-2 border-moss bg-moss/10 px-3 py-2.5">
+            <p className="text-sm text-ink">
+              Nesse ritmo, você termina em{" "}
+              <strong>~{prediction.daysRemaining} dias</strong>{" "}
+              ({prediction.dateLabel}).
+            </p>
           </div>
         )}
 
@@ -162,46 +190,74 @@ export default async function BookPage({
             src={embedUrl}
             width="100%"
             height="152"
-            style={{ borderRadius: 12, marginBottom: "1rem" }}
+            style={{ borderRadius: 0, marginBottom: "0.5rem" }}
             allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
             loading="lazy"
+            className="border-2 border-ink"
           />
         )}
 
-        <section>
-          <h2 className="mb-2 text-sm font-medium">Comentários</h2>
-          <div className="mb-3 flex flex-col gap-2">
-            {(comments ?? []).map((c) => (
-              <div
-                key={c.id}
-                className="rounded-md border-2 border-cover-border px-3 py-2 text-sm"
-              >
-                <div className="mb-1 flex items-center gap-1.5 text-[10.5px] text-ink/55">
-                  {c.scope === "chapter" && c.chapter_ref != null && (
-                    <span className="rounded-full border border-cover-border bg-paper px-2 py-0.5">
-                      cap. {c.chapter_ref}
+        {/* Comentários / diário */}
+        <section className="space-y-3">
+          <h3 className="flex items-center gap-2 font-display text-sm uppercase tracking-wider text-ink">
+            <span className="h-2 w-2 border border-ink bg-coral" />
+            Minhas anotações
+          </h3>
+
+          {(comments ?? []).length === 0 ? (
+            <div className="border-2 border-dashed border-ink/40 p-6 text-center">
+              <p className="font-serif text-sm italic text-ink-soft">
+                Nenhuma nota ainda. Adicione uma abaixo.
+              </p>
+            </div>
+          ) : (
+            <ul className="space-y-3">
+              {(comments ?? []).map((c) => (
+                <li
+                  key={c.id}
+                  className="border-2 border-ink border-l-8 border-l-navy bg-paper p-4 shadow-hard-sm"
+                >
+                  <div className="mb-2 flex items-center gap-2">
+                    {c.scope === "chapter" && c.chapter_ref != null && (
+                      <span className="border border-ink bg-mustard px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-ink">
+                        cap. {c.chapter_ref}
+                      </span>
+                    )}
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-soft">
+                      {c.is_public ? "🌍 público" : "🔒 privado"}
                     </span>
+                  </div>
+                  {c.content && (
+                    <p className="font-serif text-sm leading-relaxed text-ink">
+                      {c.content}
+                    </p>
                   )}
-                  <span aria-label={c.is_public ? "visível para amigos" : "só você"}>
-                    {c.is_public ? "🌍" : "🔒"}
-                  </span>
-                </div>
-                {c.content && <p>{c.content}</p>}
-                {c.gif_url && (
-                  // eslint-disable-next-line @next/next/no-img-element -- GIF externo do Giphy
-                  <img
-                    src={c.gif_url}
-                    alt="GIF"
-                    className="mt-1.5 max-h-32 rounded border-2 border-cover-border"
-                  />
-                )}
-              </div>
-            ))}
-          </div>
+                  {c.gif_url && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={c.gif_url}
+                      alt="GIF"
+                      className="mt-1.5 max-h-32 border-2 border-cover-border"
+                    />
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+
           <CommentComposer itemId={item.id} />
         </section>
-      </main>
-    </>
+      </div>
+    </div>
+  );
+}
+
+function StatBox({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="border-2 border-ink bg-paper py-3 text-center shadow-hard-sm">
+      <div className="font-display text-base text-ink">{value}</div>
+      <div className="text-[10.5px] uppercase tracking-wide text-ink-soft">{label}</div>
+    </div>
   );
 }
 
@@ -216,8 +272,6 @@ type ItemRow = {
   cover_palette: number;
 };
 
-// Visão de um livro que pertence a um amigo: só leitura (status + nota + comentários
-// públicos do dono) + "Indicar para alguém". Sem trava de spoiler (cortada).
 async function FriendBookView({
   item,
   userId,
@@ -247,32 +301,47 @@ async function FriendBookView({
     ]);
 
   const ownerName = owner?.display_name ?? "amigo";
+  const statusStyle = STATUS_STYLE[item.status] ?? "bg-paper text-ink";
+  const statusLabel = STATUS_LABEL[item.status] ?? item.status;
 
   return (
-    <>
-      <header className="flex items-center gap-2 border-b-2 border-ink bg-white px-4 py-3">
-        <Link href="/estante?view=amigos" aria-label="Voltar" className="text-lg">
-          ←
+    <div className="flex min-h-full flex-col bg-paper">
+      {/* Header */}
+      <header className="sticky top-0 z-10 flex items-center gap-3 border-b-2 border-ink bg-paper px-3 py-3">
+        <Link
+          href="/estante?view=amigos"
+          aria-label="Voltar"
+          className="flex h-9 w-9 items-center justify-center border-2 border-ink bg-paper shadow-hard-sm"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="square">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
         </Link>
-        <span className="font-serif text-lg">estante de {ownerName}</span>
+        <h1 className="font-display text-base uppercase tracking-tight text-ink">
+          Na estante de{" "}
+          <span className="text-coral">{ownerName}</span>
+        </h1>
       </header>
 
-      <main className="mx-auto w-full max-w-sm flex-1 px-4 py-6">
-        <div className="mb-4 flex items-start gap-4">
-          <div className="w-[74px] shrink-0" style={{ aspectRatio: "2/3" }}>
+      <div className="flex-1 overflow-y-auto pb-40">
+        {/* Hero */}
+        <section className="flex gap-5 px-5 pt-6">
+          <div className="w-[90px] shrink-0 shadow-[4px_4px_0_0_var(--color-ink)]">
             <BookCover item={item} />
           </div>
-          <div className="pt-0.5">
-            <h1 className="font-serif text-xl font-semibold leading-tight">
-              {item.title}
-            </h1>
-            {item.creator && (
-              <p className="mt-0.5 text-sm text-ink/65">{item.creator}</p>
-            )}
-            <span className="mt-2 inline-block rounded-full border-2 border-ink bg-white px-3 py-0.5 text-xs font-medium">
-              {STATUS_LABEL[item.status] ?? item.status}
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <span
+              className={`inline-flex w-fit items-center border-2 border-ink px-2 py-0.5 font-display text-[10px] uppercase tracking-wider ${statusStyle}`}
+            >
+              {statusLabel}
             </span>
-            <div className="mt-2">
+            <h2 className="font-serif text-xl font-bold leading-tight text-ink">
+              {item.title}
+            </h2>
+            {item.creator && (
+              <p className="font-serif text-sm italic text-ink-soft">{item.creator}</p>
+            )}
+            <div className="mt-1">
               {ownerRating?.stars ? (
                 <StarsStatic stars={ownerRating.stars} />
               ) : (
@@ -280,41 +349,62 @@ async function FriendBookView({
               )}
             </div>
           </div>
-        </div>
+        </section>
 
-        <section className="mb-5">
-          <h2 className="mb-2 text-sm font-medium">Comentários de {ownerName}</h2>
-          {comments && comments.length > 0 ? (
-            <div className="flex flex-col gap-2">
+        {/* Comentários */}
+        <section className="px-5 pt-8">
+          <h3 className="mb-4 flex items-center gap-2 font-display text-sm uppercase tracking-wider text-ink">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-ink bg-moss font-display text-[10px] text-paper">
+              {ownerName.charAt(0).toUpperCase()}
+            </span>
+            Comentários de {ownerName}
+          </h3>
+
+          {(!comments || comments.length === 0) ? (
+            <div className="border-2 border-dashed border-ink/40 p-6 text-center">
+              <p className="font-serif text-sm italic text-ink-soft">
+                {ownerName} ainda não deixou comentários públicos neste livro.
+              </p>
+            </div>
+          ) : (
+            <div className="relative space-y-5">
+              <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-ink/10" />
               {comments.map((c) => (
-                <div
-                  key={c.id}
-                  className="rounded-md border-2 border-cover-border bg-white px-3 py-2 text-sm"
-                >
-                  {c.scope === "chapter" && c.chapter_ref != null && (
-                    <span className="mr-1 rounded-full border border-cover-border bg-paper px-2 py-0.5 text-[10.5px] text-ink/60">
-                      cap. {c.chapter_ref}
-                    </span>
-                  )}
-                  {c.content}
-                  {c.gif_url && (
-                    // eslint-disable-next-line @next/next/no-img-element -- GIF externo do Giphy
-                    <img
-                      src={c.gif_url}
-                      alt="GIF"
-                      className="mt-1.5 max-h-32 rounded border-2 border-cover-border"
-                    />
-                  )}
+                <div key={c.id} className="relative pl-10">
+                  <div className="absolute left-[9px] top-3 h-3 w-3 rounded-full border-2 border-ink bg-mustard" />
+                  <article className="border-2 border-ink bg-paper p-3 shadow-hard-sm">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      {c.scope === "chapter" && c.chapter_ref != null && (
+                        <span className="border border-ink bg-ink px-1.5 py-0.5 font-display text-[9px] uppercase tracking-wider text-paper">
+                          cap. {c.chapter_ref}
+                        </span>
+                      )}
+                    </div>
+                    {c.content && (
+                      <p className="font-serif text-sm leading-relaxed text-ink">
+                        {c.content}
+                      </p>
+                    )}
+                    {c.gif_url && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={c.gif_url}
+                        alt="GIF"
+                        className="mt-1.5 max-h-32 border-2 border-cover-border"
+                      />
+                    )}
+                  </article>
                 </div>
               ))}
             </div>
-          ) : (
-            <p className="text-sm text-ink/55">Nenhum comentário público ainda.</p>
           )}
         </section>
+      </div>
 
+      {/* Fixed CTAs */}
+      <div className="sticky bottom-0 flex flex-col gap-2 border-t-2 border-ink bg-paper p-4">
         <RecommendButton friends={friends} itemRef={item.id} title={item.title} />
-      </main>
-    </>
+      </div>
+    </div>
   );
 }

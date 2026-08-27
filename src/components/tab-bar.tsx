@@ -2,63 +2,64 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { ReactNode } from "react";
 
-const TABS = [
-  { href: "/", label: "Quill", icon: "home" },
-  { href: "/ler", label: "Ler", icon: "play" },
-  { href: "/estante", label: "Estante", icon: "books" },
-  { href: "/juntos", label: "Juntos", icon: "juntos" },
+type TabItem = {
+  href: string;
+  label: string;
+  icon: ReactNode;
+  exact?: boolean;
+};
+
+const stroke = {
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+};
+
+const IconQuill = (
+  <svg viewBox="0 0 24 24" className="h-5 w-5" {...stroke}>
+    <path d="M4 20c6-1 10-5 14-14-4 1-9 3-11 6s-3 6-3 8Z" />
+    <path d="M4 20l6-6" />
+  </svg>
+);
+const IconLer = (
+  <svg viewBox="0 0 24 24" className="h-5 w-5" {...stroke}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M10 8.5v7l6-3.5-6-3.5Z" fill="currentColor" stroke="none" />
+  </svg>
+);
+const IconEstante = (
+  <svg viewBox="0 0 24 24" className="h-5 w-5" {...stroke}>
+    <rect x="4" y="3" width="4" height="18" rx="1" />
+    <rect x="10" y="6" width="4" height="15" rx="1" />
+    <rect x="16" y="3" width="4" height="18" rx="1" />
+  </svg>
+);
+const IconJuntos = (
+  <svg viewBox="0 0 24 24" className="h-5 w-5" {...stroke}>
+    <circle cx="9" cy="9" r="3" />
+    <circle cx="17" cy="11" r="2.5" />
+    <path d="M3 20c.5-3 3-5 6-5s5.5 2 6 5" />
+    <path d="M14 20c.3-2 2-3.5 4-3.5s3.5 1 4 3" />
+  </svg>
+);
+const IconPerfil = (
+  <svg viewBox="0 0 24 24" className="h-5 w-5" {...stroke}>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 21c1-4 4-6 8-6s7 2 8 6" />
+  </svg>
+);
+
+const TABS: TabItem[] = [
+  { href: "/", label: "Quill", icon: IconQuill, exact: true },
+  { href: "/ler", label: "Ler", icon: IconLer },
+  { href: "/estante", label: "Estante", icon: IconEstante },
+  { href: "/juntos", label: "Juntos", icon: IconJuntos },
+  { href: "/profile", label: "Perfil", icon: IconPerfil },
 ];
-
-function TabIcon({ icon, active }: { icon: string; active: boolean }) {
-  const color = active ? "#0F6E56" : "#2C2C2A";
-  if (icon === "home") {
-    return (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path
-          d="M4 11.5 12 4l8 7.5V20a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"
-          stroke={color}
-          strokeWidth="2"
-          strokeLinejoin="round"
-        />
-      </svg>
-    );
-  }
-  if (icon === "play") {
-    return (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <circle cx="12" cy="12" r="9" stroke={color} strokeWidth="2" />
-        <path d="M10 8.5v7l6-3.5z" fill={color} />
-      </svg>
-    );
-  }
-  if (icon === "books") {
-    return (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <rect x="4" y="4" width="4.5" height="16" rx="1" stroke={color} strokeWidth="2" />
-        <rect x="10" y="4" width="4.5" height="16" rx="1" stroke={color} strokeWidth="2" />
-        <rect
-          x="15.7"
-          y="5.3"
-          width="4.5"
-          height="16"
-          rx="1"
-          stroke={color}
-          strokeWidth="2"
-          transform="rotate(12 18 13)"
-        />
-      </svg>
-    );
-  }
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.8" aria-hidden="true">
-      <circle cx="8" cy="9" r="3" stroke={color} />
-      <circle cx="16" cy="9" r="3" stroke={color} />
-      <path d="M3 19c1-3 3-4.5 5-4.5S12 16 13 19" stroke={color} strokeLinecap="round" />
-      <path d="M11 19c1-3 3-4.5 5-4.5s4 1.5 5 4.5" stroke={color} strokeLinecap="round" />
-    </svg>
-  );
-}
 
 export function TabBar() {
   const pathname = usePathname();
@@ -66,25 +67,33 @@ export function TabBar() {
   return (
     <nav
       aria-label="Navegação principal"
-      className="sticky bottom-0 flex border-t-2 border-ink bg-white"
+      className="shrink-0 border-t-2 border-ink bg-paper pb-[env(safe-area-inset-bottom)]"
     >
-      {TABS.map((tab) => {
-        const active =
-          tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);
-        return (
-          <Link
-            key={tab.href}
-            href={tab.href}
-            aria-current={active ? "page" : undefined}
-            className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[10.5px] font-medium ${
-              active ? "text-moss-dark" : "text-ink/60"
-            }`}
-          >
-            <TabIcon icon={tab.icon} active={active} />
-            {tab.label}
-          </Link>
-        );
-      })}
+      <ul className="mx-auto flex w-full items-stretch justify-between gap-1 px-2 py-1.5">
+        {TABS.map((tab) => {
+          const active = tab.exact
+            ? pathname === tab.href
+            : pathname === tab.href || pathname.startsWith(tab.href + "/");
+          return (
+            <li key={tab.href} className="flex-1 min-w-0">
+              <Link
+                href={tab.href}
+                aria-current={active ? "page" : undefined}
+                className={
+                  active
+                    ? "flex h-14 flex-col items-center justify-center gap-0.5 rounded-md border-2 border-ink bg-navy px-1 text-paper shadow-hard-sm"
+                    : "flex h-14 flex-col items-center justify-center gap-0.5 rounded-md border-2 border-transparent px-1 text-ink-soft"
+                }
+              >
+                {tab.icon}
+                <span className="text-[10px] font-semibold tracking-wide leading-none">
+                  {tab.label}
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
     </nav>
   );
 }

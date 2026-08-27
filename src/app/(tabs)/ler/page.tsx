@@ -13,14 +13,11 @@ export default async function LerPage() {
   ]);
 
   return (
-    <>
-      <header className="border-b-2 border-ink bg-white px-4 py-3">
-        <span className="font-serif text-lg">Ler</span>
-      </header>
+    <div className="min-h-full">
       <FreeReadingSession
         books={books ?? []}
         activeChallenges={activeChallenges}
       />
-    </>
+    </div>
   );
 }

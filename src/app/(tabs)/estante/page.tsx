@@ -37,7 +37,7 @@ export default async function EstantePage({
   const supabase = await createClient();
 
   return (
-    <>
+    <div className="flex min-h-full flex-col bg-paper">
       {/* Cabeçalho estilo Lovable: toggle Minha/Amigos + ações (diário, adicionar) */}
       <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b-2 border-ink bg-paper px-4 py-3">
         <div
@@ -47,10 +47,10 @@ export default async function EstantePage({
         >
           <Link
             role="tab"
-            aria-selected={!isFriends}
+            aria-selected={!isFriends && !isDiary}
             href="/estante"
             className={`rounded-full px-3 py-1 text-xs font-semibold ${
-              !isFriends ? "bg-navy text-paper" : "text-ink-soft"
+              !isFriends && !isDiary ? "bg-navy text-paper" : "text-ink-soft"
             }`}
           >
             Minha
@@ -70,12 +70,9 @@ export default async function EstantePage({
         {!isFriends && (
           <div className="flex items-center gap-2">
             <Link
-              href="/estante?view=diario"
+              href="/estante/diario"
               aria-label="Abrir diário"
-              aria-current={isDiary ? "page" : undefined}
-              className={`flex h-10 w-10 items-center justify-center rounded-md border-2 border-ink shadow-hard-sm ${
-                isDiary ? "bg-ink text-paper" : "bg-mustard text-ink"
-              }`}
+              className="flex h-10 w-10 items-center justify-center rounded-md border-2 border-ink bg-mustard text-ink shadow-hard-sm"
             >
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
@@ -102,7 +99,7 @@ export default async function EstantePage({
       ) : (
         <MyShelf supabase={supabase} />
       )}
-    </>
+    </div>
   );
 }
 
@@ -112,9 +109,6 @@ const DAY_FMT = new Intl.DateTimeFormat("pt-BR", {
   month: "short",
 });
 
-// "Meu diário": linha do tempo dos meus comentários (livro/capítulo), privados
-// por padrão. comments.item_id tem FK direta pra media_items, então dá pra
-// embutir o título no mesmo select.
 async function MyDiary({
   supabase,
   userId,
@@ -125,7 +119,7 @@ async function MyDiary({
   const { data: entries } = await supabase
     .from("comments")
     .select("id, content, chapter_ref, scope, is_public, created_at, item:media_items(title)")
-    .eq("user_id", userId) // RLS deixa ler comentários públicos de outros; o diário é só meu
+    .eq("user_id", userId)
     .in("scope", ["item", "chapter"])
     .not("content", "is", null)
     .order("created_at", { ascending: false });
@@ -135,14 +129,12 @@ async function MyDiary({
       <main className="flex flex-1 flex-col items-center gap-3 px-6 py-16 text-center">
         <h1 className="font-serif text-2xl">Seu diário está vazio</h1>
         <p className="max-w-[240px] text-ink/70">
-          Anote uma frase ou ideia ao terminar uma sessão de leitura — aparece
-          aqui, só pra você.
+          Anote uma frase ou ideia ao terminar uma sessão de leitura — aparece aqui, só pra você.
         </p>
       </main>
     );
   }
 
-  // agrupa por dia (chave = data local)
   const groups = new Map<string, typeof entries>();
   for (const e of entries) {
     const key = DAY_FMT.format(new Date(e.created_at));
@@ -199,7 +191,6 @@ async function MyShelf({
       .from("media_items")
       .select("id, title, creator, cover_kind, cover_url, cover_palette, status")
       .order("created_at", { ascending: false }),
-    // RLS já limita `ratings` às notas do próprio usuário.
     supabase.from("ratings").select("item_id, stars"),
   ]);
 
@@ -236,8 +227,7 @@ async function FriendsShelf({
       <main className="flex flex-1 flex-col items-center gap-3 px-6 py-16 text-center">
         <h1 className="font-serif text-2xl">Nenhum amigo por aqui ainda</h1>
         <p className="max-w-[240px] text-ink/70">
-          Entre num desafio pelo código de convite — quem participa junto vira
-          seu amigo e aparece aqui.
+          Entre num desafio pelo código de convite — quem participa junto vira seu amigo e aparece aqui.
         </p>
         <Link
           href="/juntos"
@@ -252,6 +242,15 @@ async function FriendsShelf({
   return (
     <main className="flex-1 px-4 pb-6 pt-4">
       <RecommendationsStrip recs={recs} />
+
+      {/* Botão "Indicar livro" */}
+      <button
+        type="button"
+        className="mb-4 flex w-full items-center justify-center gap-2 rounded-md border-2 border-ink bg-mustard px-3 py-2.5 text-sm font-semibold uppercase tracking-wider text-ink shadow-hard-sm active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+      >
+        Indicar um livro a um amigo
+      </button>
+
       <div className="flex flex-col gap-4">
         {shelves.map((shelf) => (
           <section key={shelf.friendId}>
