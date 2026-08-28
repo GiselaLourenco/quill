@@ -183,8 +183,8 @@ export function PerfilClient({
       >
         <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full border-2 border-ink bg-paper">
           <AppImage
-            slot="perfil.meta-ano"
-            src="/img/perfil/quill-ok.webp"
+            slot={phaseImg ? `perfil.fase.${faseDaImagem(phaseImg)}` : "perfil.meta-ano"}
+            src={phaseImg ?? "/img/perfil/quill-ok.webp"}
             alt=""
             aria-hidden
             width={48}
@@ -199,12 +199,7 @@ export function PerfilClient({
           {phaseLabel && (
             <p className="mt-0.5 text-sm font-semibold">
               Fase do Quill:{" "}
-              <span className="inline-flex items-center gap-1 align-middle">
-                {phaseImg && (
-                  <AppImage slot={`perfil.fase.${faseDaImagem(phaseImg)}`} src={phaseImg} alt="" aria-hidden width={22} height={22} className="h-[22px] w-[22px] object-contain" />
-                )}
-                <span className="text-moss underline decoration-2 underline-offset-2">{phaseLabel}</span>
-              </span>
+              <span className="text-moss underline decoration-2 underline-offset-2">{phaseLabel}</span>
             </p>
           )}
           <div className="mt-2 h-3 w-full overflow-hidden rounded-full border-2 border-ink bg-paper">
