@@ -199,10 +199,15 @@ export const GOAL_TYPES = [
 // meta anual de livros — criança → jovem → adulto, sem regressão no ano.
 // Os emojis são placeholders até a arte oficial das 3 fases existir.
 export const QUILL_PHASES = [
-  { key: "crianca", label: "criança", emoji: "🌱", range: "0–33%" },
-  { key: "jovem", label: "jovem", emoji: "🪶", range: "34–66%" },
-  { key: "adulto", label: "adulto", emoji: "🌳", range: "67%+" },
+  { key: "crianca", label: "criança", img: "/img/niveis/quill-crianca.webp", range: "0–33%" },
+  { key: "jovem", label: "jovem", img: "/img/niveis/quill-jovem.webp", range: "34–66%" },
+  { key: "adulto", label: "adulto", img: "/img/niveis/quill-adulto.webp", range: "67%+" },
 ] as const;
+
+/** Qual fase corresponde a uma arte — usado para dar slot próprio a cada fase. */
+export function faseDaImagem(img: string): string {
+  return QUILL_PHASES.find((p) => p.img === img)?.key ?? "atual";
+}
 
 export function quillPhase(percent: number): (typeof QUILL_PHASES)[number] {
   if (percent >= 67) return QUILL_PHASES[2];
@@ -232,6 +237,8 @@ export function goalProgress(
     finishedThisYear: number;
     pagesPerDay: number;
     minutesPerDay: number;
+    hoursThisMonth: number;
+    currentStreak: number;
   },
 ): {
   current: number;
@@ -240,7 +247,9 @@ export function goalProgress(
   dailyTargetLabel: string | null;
 } {
   let current = 0;
-  let label = goal.type;
+  // Nunca cair no identificador cru do banco: se um tipo novo chegar aqui sem
+  // tradução, o rótulo genérico ainda fica legível em português.
+  let label = `Meta de ${goal.target_value}`;
   let dailyTargetLabel: string | null = null;
 
   if (goal.type === "books_per_year") {
@@ -255,6 +264,12 @@ export function goalProgress(
   } else if (goal.type === "minutes_per_day") {
     current = ctx.minutesPerDay;
     label = `${goal.target_value} minutos / dia`;
+  } else if (goal.type === "hours_per_month") {
+    current = ctx.hoursThisMonth;
+    label = `${goal.target_value} horas / mês`;
+  } else if (goal.type === "streak_days") {
+    current = ctx.currentStreak;
+    label = `${goal.target_value} dias seguidos`;
   } else if (goal.type === "pages_in_period") {
     const start = goal.period_start ?? new Date().toISOString().slice(0, 10);
     const end = goal.period_end ?? start;

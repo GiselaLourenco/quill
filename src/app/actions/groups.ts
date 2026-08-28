@@ -18,6 +18,8 @@ export async function createChallenge(formData: FormData) {
   const endsAt = String(formData.get("ends_at") ?? "").trim() || null;
   const itemId = String(formData.get("item_id") ?? "").trim() || null;
   const competes = formData.get("competes") === "on";
+  // Guardado em minúsculo porque a entrada por código normaliza para minúsculo.
+  const inviteCode = String(formData.get("invite_code") ?? "").trim().toLowerCase() || null;
 
   if (!name || !SCORING_METRICS.includes(scoringMetric)) {
     redirect("/juntos/novo?error=Preencha nome e métrica de pontuação.");
@@ -36,6 +38,8 @@ export async function createChallenge(formData: FormData) {
       ends_at: endsAt,
       item_id: itemId,
       created_by: userId,
+      // Sem código informado, o default do banco gera um.
+      ...(inviteCode ? { invite_code: inviteCode } : {}),
     })
     .select("id")
     .single();
@@ -86,4 +90,21 @@ export async function toggleCompete(groupId: string, competes: boolean) {
     .eq("user_id", userId);
 
   revalidatePath(`/juntos/${groupId}`);
+}
+
+// Sair de um desafio: remove a participação. Os check-ins já feitos continuam
+// no histórico das sessões, mas somem do feed e do ranking do grupo.
+export async function leaveChallenge(groupId: string) {
+  const userId = await requireUserId();
+  const supabase = await createClient();
+
+  await supabase
+    .from("group_members")
+    .delete()
+    .eq("group_id", groupId)
+    .eq("user_id", userId);
+
+  revalidatePath("/juntos");
+  revalidatePath("/");
+  redirect("/juntos");
 }

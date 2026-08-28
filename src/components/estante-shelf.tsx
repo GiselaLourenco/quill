@@ -2,7 +2,8 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { AppImage } from "@/components/app-image";
+import { EmptyState } from "@/components/empty-state";
 import { BookCover } from "@/components/book-cover";
 import { StarRating } from "@/components/star-rating";
 import { setRating } from "@/app/actions/ratings";
@@ -76,18 +77,13 @@ export function EstanteShelf({ books }: { books: ShelfBook[] }) {
 
   if (total === 0) {
     return (
-      <main className="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-12 text-center">
-        <Image src={CONFIANTE} alt="" width={128} height={128} className="h-32 w-32" />
-        <h2 className="font-display text-2xl text-ink">Sua estante está vazia</h2>
-        <p className="font-serif text-sm text-ink-soft">
-          Coloque o primeiro livro para o Quill saber por onde te acompanhar.
-        </p>
-        <Link
-          href="/books/new"
-          className="rounded-md border-2 border-ink bg-coral px-5 py-2.5 text-sm font-semibold text-paper shadow-hard"
-        >
-          Adicionar meu 1º livro
-        </Link>
+      <main className="flex flex-1 flex-col">
+        <EmptyState
+          mascote="lendo"
+          titulo="Sua estante está vazia"
+          texto="Coloque o primeiro livro para o Quill saber por onde te acompanhar."
+          acao={{ href: "/books/new", label: "Adicionar meu 1º livro" }}
+        />
       </main>
     );
   }
@@ -105,7 +101,7 @@ export function EstanteShelf({ books }: { books: ShelfBook[] }) {
           </p>
         </div>
         <div className="absolute -bottom-3 -right-3 flex h-24 w-24 rotate-12 items-center justify-center rounded-full border-2 border-ink bg-mustard">
-          <Image src={CONFIANTE} alt="" width={64} height={64} className="h-16 w-16 -rotate-12" />
+          <AppImage slot="estante.hero" src={CONFIANTE} alt="" width={64} height={64} className="h-16 w-16 -rotate-12" />
         </div>
       </div>
 
@@ -156,9 +152,13 @@ export function EstanteShelf({ books }: { books: ShelfBook[] }) {
       <div className="rounded-md border-2 border-ink bg-[#8B5E3C] p-3 shadow-hard">
         <div className="rounded-sm border-2 border-ink bg-paper p-4">
           {filtrados.length === 0 ? (
-            <p className="py-6 text-center font-serif text-sm italic text-ink-soft">
-              Nenhum livro com esse status ainda.
-            </p>
+            <EmptyState
+              compacto
+              mascote="lendo"
+              titulo="Prateleira vazia"
+              texto="Nenhum livro com esse status ainda. Troque o filtro acima ou adicione um livro novo."
+              acao={{ href: "/books/new", label: "Adicionar livro" }}
+            />
           ) : (
             <div className="grid grid-cols-3 gap-x-3 gap-y-6">
               {filtrados.map((b) => (

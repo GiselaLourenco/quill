@@ -14,6 +14,19 @@ export type Achievement = {
   criteria: AchievementCriteria;
 };
 
+/**
+ * Ícone da conquista — escolhido pelo CRITÉRIO, não pelo nível.
+ * Assim a arte diz o que a pessoa fez: caneca = tempo de sessão,
+ * livro = livros terminados, mochila = sequência (a jornada),
+ * símbolo = façanha de leitura numa sessão só.
+ */
+export const ACHIEVEMENT_ICON: Record<AchievementCriteria["type"], string> = {
+  sessions_count: "/img/conquistas/caneca.webp",
+  books_finished: "/img/conquistas/livro.webp",
+  streak_record: "/img/conquistas/mochila.webp",
+  max_session_pages: "/img/conquistas/simbolo.webp",
+};
+
 export const ACHIEVEMENTS: Achievement[] = [
   {
     key: "first_session",

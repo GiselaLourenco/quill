@@ -1,103 +1,398 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useMemo, useState, useTransition } from "react";
-import { createSession, type SessionUnit } from "@/app/actions/sessions";
-import { formatTimer } from "@/lib/reading-stats";
-import { PostSession } from "@/components/post-session";
+import { AppImage } from "@/components/app-image";
+import { BookThumb } from "@/components/book-thumb";
+import type { CoverFields } from "@/components/book-cover";
+import { useEffect, useState, useTransition } from "react";
+import {
+  createSession,
+  publishSession,
+  saveSessionMemory,
+  type SessionUnit,
+} from "@/app/actions/sessions";
 import type { ActiveChallenge } from "@/lib/challenges";
 
-type Book = { id: string; title: string };
+export type BookOption = CoverFields & {
+  id: string;
+  author: string;
+  status: string;
+  paginaAtual: number | null;
+};
 
-const TAG_OPTIONS = [
-  { value: "flowed", label: "a leitura fluiu" },
-  { value: "no_distractions", label: "sem distrações" },
-  { value: "phone", label: "olhei o celular" },
-  { value: "hard", label: "foi difícil" },
+const TAG_OPTIONS: { value: string; label: string; positiva: boolean }[] = [
+  { value: "flowed", label: "a leitura fluiu", positiva: true },
+  { value: "no_distractions", label: "li sem distrações", positiva: true },
+  { value: "phone", label: "parei p/ olhar o celular", positiva: false },
+  { value: "hard", label: "foi difícil", positiva: false },
 ];
+
+const PRESETS = [15, 30, 45, 60];
+
+function metricLabel(metric: string): string {
+  switch (metric) {
+    case "pages":
+      return "páginas";
+    case "chapters":
+      return "capítulos";
+    case "active_days":
+      return "dias com leitura";
+    case "check_ins":
+      return "check-ins";
+    case "minutes":
+      return "minutos";
+    default:
+      return metric;
+  }
+}
+
+type Fase = "idle" | "rodando" | "registro" | "salvo";
 
 export function FreeReadingSession({
   books,
   activeChallenges,
 }: {
-  books: Book[];
+  books: BookOption[];
   activeChallenges: ActiveChallenge[];
 }) {
-  const [phase, setPhase] = useState<
-    "idle" | "running" | "paused" | "stopped" | "saved"
-  >("idle");
+  const [fase, setFase] = useState<Fase>("idle");
   const [startedAt, setStartedAt] = useState<string | null>(null);
   // Timestamp (ms) de quando o período de running atual começou
   const [runStartMs, setRunStartMs] = useState<number | null>(null);
   // Segundos acumulados de períodos anteriores (antes de cada pausa)
   const [accSeconds, setAccSeconds] = useState(0);
-  // Tick só para forçar re-render a cada segundo
-  const [, setTick] = useState(0);
-  const [query, setQuery] = useState("");
-  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
-  const [unit, setUnit] = useState<SessionUnit>("chapters");
-  const [quantity, setQuantity] = useState("");
-  const [tags, setTags] = useState<Set<string>>(new Set());
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [savedElapsed, setSavedElapsed] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [isSaving, startSave] = useTransition();
+  const [pausado, setPausado] = useState(false);
+  // Segundos exibidos — sempre derivados de timestamps reais (ver efeito abaixo)
+  const [elapsed, setElapsed] = useState(0);
+  const [minutosSessao, setMinutosSessao] = useState(30);
+  const [origem, setOrigem] = useState<"timer" | "manual">("manual");
+  const [resumo, setResumo] = useState<{ minutos: number; titulo: string; quantidade: number; unidade: SessionUnit } | null>(null);
 
-  // elapsed é sempre calculado a partir de timestamps reais — não para em background
-  const elapsed =
-    phase === "running" && runStartMs != null
-      ? accSeconds + Math.floor((Date.now() - runStartMs) / 1000)
-      : accSeconds;
+  const rodando = fase === "rodando" && !pausado;
 
+  // O tempo decorrido NUNCA é contado somando ticks: ele é sempre recalculado a
+  // partir do timestamp de início. Assim o timer continua certo mesmo quando o
+  // navegador congela o setInterval em background (aba oculta, tela bloqueada).
   useEffect(() => {
-    if (phase !== "running") return;
-    // setInterval só dispara re-renders; o valor real vem de Date.now()
-    const id = setInterval(() => setTick((t) => t + 1), 1000);
-    // visibilitychange: força re-render ao voltar do background
-    const onVisible = () => setTick((t) => t + 1);
-    document.addEventListener("visibilitychange", onVisible);
+    if (!rodando || runStartMs == null) return;
+    const sincronizar = () =>
+      setElapsed(accSeconds + Math.floor((Date.now() - runStartMs) / 1000));
+    const id = setInterval(sincronizar, 1000);
+    // ao voltar do background, ressincroniza na hora em vez de esperar o tick
+    document.addEventListener("visibilitychange", sincronizar);
     return () => {
       clearInterval(id);
-      document.removeEventListener("visibilitychange", onVisible);
+      document.removeEventListener("visibilitychange", sincronizar);
     };
-  }, [phase]);
+  }, [rodando, runStartMs, accSeconds]);
 
-  function handlePlay() {
+  // Valor exato agora — para pausar/encerrar sem depender do último tick.
+  function segundosAgora() {
+    return !pausado && runStartMs != null
+      ? accSeconds + Math.floor((Date.now() - runStartMs) / 1000)
+      : accSeconds;
+  }
+
+  function iniciar() {
     setStartedAt(new Date().toISOString());
     setAccSeconds(0);
+    setElapsed(0);
     setRunStartMs(Date.now());
-    setPhase("running");
+    setPausado(false);
+    setFase("rodando");
   }
 
-  function handlePause() {
-    // Congela os segundos acumulados antes de pausar
-    const current =
-      runStartMs != null
-        ? accSeconds + Math.floor((Date.now() - runStartMs) / 1000)
-        : accSeconds;
-    setAccSeconds(current);
+  function alternarPausa() {
+    if (pausado) {
+      // Retomar: novo marco de tempo, o acumulado já está congelado
+      setRunStartMs(Date.now());
+      setPausado(false);
+      return;
+    }
+    // Pausar: congela os segundos acumulados até agora
+    const atual = segundosAgora();
+    setAccSeconds(atual);
+    setElapsed(atual);
     setRunStartMs(null);
-    setPhase("paused");
+    setPausado(true);
   }
 
-  function handleResume() {
-    setRunStartMs(Date.now());
-    setPhase("running");
+  function encerrar() {
+    const atual = segundosAgora();
+    setAccSeconds(atual);
+    setElapsed(atual);
+    setRunStartMs(null);
+    setPausado(false);
+    setMinutosSessao(Math.max(1, Math.round(atual / 60)));
+    setOrigem("timer");
+    setFase("registro");
   }
 
-  function reset() {
-    setPhase("idle");
+  function abrirManual() {
+    setStartedAt(new Date().toISOString());
+    setMinutosSessao(30);
+    setOrigem("manual");
+    setFase("registro");
+  }
+
+  function voltarAoInicio() {
+    setFase("idle");
     setAccSeconds(0);
+    setElapsed(0);
     setRunStartMs(null);
+    setPausado(false);
     setStartedAt(null);
-    setSelectedBook(null);
-    setQuery("");
-    setUnit("chapters");
-    setQuantity("");
-    setTags(new Set());
-    setSessionId(null);
-    setError(null);
+    setResumo(null);
   }
+
+  if (fase === "salvo" && resumo) {
+    return <TelaSalvo resumo={resumo} onVoltar={voltarAoInicio} />;
+  }
+
+  if (fase === "registro") {
+    return (
+      <TelaRegistro
+        key={`${origem}-${minutosSessao}`}
+        books={books}
+        activeChallenges={activeChallenges}
+        minutosIniciais={minutosSessao}
+        origem={origem}
+        startedAt={startedAt ?? new Date().toISOString()}
+        onVoltar={voltarAoInicio}
+        onSalvo={(r) => {
+          setResumo(r);
+          setFase("salvo");
+        }}
+      />
+    );
+  }
+
+  if (fase === "rodando") {
+    return (
+      <TelaRodando
+        segundos={elapsed}
+        pausado={pausado}
+        onPausar={alternarPausa}
+        onEncerrar={encerrar}
+        onManual={abrirManual}
+      />
+    );
+  }
+
+  return <TelaIdle onIniciar={iniciar} onManual={abrirManual} />;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Tela idle                                                          */
+/* ------------------------------------------------------------------ */
+
+function CenaQuill({ src, alt, badge }: { src: string; alt: string; badge?: string }) {
+  return (
+    <div className="relative">
+      <div className="shadow-hard relative flex aspect-square w-[min(18rem,78vw)] items-center justify-center overflow-hidden rounded-full border-2 border-ink bg-moss">
+        <div className="absolute inset-x-0 bottom-0 h-1/3 bg-ink/10" />
+        <span className="absolute left-8 top-6 font-display text-xl text-paper" aria-hidden>✦</span>
+        <span className="absolute right-10 top-10 font-display text-sm text-paper/80" aria-hidden>✦</span>
+        <span className="absolute bottom-16 right-6 font-display text-lg text-paper/70" aria-hidden>✦</span>
+        {/* O mascote é centralizado: os webp são 512×288 (largos), então
+            ancorar embaixo jogava a arte pro rodapé do círculo. */}
+        <AppImage
+          slot="ler.cena"
+          src={src}
+          alt={alt}
+          width={320}
+          height={320}
+          priority
+          className="relative w-[86%] object-contain drop-shadow-[3px_3px_0_rgba(0,0,0,0.35)]"
+        />
+      </div>
+      {badge && (
+        <span className="shadow-hard-sm absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border-2 border-ink bg-mustard px-3 py-1 font-display text-xs tracking-wide">
+          {badge}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function TelaIdle({ onIniciar, onManual }: { onIniciar: () => void; onManual: () => void }) {
+  return (
+    <div className="px-5 pb-8 pt-6">
+      <h1 className="font-display text-3xl uppercase leading-none tracking-tight text-ink">
+        Sessão de leitura
+      </h1>
+      <p className="mt-1 text-sm text-ink-soft">Um botão. Um tempo pra você e o livro.</p>
+
+      <div className="mt-8 flex justify-center">
+        <CenaQuill
+          src="/img/mascot/quill-lendo.webp"
+          alt="Quill lendo tranquilo"
+          badge="pronto pra ler?"
+        />
+      </div>
+
+      <div className="mt-8 flex flex-col items-center">
+        <button
+          type="button"
+          onClick={onIniciar}
+          aria-label="Começar sessão de leitura"
+          className="shadow-hard flex h-24 w-24 items-center justify-center rounded-full border-2 border-ink bg-coral text-paper transition active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+        >
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+            <path d="M8 5.5v13a1 1 0 0 0 1.55.83l10-6.5a1 1 0 0 0 0-1.66l-10-6.5A1 1 0 0 0 8 5.5Z" />
+          </svg>
+        </button>
+        <p className="mt-3 font-display text-base tracking-wide">COMEÇAR</p>
+        <p className="mt-1 text-xs text-ink-soft">Vincular a um livro é opcional.</p>
+
+        <button
+          type="button"
+          onClick={onManual}
+          className="mt-5 text-sm font-medium text-moss-dark underline underline-offset-4"
+        >
+          Leu sem o timer? Registrar manualmente
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Tela sessão rodando                                                */
+/* ------------------------------------------------------------------ */
+
+function TelaRodando({
+  segundos,
+  pausado,
+  onPausar,
+  onEncerrar,
+  onManual,
+}: {
+  segundos: number;
+  pausado: boolean;
+  onPausar: () => void;
+  onEncerrar: () => void;
+  onManual: () => void;
+}) {
+  const h = Math.floor(segundos / 3600);
+  const m = Math.floor((segundos % 3600) / 60);
+  const s = segundos % 60;
+  const label =
+    h > 0
+      ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+      : `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+
+  const mascote =
+    segundos >= 60 * 25 ? "/img/mascot/quill-timer-completo.webp" : "/img/mascot/quill-lendo.webp";
+
+  return (
+    <div className="px-5 pb-8 pt-6">
+      <h1 className="font-display text-3xl uppercase leading-none tracking-tight text-ink">
+        Sessão de leitura
+      </h1>
+
+      <div className="mt-5 flex justify-center">
+        <CenaQuill src={mascote} alt="Quill lendo" badge={pausado ? "pausado" : undefined} />
+      </div>
+
+      <div className="mt-8 text-center">
+        <div className="font-display text-6xl tabular-nums tracking-tight" aria-live="polite">
+          {label}
+        </div>
+        <p className="mt-2 text-xs text-ink-soft">
+          O timer nunca trava o app — pode navegar à vontade.
+        </p>
+      </div>
+
+      <div className="mt-8 flex gap-3">
+        <button
+          type="button"
+          onClick={onPausar}
+          className="shadow-hard h-14 flex-1 rounded-xl border-2 border-ink bg-paper font-display tracking-wide text-ink active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+        >
+          {pausado ? "▶ Retomar" : "II Pausar"}
+        </button>
+        <button
+          type="button"
+          onClick={onEncerrar}
+          className="shadow-hard h-14 flex-1 rounded-xl border-2 border-ink bg-coral font-display tracking-wide text-paper active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+        >
+          ■ Encerrar
+        </button>
+      </div>
+
+      <div className="mt-6 text-center">
+        <button
+          type="button"
+          onClick={onManual}
+          className="text-sm font-medium text-moss-dark underline underline-offset-4"
+        >
+          Leu sem o timer? Registrar manualmente
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Tela de registro — modelo único (manual e pós-timer)               */
+/* ------------------------------------------------------------------ */
+
+function Passo({
+  numero,
+  titulo,
+  children,
+}: {
+  numero: string;
+  titulo: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="mt-6">
+      <div className="mb-3 flex items-center gap-2">
+        <span className="flex h-6 w-6 items-center justify-center rounded-sm bg-ink font-display text-[11px] text-paper">
+          {numero}
+        </span>
+        <h2 className="font-display text-sm uppercase tracking-tight text-ink">{titulo}</h2>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function TelaRegistro({
+  books,
+  activeChallenges,
+  minutosIniciais,
+  origem,
+  startedAt,
+  onVoltar,
+  onSalvo,
+}: {
+  books: BookOption[];
+  activeChallenges: ActiveChallenge[];
+  minutosIniciais: number;
+  origem: "timer" | "manual";
+  startedAt: string;
+  onVoltar: () => void;
+  onSalvo: (r: { minutos: number; titulo: string; quantidade: number; unidade: SessionUnit }) => void;
+}) {
+  const lendo = books.filter((b) => b.status === "reading");
+  const disponiveis = lendo.length > 0 ? lendo : books;
+
+  const [livroId, setLivroId] = useState<string | null>(disponiveis[0]?.id ?? null);
+  const [unidade, setUnidade] = useState<SessionUnit>("pages");
+  const [quantidade, setQuantidade] = useState(0);
+  const [total, setTotal] = useState(minutosIniciais);
+  const [tags, setTags] = useState<Set<string>>(new Set());
+  const [nota, setNota] = useState("");
+  const [visibilidade, setVisibilidade] = useState<"eu" | "amigos">("eu");
+  const [desafiosOn, setDesafiosOn] = useState<Set<string>>(
+    () => new Set(activeChallenges.filter((d) => d.scoring_metric === "active_days").map((d) => d.id)),
+  );
+  const [erro, setErro] = useState<string | null>(null);
+  const [salvando, startSave] = useTransition();
+
+  const livro = disponiveis.find((l) => l.id === livroId) ?? null;
 
   function toggleTag(value: string) {
     setTags((prev) => {
@@ -108,265 +403,434 @@ export function FreeReadingSession({
     });
   }
 
-  function handleSave() {
-    setError(null);
-    startSave(async () => {
-      const result = await createSession({
-        itemId: selectedBook?.id ?? null,
-        startedAt: startedAt ?? new Date().toISOString(),
-        durationSeconds: elapsed,
-        unit,
-        quantity: quantity ? Number(quantity) : null,
-        tags: [...tags],
-      });
-      if (result.error || !result.sessionId) {
-        setError(result.error ?? "Algo deu errado.");
-        return;
-      }
-      setSessionId(result.sessionId);
-      setSavedElapsed(elapsed);
-      setPhase("saved");
+  function toggleDesafio(id: string) {
+    setDesafiosOn((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
   }
 
-  const matches = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    return books.filter((b) => b.title.toLowerCase().includes(q)).slice(0, 5);
-  }, [books, query]);
+  function finalizar() {
+    setErro(null);
+    startSave(async () => {
+      const resultado = await createSession({
+        itemId: livroId,
+        startedAt,
+        durationSeconds: Math.max(60, total * 60),
+        unit: unidade,
+        quantity: quantidade > 0 ? quantidade : null,
+        tags: [...tags],
+      });
 
-  if (phase === "saved" && sessionId) {
-    return (
-      <PostSession
-        sessionId={sessionId}
-        book={selectedBook}
-        durationSeconds={savedElapsed}
-        quantity={quantity ? Number(quantity) : null}
-        unit={unit}
-        challenges={activeChallenges}
-        onDone={reset}
-      />
-    );
-  }
+      if (resultado.error || !resultado.sessionId) {
+        setErro(resultado.error ?? "Algo deu errado ao salvar.");
+        return;
+      }
 
-  if (phase === "idle") {
-    return (
-      <main className="flex flex-1 flex-col items-center justify-center gap-6 px-6">
-        {/* eslint-disable-next-line @next/next/no-img-element -- svg estático em /public */}
-        <img
-          src="/quill-lendo.svg"
-          alt="Quill lendo num cantinho aconchegante"
-          className="w-full max-w-[320px]"
-        />
-        <button
-          type="button"
-          aria-label="Começar a ler"
-          onClick={handlePlay}
-          className="flex h-[88px] w-[88px] items-center justify-center rounded-full border-2 border-ink bg-moss-dark text-3xl text-paper shadow-hard"
-        >
-          ▶
-        </button>
-        <p className="max-w-[220px] text-center text-sm text-ink/70">
-          Toque em play pra começar uma sessão de leitura — escolhe o livro
-          só no final, se quiser.
-        </p>
-        <Link
-          href="/ler/manual"
-          className="text-[11.5px] font-medium text-moss-dark underline"
-        >
-          registrar manualmente em vez disso
-        </Link>
-      </main>
-    );
+      if (desafiosOn.size > 0) {
+        await publishSession({
+          sessionId: resultado.sessionId,
+          itemId: livroId,
+          groupIds: [...desafiosOn],
+          note: nota.trim() || null,
+          pagesExtra: null,
+        });
+      }
+
+      if (livroId && nota.trim()) {
+        await saveSessionMemory({
+          itemId: livroId,
+          text: nota,
+          isPublic: visibilidade === "amigos",
+        });
+      }
+
+      onSalvo({
+        minutos: total,
+        titulo: livro?.title ?? "Sem livro vinculado",
+        quantidade,
+        unidade,
+      });
+    });
   }
 
   return (
-    <main className="flex flex-1 flex-col items-center gap-6 px-6 py-8">
-      <div className="flex w-full justify-start">
-        <button
-          type="button"
-          aria-label="Cancelar sessão"
-          onClick={reset}
-          className="text-lg"
-        >
-          ×
-        </button>
-      </div>
+    <div className="min-h-full">
+      <header className="relative flex flex-col">
+        <div className="relative flex items-center justify-between gap-3 overflow-visible border-y-2 border-ink bg-mustard px-5 py-6">
+          <div className="absolute left-3 top-2 flex gap-1 opacity-20">
+            <span className="size-2 rounded-full bg-ink" />
+            <span className="size-2 rounded-full bg-ink" />
+            <span className="size-2 rounded-full bg-ink" />
+          </div>
 
-      <div className="font-serif text-4xl font-semibold tracking-wide">
-        {formatTimer(elapsed)}
-      </div>
-
-      {phase === "paused" && (
-        <span className="rounded-full border-2 border-cover-border px-3 py-1 text-xs">
-          pausado
-        </span>
-      )}
-
-      {(phase === "running" || phase === "paused") && (
-        <div className="flex gap-3.5">
-          {phase === "running" ? (
+          <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"
-              aria-label="Pausar sessão"
-              onClick={handlePause}
-              className="flex h-[64px] w-[64px] items-center justify-center rounded-full border-2 border-ink bg-mustard text-xl text-ink shadow-hard-sm"
+              onClick={onVoltar}
+              aria-label="Voltar"
+              className="shadow-hard-sm flex size-10 shrink-0 items-center justify-center rounded-md border-2 border-ink bg-card text-ink active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
             >
-              ❚❚
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
             </button>
-          ) : (
-            <button
-              type="button"
-              aria-label="Retomar sessão"
-              onClick={handleResume}
-              className="flex h-[64px] w-[64px] items-center justify-center rounded-full border-2 border-ink bg-moss-dark text-xl text-paper shadow-hard-sm"
-            >
-              ▶
-            </button>
-          )}
-          <button
-            type="button"
-            aria-label="Parar sessão"
-            onClick={() => setPhase("stopped")}
-            className="flex h-[64px] w-[64px] items-center justify-center rounded-full border-2 border-ink bg-coral text-xl text-paper shadow-hard-sm"
-          >
-            ■
-          </button>
-        </div>
-      )}
 
-      {phase === "stopped" && (
-        <div className="fixed inset-0 flex items-end justify-center bg-ink/45 sm:items-center sm:px-4">
-          <div className="max-h-[92vh] w-full max-w-sm overflow-y-auto rounded-t-2xl border-2 border-ink bg-paper p-5 sm:rounded-md">
-            <div className="mx-auto mb-3 h-1 w-11 rounded-full bg-cover-border/60 sm:hidden" />
-            <h2 className="text-center font-serif text-lg font-semibold">
-              Boa! {formatTimer(elapsed)} de leitura 🎉
-            </h2>
-            <p className="mb-4 text-center text-xs text-ink/60">
-              Como foi a sessão?
-            </p>
+            <h1 className="font-display text-3xl uppercase leading-none tracking-tight text-ink">
+              Registrar
+              <br />
+              leitura
+            </h1>
+          </div>
 
-            <div className="flex flex-col gap-4">
-              <div>
-                <span className="text-sm font-medium">
-                  Quanto você leu?{" "}
-                  <span className="font-normal text-ink/60">(opcional)</span>
-                </span>
-                <div className="mt-1.5 flex overflow-hidden rounded-md border-2 border-ink text-center text-sm font-semibold">
-                  {(
-                    [
-                      ["chapters", "Capítulos"],
-                      ["pages", "Páginas"],
-                    ] as const
-                  ).map(([value, label]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setUnit(value)}
-                      className={`flex-1 py-2 ${unit === value ? "bg-navy font-display text-paper" : "bg-white"}`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                <input
-                  type="number"
-                  min={0}
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  placeholder={
-                    unit === "chapters" ? "capítulos lidos" : "páginas lidas"
-                  }
-                  className="mt-2 block w-full rounded border-2 border-ink bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-moss-dark"
-                />
-              </div>
-
-              <fieldset>
-                <legend className="mb-1.5 text-sm font-medium">
-                  Como foi?{" "}
-                  <span className="font-normal text-ink/60">(opcional)</span>
-                </legend>
-                <div className="flex flex-wrap gap-2">
-                  {TAG_OPTIONS.map((tag) => (
-                    <button
-                      key={tag.value}
-                      type="button"
-                      onClick={() => toggleTag(tag.value)}
-                      className={`rounded-full border-2 border-ink px-3 py-1.5 text-xs font-medium ${tags.has(tag.value) ? "bg-mustard" : "bg-white"}`}
-                    >
-                      {tag.label}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-
-              <div className="border-t-2 border-cover-border pt-3">
-                <label className="text-sm font-medium">
-                  Esse tempo foi em qual livro?{" "}
-                  <span className="font-normal text-ink/60">(opcional)</span>
-                  <input
-                    value={selectedBook ? selectedBook.title : query}
-                    onChange={(e) => {
-                      setSelectedBook(null);
-                      setQuery(e.target.value);
-                    }}
-                    placeholder="Buscar na estante..."
-                    className="mt-1 mb-2 block w-full rounded border-2 border-ink bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-moss-dark"
-                  />
-                </label>
-                {!selectedBook && matches.length > 0 && (
-                  <ul className="mb-2 flex flex-col gap-1">
-                    {matches.map((b) => (
-                      <li key={b.id}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedBook(b);
-                            setQuery("");
-                          }}
-                          className="w-full rounded border-2 border-ink bg-white px-3 py-1.5 text-left text-sm"
-                        >
-                          {b.title}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {selectedBook && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedBook(null)}
-                    className="text-xs text-ink/60 underline"
-                  >
-                    Remover vínculo
-                  </button>
-                )}
-              </div>
-
-              {error && <p className="text-sm font-medium text-coral">{error}</p>}
-
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={isSaving}
-                className="rounded-md border-2 border-ink bg-moss-dark px-4 py-2.5 font-display text-sm text-paper shadow-hard-sm disabled:opacity-60"
-              >
-                {isSaving ? "Salvando…" : "Salvar sessão"}
-              </button>
-              <p className="-mt-2 text-center text-[11px] text-ink/60">
-                só isso — notas e desafios vêm depois, se você quiser
-              </p>
-              <button
-                type="button"
-                onClick={reset}
-                className="text-center text-xs text-ink/60"
-              >
-                Descartar sessão
-              </button>
+          <div className="relative shrink-0">
+            <div className="absolute -bottom-1 -right-1 size-16 rounded-full bg-ink/10" />
+            <div className="relative flex size-16 items-center justify-center rounded-2xl border-2 border-ink bg-card shadow-[4px_4px_0_0_var(--color-coral)]">
+              <AppImage
+                slot={origem === "timer" ? "ler.resumo-timer" : "ler.resumo-manual"}
+                src={
+                  origem === "timer"
+                    ? "/img/mascot/quill-timer-completo.webp"
+                    : "/img/mascot/quill-lendo.webp"
+                }
+                alt=""
+                width={48}
+                height={48}
+                className="size-12 object-contain"
+              />
             </div>
           </div>
         </div>
-      )}
-    </main>
+
+        <div className="mt-2 px-5">
+          <div className="h-1 w-24 rounded-full bg-coral" />
+        </div>
+      </header>
+
+      <div className="px-5 pb-10 pt-4">
+        {/* 01 — Livro */}
+        <Passo numero="01" titulo="Em qual livro?">
+          {disponiveis.length === 0 ? (
+            <p className="rounded-md border-2 border-dashed border-ink bg-card p-4 text-center font-serif text-sm italic text-ink-soft">
+              Sua estante está vazia — a sessão vai valer só pelo tempo.
+            </p>
+          ) : (
+            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+              {disponiveis.map((l) => {
+                const on = livroId === l.id;
+                return (
+                  <button
+                    key={l.id}
+                    type="button"
+                    onClick={() => setLivroId(l.id)}
+                    aria-pressed={on}
+                    className={`w-[116px] shrink-0 rounded-md border-2 border-ink p-2 text-left ${
+                      on ? "shadow-hard-sm bg-moss text-paper" : "bg-card text-ink"
+                    }`}
+                  >
+                    <BookThumb item={l} />
+                    <span className="mt-2 block line-clamp-2 text-xs font-medium leading-tight">
+                      {l.title}
+                    </span>
+                    <span className={`mt-0.5 block text-[10px] ${on ? "text-paper/80" : "text-ink-soft"}`}>
+                      {l.paginaAtual ? `pág. ${l.paginaAtual}` : l.author || "sem autor"}
+                    </span>
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => setLivroId(null)}
+                aria-pressed={livroId === null}
+                className={`w-[116px] shrink-0 rounded-md border-2 border-dashed border-ink p-2 text-left ${
+                  livroId === null ? "shadow-hard-sm bg-ink text-paper" : "bg-card text-ink"
+                }`}
+              >
+                <span className="flex aspect-[2/3] w-[92px] items-center justify-center rounded-sm border-2 border-dashed border-current text-lg opacity-60">
+                  —
+                </span>
+                <span className="mt-2 block text-xs font-medium">Não vincular</span>
+                <span className="mt-0.5 block text-[10px] opacity-70">só o tempo</span>
+              </button>
+            </div>
+          )}
+        </Passo>
+
+        {/* 02 — Quanto leu */}
+        <Passo numero="02" titulo="Quanto você leu?">
+          <div className="shadow-hard-sm rounded-md border-2 border-ink bg-mustard p-3">
+            <div className="flex justify-end">
+              <div className="grid grid-cols-2 overflow-hidden rounded-sm border-2 border-ink">
+                {(["pages", "chapters"] as const).map((m) => {
+                  const ativo = unidade === m;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => {
+                        setUnidade(m);
+                        setQuantidade(0);
+                      }}
+                      className={`px-4 py-1.5 font-display text-[11px] uppercase tracking-wide ${
+                        ativo ? "bg-ink text-paper" : "bg-card text-ink"
+                      }`}
+                    >
+                      {m === "pages" ? "Páginas" : "Caps"}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="mt-3 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setQuantidade((q) => Math.max(0, q - (unidade === "pages" ? 5 : 1)))}
+                className="h-12 w-12 shrink-0 rounded-md border-2 border-ink bg-card font-display text-xl leading-none active:translate-y-0.5"
+                aria-label="diminuir"
+              >
+                −
+              </button>
+              <div className="flex-1 rounded-md border-2 border-ink bg-card py-2 text-center">
+                <span className="font-display text-3xl leading-none tabular-nums">{quantidade}</span>
+                <span className="ml-1 text-xs uppercase text-ink-soft">
+                  {unidade === "pages" ? "pág" : "cap"}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQuantidade((q) => q + (unidade === "pages" ? 5 : 1))}
+                className="h-12 w-12 shrink-0 rounded-md border-2 border-ink bg-card font-display text-xl leading-none active:translate-y-0.5"
+                aria-label="aumentar"
+              >
+                +
+              </button>
+            </div>
+          </div>
+          {livro && unidade === "pages" && quantidade > 0 && (
+            <p className="mt-2 text-[11px] text-ink-soft">
+              {livro.title} vai da pág. {livro.paginaAtual ?? 0} para{" "}
+              {(livro.paginaAtual ?? 0) + quantidade}
+            </p>
+          )}
+        </Passo>
+
+        {/* 03 — Tempo */}
+        <Passo numero="03" titulo="Por quanto tempo?">
+          <div className="grid grid-cols-4 gap-2">
+            {PRESETS.map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setTotal(m)}
+                className={`rounded-md border-2 border-ink py-2.5 font-display text-xs tracking-wide active:translate-y-0.5 ${
+                  total === m ? "shadow-hard-sm bg-coral text-card" : "bg-card"
+                }`}
+              >
+                {m}m
+              </button>
+            ))}
+          </div>
+          <label className="shadow-hard-sm mt-2 flex cursor-text items-baseline justify-center gap-1 rounded-md border-2 border-ink bg-card py-3 transition-colors focus-within:bg-paper">
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={total}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, "").slice(0, 3);
+                setTotal(digits === "" ? 0 : Math.min(600, Number(digits)));
+              }}
+              onBlur={() => setTotal((t) => Math.max(1, t))}
+              aria-label="Tempo lido em minutos"
+              className="w-16 bg-transparent text-center font-serif text-3xl font-bold focus:outline-none"
+            />
+            <span className="font-display text-sm tracking-wide">min</span>
+          </label>
+          <p className="mt-2 text-center text-[11px] text-ink-soft">
+            {origem === "timer"
+              ? "tempo medido pelo cronômetro — toque para ajustar"
+              : "toque no número para digitar quanto tempo você leu"}
+          </p>
+        </Passo>
+
+        {/* 04 — Como foi */}
+        <Passo numero="04" titulo="Como foi hoje?">
+          <div className="flex flex-wrap gap-2">
+            {TAG_OPTIONS.map((t) => {
+              const on = tags.has(t.value);
+              return (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => toggleTag(t.value)}
+                  aria-pressed={on}
+                  className={
+                    "h-9 rounded-full border-2 border-ink px-3 text-sm font-medium " +
+                    (on
+                      ? t.positiva
+                        ? "shadow-hard-sm bg-moss text-paper"
+                        : "shadow-hard-sm bg-mustard text-ink"
+                      : "bg-card text-ink")
+                  }
+                >
+                  {on ? "✓ " : ""}
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-3 rounded-md border-2 border-ink bg-card p-3">
+            <textarea
+              value={nota}
+              onChange={(e) => setNota(e.target.value)}
+              placeholder="Anota aquela frase ou sentimento…"
+              className="min-h-[80px] w-full resize-y bg-transparent text-sm placeholder:text-ink-soft/60 focus:outline-none"
+            />
+            <div className="mt-2 flex justify-end">
+              <label className="flex items-center gap-2 rounded-md border-2 border-ink bg-paper px-2 py-1">
+                <span className="font-display text-[10px] uppercase tracking-widest text-ink-soft">
+                  visível para:
+                </span>
+                <select
+                  value={visibilidade}
+                  onChange={(e) => setVisibilidade(e.target.value as "eu" | "amigos")}
+                  className="bg-transparent text-xs font-medium focus:outline-none"
+                >
+                  <option value="eu">só eu</option>
+                  <option value="amigos">amigos</option>
+                </select>
+              </label>
+            </div>
+            {nota.trim() && !livroId && (
+              <p className="mt-2 text-[11px] text-ink-soft">
+                Vincule um livro para a anotação virar comentário na página dele.
+              </p>
+            )}
+          </div>
+        </Passo>
+
+        {/* 05 — Desafios */}
+        {activeChallenges.length > 0 && (
+          <Passo numero="05" titulo="Publicar nos desafios">
+            <ul className="space-y-2">
+              {activeChallenges.map((d) => {
+                const on = desafiosOn.has(d.id);
+                const valor =
+                  d.scoring_metric === "active_days" || d.scoring_metric === "check_ins"
+                    ? "+1 dia"
+                    : d.scoring_metric === "minutes"
+                      ? `+${total} min`
+                      : d.scoring_metric === "pages"
+                        ? `+${unidade === "pages" ? quantidade : 0} pág`
+                        : `+${unidade === "chapters" ? quantidade : 0} cap`;
+                return (
+                  <li key={d.id}>
+                    <button
+                      type="button"
+                      onClick={() => toggleDesafio(d.id)}
+                      aria-pressed={on}
+                      className={`flex w-full items-center gap-3 rounded-md border-2 border-ink p-3 text-left ${
+                        on ? "shadow-hard-sm bg-card" : "bg-card/60"
+                      }`}
+                    >
+                      <span
+                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border-2 border-ink ${
+                          on ? "bg-moss text-paper" : "bg-paper"
+                        }`}
+                      >
+                        {on && <span className="text-xs font-bold">✓</span>}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">
+                          {d.emoji && (
+                            <span className="mr-1" aria-hidden>
+                              {d.emoji}
+                            </span>
+                          )}
+                          {d.name}
+                        </span>
+                        <span className="block text-[11px] text-ink-soft">
+                          pontua por {metricLabel(d.scoring_metric)}
+                        </span>
+                      </span>
+                      <span
+                        className={`shrink-0 rounded-full border-2 border-ink px-2 py-0.5 font-display text-[10px] ${
+                          on ? "bg-navy text-paper" : "bg-paper text-ink-soft"
+                        }`}
+                      >
+                        {valor}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </Passo>
+        )}
+
+        {erro && <p className="mt-4 text-center text-sm font-medium text-coral">{erro}</p>}
+
+        <button
+          type="button"
+          onClick={finalizar}
+          disabled={salvando}
+          className="shadow-hard mt-8 flex w-full items-center justify-center gap-2 rounded-md border-2 border-ink bg-coral py-4 font-display text-lg tracking-wide text-card transition hover:shadow-hard-hover active:translate-y-1 active:shadow-none disabled:opacity-60"
+        >
+          {salvando ? "Salvando…" : "✓ Finalizar registro"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Confirmação                                                        */
+/* ------------------------------------------------------------------ */
+
+function TelaSalvo({
+  resumo,
+  onVoltar,
+}: {
+  resumo: { minutos: number; titulo: string; quantidade: number; unidade: SessionUnit };
+  onVoltar: () => void;
+}) {
+  const horas = Math.floor(resumo.minutos / 60);
+  const mins = resumo.minutos % 60;
+
+  return (
+    <div className="flex min-h-full flex-col items-center justify-center px-5 py-12 text-center">
+      <AppImage
+        slot="ler.fim"
+        src="/img/mascot/quill-comemorando.webp"
+        alt="Quill comemorando"
+        width={200}
+        height={200}
+        className="w-40"
+      />
+      <span className="mt-3 inline-flex h-7 items-center gap-1.5 rounded-full border-2 border-ink bg-moss px-3 font-display text-[11px] tracking-wide text-paper">
+        ✓ sessão salva
+      </span>
+      <h1 className="mt-3 font-display text-3xl leading-tight">
+        +{horas > 0 ? `${horas}h ` : ""}
+        {mins} min registrados!
+      </h1>
+      <p className="mt-2 text-sm text-ink-soft">
+        {resumo.titulo}
+        {resumo.quantidade > 0
+          ? ` · ${resumo.quantidade} ${resumo.unidade === "pages" ? "pág" : "cap"}`
+          : ""}
+      </p>
+      <button
+        type="button"
+        onClick={onVoltar}
+        className="shadow-hard mt-8 w-full max-w-sm rounded-md border-2 border-ink bg-mustard py-3.5 font-display text-base tracking-wide active:translate-y-1 active:shadow-none"
+      >
+        Voltar ao início
+      </button>
+    </div>
   );
 }

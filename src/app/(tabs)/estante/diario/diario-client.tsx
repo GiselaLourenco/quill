@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { AppImage } from "@/components/app-image";
 import { useMemo, useState } from "react";
 import type { EntradaDiario } from "@/lib/types";
 
@@ -20,6 +21,17 @@ const SPINE_BG: Record<EntradaDiario["cover_palette"], string> = {
   "cover-3": "bg-cover-3",
   "cover-4": "bg-cover-4",
 };
+
+const PALETAS = Object.keys(SPINE_BG) as EntradaDiario["cover_palette"][];
+
+/** Cor da lombada = paleta do livro; sem paleta, sorteio estável pelo id. */
+function paletaDaEntrada(entrada: EntradaDiario): EntradaDiario["cover_palette"] {
+  if (entrada.cover_palette) return entrada.cover_palette;
+  const chave = entrada.livroId || entrada.id;
+  let hash = 0;
+  for (let i = 0; i < chave.length; i += 1) hash = (hash * 31 + chave.charCodeAt(i)) >>> 0;
+  return PALETAS[hash % PALETAS.length]!;
+}
 
 function formatData(iso: string): string {
   const d = new Date(iso);
@@ -52,26 +64,29 @@ export default function DiarioClient({ entradas }: { entradas: EntradaDiario[] }
 
   return (
     <div className="flex min-h-full flex-col bg-paper">
-      <header className="sticky top-0 z-20 border-b-2 border-ink bg-paper px-5 pb-4 pt-4">
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/estante"
-              aria-label="Voltar"
-              className="flex h-8 w-8 items-center justify-center border-2 border-ink bg-paper shadow-hard-sm"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="square">
-                <path d="M19 12H5M12 19l-7-7 7-7" />
-              </svg>
-            </Link>
-            <h1 className="font-display text-2xl uppercase tracking-tight text-ink">Diário</h1>
-          </div>
-          <span className="rounded-full border-2 border-ink bg-paper px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-ink">
-            Privado
+      <header className="sticky top-0 z-20 border-b-2 border-ink bg-paper px-4 pb-3 pt-4">
+        <div className="flex items-center justify-between gap-2">
+          <Link
+            href="/estante"
+            className="flex shrink-0 items-center gap-1 text-sm font-bold text-ink"
+          >
+            <span aria-hidden>‹</span> Estante
+          </Link>
+
+          <h1 className="font-display text-xl uppercase leading-none tracking-tight text-ink">
+            Meu diário
+          </h1>
+
+          <span className="flex shrink-0 items-center gap-1 rounded-full border-2 border-ink bg-card px-3 py-1 text-[11px] font-bold text-ink shadow-hard-sm">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+              <rect x="4" y="10" width="16" height="11" rx="2" />
+              <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+            </svg>
+            privado
           </span>
         </div>
 
-        <div className="flex gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
           {FILTROS.map((f) => {
             const active = f.id === filtro;
             return (
@@ -91,48 +106,87 @@ export default function DiarioClient({ entradas }: { entradas: EntradaDiario[] }
       </header>
 
       {visiveis.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-          <span className="text-6xl" aria-hidden>📖</span>
-          <p className="max-w-[260px] font-serif text-sm text-ink-soft">
-            {entradas.length === 0
-              ? "Ainda sem anotações. Elas aparecem aqui quando você comentar em um livro."
-              : "Nenhuma entrada com esse filtro."}
-          </p>
-        </div>
+        <EmptyDiario semNenhuma={entradas.length === 0} />
       ) : (
-        <ul className="flex flex-1 flex-col gap-4 px-5 py-6">
-          {visiveis.map((e) => (
-            <li key={e.id} className="relative flex gap-4 border-2 border-ink bg-paper p-4 shadow-hard">
-              <div
-                className={`w-3 shrink-0 self-stretch border-2 border-ink ${SPINE_BG[e.cover_palette]}`}
-                aria-hidden
-              />
-              <div className="min-w-0 flex-1 space-y-2 pt-0.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <Link href={`/books/${e.livroId}`} className="hover:underline">
-                      <h3 className="truncate text-xs font-bold uppercase leading-none text-ink">
-                        {e.livroTitulo}
-                      </h3>
-                    </Link>
-                    <span className="mt-1 block text-[10px] font-semibold text-ink-soft">
-                      {formatData(e.data)}
-                      {e.capitulo ? ` • ${e.capitulo}` : ""}
-                    </span>
-                  </div>
-                  <span
-                    className={`shrink-0 border border-ink px-1.5 py-0.5 text-[9px] font-bold uppercase ${
-                      e.publico ? "bg-paper text-ink shadow-hard-sm" : "bg-paper text-ink"
-                    }`}
-                  >
-                    {e.publico ? "Público" : "Privado"}
-                  </span>
-                </div>
-                <p className="font-serif text-lg leading-snug text-ink">{e.texto}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="flex flex-1 flex-col gap-3 px-4 py-4">
+            {visiveis.map((e) => (
+              <EntradaItem key={e.id} entrada={e} />
+            ))}
+          </ul>
+          <p className="px-8 pb-6 text-center font-serif text-xs leading-snug text-ink-soft">
+            Tudo aqui é seu e privado por padrão — cada item pode virar público na
+            página do livro.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
+function EntradaItem({ entrada }: { entrada: EntradaDiario }) {
+  const paleta = paletaDaEntrada(entrada);
+  return (
+    <li className="flex items-stretch gap-2">
+      <div
+        className={`flex w-11 shrink-0 items-center justify-center overflow-hidden rounded-md border-2 border-ink px-1 py-2 text-center shadow-hard-sm ${SPINE_BG[paleta]}`}
+      >
+        <span className="line-clamp-4 break-words font-serif text-[8px] font-bold uppercase leading-[1.15] tracking-tight text-ink">
+          {entrada.livroTitulo}
+        </span>
+      </div>
+
+      <div className="min-w-0 flex-1 rounded-md border-2 border-ink bg-card p-3 shadow-hard">
+        <div className="flex items-baseline justify-between gap-2">
+          <h3 className="min-w-0 truncate text-[13px] font-bold leading-tight text-ink">
+            <Link href={`/books/${entrada.livroId}`} className="hover:underline">
+              {entrada.livroTitulo}
+            </Link>
+            <span className="font-semibold text-ink-soft">
+              {" · "}
+              {formatData(entrada.data).toLowerCase()}
+            </span>
+          </h3>
+          {entrada.publico ? (
+            <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide text-ink-soft">
+              Público
+            </span>
+          ) : null}
+        </div>
+        {entrada.capitulo ? (
+          <span className="mt-0.5 block text-[10px] font-semibold text-ink-soft">
+            {entrada.capitulo}
+          </span>
+        ) : null}
+        <p className="mt-1 font-serif text-[14px] leading-snug text-ink">{entrada.texto}</p>
+      </div>
+    </li>
+  );
+}
+
+function EmptyDiario({ semNenhuma }: { semNenhuma: boolean }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 py-16 text-center">
+      <AppImage
+        slot="diario.vazio"
+        src="/img/mascot/quill-escrevendo.webp"
+        alt="Quill escrevendo no caderno"
+        width={200}
+        height={133}
+        className="w-40 max-w-full"
+      />
+      <p className="max-w-[280px] font-serif text-sm leading-snug text-ink-soft">
+        {semNenhuma
+          ? "Ainda sem anotações. Elas aparecem aqui quando você comentar em um livro ou registrar um “pra não esquecer”."
+          : "Nenhuma entrada com esse filtro."}
+      </p>
+      {semNenhuma && (
+        <Link
+          href="/estante"
+          className="shadow-hard-sm rounded-md border-2 border-ink bg-mustard px-4 py-2.5 font-display text-xs uppercase tracking-wider text-ink active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+        >
+          Ir para a estante
+        </Link>
       )}
     </div>
   );

@@ -41,6 +41,21 @@ const QUALITY = Number(args.quality || 82);
 const DENSITY = Number(args.density || 200);
 const EXTS = new Set([".svg", ".png", ".jpg", ".jpeg", ".webp"]);
 
+/**
+ * Artes que vêm com margem transparente sobrando e precisam ser aparadas.
+ *
+ * A maioria dos mascotes já vem enquadrada; aparar todos mudaria o
+ * enquadramento em telas que hoje estão certas. Por isso a lista é explícita:
+ * só entra aqui a arte que chega com sobra de fato.
+ */
+const APARAR = new Set([
+  "quill-explorando",
+  // Avatares: a arte ocupa ~150x210 de um quadro de 512x512 e cada uma senta
+  // num canto diferente. Sem aparar, o Quill aparece minúsculo e torto dentro
+  // do círculo — aparado, cada um fica centralizado e do mesmo tamanho.
+  "quill-bolado", "quill-inlove", "quill-ok", "quill-omg", "quill-rindo", "quill-zen",
+]);
+
 function walk(dir) {
   const out = [];
   for (const entry of readdirSync(dir)) {
@@ -71,7 +86,12 @@ for (const file of files) {
   mkdirSync(dirname(outPath), { recursive: true });
 
   const inputSize = statSync(file).size;
-  const info = await sharp(file, { density: DENSITY })
+  const nome = basename(rel, extname(rel));
+
+  let pipeline = sharp(file, { density: DENSITY });
+  if (APARAR.has(nome)) pipeline = pipeline.trim();
+
+  const info = await pipeline
     .resize(WIDTH, WIDTH, { fit: "inside", withoutEnlargement: true })
     .webp({ quality: QUALITY })
     .toFile(outPath);

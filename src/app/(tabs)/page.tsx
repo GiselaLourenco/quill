@@ -1,160 +1,277 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 import { getActiveChallenges } from "@/lib/challenges";
-import HomeClient from "./home-client";
+import { nomeExibicao } from "@/lib/nome-exibicao";
+import { AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
+import HomeClient, { type Meta, type SemanaDados, type MesCalendario } from "./home-client";
+
+const DIA_LABEL = ["D", "S", "T", "Q", "Q", "S", "S"];
+const SEMANAS_VISIVEIS = 5;
+const MESES_ANTES = 2;
+const MESES_DEPOIS = 2;
+
+function iso(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function ddmm(d: Date): string {
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** Domingo da semana que contém `d`. */
+function domingoDa(d: Date): Date {
+  const out = new Date(d);
+  out.setDate(out.getDate() - out.getDay());
+  out.setHours(0, 0, 0, 0);
+  return out;
+}
+
+type SessionLite = {
+  started_at: string;
+  duration_seconds: number | null;
+  unit_start: number | null;
+  unit_end: number | null;
+};
+
+function paginasDa(s: SessionLite): number {
+  return Math.max(0, (s.unit_end ?? 0) - (s.unit_start ?? 0));
+}
 
 export default async function HomePage() {
   const userId = await requireUserId();
   const supabase = await createClient();
 
-  const hoje = new Date().toISOString().slice(0, 10);
-  const anoAtual = new Date().getFullYear();
+  const agora = new Date();
+  const hoje = iso(agora);
+  const anoAtual = agora.getFullYear();
+
+  // Janela de busca: cobre o ano corrente E os meses/semanas navegáveis,
+  // que podem começar antes de 1º de janeiro.
   const inicioAno = `${anoAtual}-01-01`;
-
-  // Dados do perfil
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("display_name")
-    .eq("id", userId)
-    .maybeSingle();
-
-  // Sessões deste ano (para stats globais)
-  const { data: sessionsAno } = await supabase
-    .from("sessions")
-    .select("started_at, duration_seconds, unit_start, unit_end")
-    .eq("user_id", userId)
-    .gte("started_at", inicioAno);
-
-  const allSessions = sessionsAno ?? [];
-
-  // Stats de hoje
-  const sessionsHoje = allSessions.filter((s) => s.started_at?.slice(0, 10) === hoje);
-  const minutosHoje = Math.round(sessionsHoje.reduce((sum, s) => sum + ((s.duration_seconds as number) ?? 0), 0) / 60);
-  const paginasHoje = sessionsHoje.reduce((max, s) => {
-    const pages = Math.max(0, ((s.unit_end as number) ?? 0) - ((s.unit_start as number) ?? 0));
-    return max + pages;
-  }, 0);
-
-  // Sessões da semana (últimos 7 dias) agrupadas por dia
-  const semanaData = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
-    const iso = d.toISOString().slice(0, 10);
-    const labels = ["D", "S", "T", "Q", "Q", "S", "S"];
-    const label = labels[d.getDay()];
-    const min = Math.round(
-      allSessions
-        .filter((s) => s.started_at?.slice(0, 10) === iso)
-        .reduce((sum, s) => sum + ((s.duration_seconds as number) ?? 0), 0) / 60,
-    );
-    return { d: label, min, hoje: iso === hoje };
-  });
-
-  // Calendário do mês atual
-  const mesAtual = new Date();
-  const diasComLeitura = new Set(
-    allSessions
-      .filter((s) => s.started_at?.startsWith(`${anoAtual}-${String(mesAtual.getMonth() + 1).padStart(2, "0")}`))
-      .map((s) => new Date(s.started_at as string).getDate()),
+  const inicioMeses = iso(new Date(anoAtual, agora.getMonth() - MESES_ANTES, 1));
+  const inicioSemanas = iso(
+    (() => {
+      const d = domingoDa(agora);
+      d.setDate(d.getDate() - 7 * (SEMANAS_VISIVEIS - 1));
+      return d;
+    })(),
   );
+  const janelaInicio = [inicioAno, inicioMeses, inicioSemanas].sort()[0]!;
 
-  // Metas ativas
-  const { data: goals } = await supabase
-    .from("goals")
-    .select("id, type, target_value, period_start, period_end")
-    .eq("user_id", userId);
+  const [
+    { data: profile },
+    { data: sessionRows },
+    { data: goals },
+    { count: livrosTerminados },
+    { count: livrosNoMes },
+  ] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("display_name, username, avatar_url, avatar_zoom, avatar_bg")
+        .eq("id", userId)
+        .maybeSingle(),
+      supabase
+        .from("sessions")
+        .select("started_at, duration_seconds, unit_start, unit_end")
+        .eq("user_id", userId)
+        .gte("started_at", `${janelaInicio}T00:00:00`),
+      supabase
+        .from("goals")
+        .select("id, type, target_value")
+        .eq("user_id", userId),
+      supabase
+        .from("media_items")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("status", "finished"),
+      supabase
+        .from("media_items")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("status", "finished")
+        .gte("finished_at", `${anoAtual}-${String(agora.getMonth() + 1).padStart(2, "0")}-01`)
+        .lte(
+          "finished_at",
+          iso(new Date(anoAtual, agora.getMonth() + 1, 0)),
+        ),
+    ]);
 
-  // Livros terminados no ano (para meta books_per_year)
-  const { count: livrosTerminados } = await supabase
-    .from("media_items")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .eq("status", "finished");
+  const todas = (sessionRows ?? []) as SessionLite[];
+  const doAno = todas.filter((s) => s.started_at?.startsWith(String(anoAtual)));
 
-  const metas = (goals ?? []).map((g) => {
-    let atual = 0;
-    let label = "";
-    let unidade = "";
-    let periodo = "";
+  // ---- Stats de hoje --------------------------------------------------
+  const deHoje = todas.filter((s) => s.started_at?.slice(0, 10) === hoje);
+  const minutosHoje = Math.round(
+    deHoje.reduce((soma, s) => soma + (s.duration_seconds ?? 0), 0) / 60,
+  );
+  const paginasHoje = deHoje.reduce((soma, s) => soma + paginasDa(s), 0);
 
-    if (g.type === "minutes_per_day") {
-      atual = minutosHoje;
-      label = "Minutos hoje";
-      unidade = "min";
-      periodo = "hoje";
-    } else if (g.type === "pages_per_day") {
-      atual = paginasHoje;
-      label = "Páginas hoje";
-      unidade = "pág";
-      periodo = "hoje";
-    } else if (g.type === "books_per_year") {
-      atual = livrosTerminados ?? 0;
-      label = "Livros no ano";
-      unidade = "livros";
-      periodo = String(anoAtual);
-    } else {
-      return null;
+  // ---- Semanas navegáveis ---------------------------------------------
+  const semanas: SemanaDados[] = [];
+  for (let i = SEMANAS_VISIVEIS - 1; i >= 0; i -= 1) {
+    const inicio = domingoDa(agora);
+    inicio.setDate(inicio.getDate() - 7 * i);
+    const fim = new Date(inicio);
+    fim.setDate(fim.getDate() + 6);
+
+    const dias = Array.from({ length: 7 }, (_, j) => {
+      const dia = new Date(inicio);
+      dia.setDate(dia.getDate() + j);
+      const chave = iso(dia);
+      const min = Math.round(
+        todas
+          .filter((s) => s.started_at?.slice(0, 10) === chave)
+          .reduce((soma, s) => soma + (s.duration_seconds ?? 0), 0) / 60,
+      );
+      return { d: DIA_LABEL[dia.getDay()]!, min, hoje: chave === hoje };
+    });
+
+    semanas.push({ inicio: ddmm(inicio), fim: ddmm(fim), dias });
+  }
+
+  // ---- Meses navegáveis ------------------------------------------------
+  const meses: MesCalendario[] = [];
+  for (let i = -MESES_ANTES; i <= MESES_DEPOIS; i += 1) {
+    const ref = new Date(anoAtual, agora.getMonth() + i, 1);
+    const prefixo = `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, "0")}`;
+    const doMes = todas.filter((s) => s.started_at?.startsWith(prefixo));
+
+    // Dia é "destaque" quando passou de 60 min lidos.
+    const minutosPorDia = new Map<number, number>();
+    for (const s of doMes) {
+      const dia = Number(s.started_at.slice(8, 10));
+      minutosPorDia.set(dia, (minutosPorDia.get(dia) ?? 0) + (s.duration_seconds ?? 0) / 60);
     }
 
-    return {
-      id: g.id as string,
-      tipo: g.type === "minutes_per_day" ? "minutos" : g.type === "pages_per_day" ? "paginas" : "livros" as "minutos" | "paginas" | "livros",
-      label,
-      atual,
-      total: g.target_value as number,
-      unidade,
-      periodo,
-    };
-  }).filter(Boolean) as { id: string; tipo: "minutos" | "paginas" | "livros"; label: string; atual: number; total: number; unidade: string; periodo: string }[];
+    const ehMesAtual = ref.getMonth() === agora.getMonth() && ref.getFullYear() === anoAtual;
+    meses.push({
+      nome: ref.toLocaleString("pt-BR", { month: "long" }),
+      ano: ref.getFullYear(),
+      diasNoMes: new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate(),
+      primeiroDiaSemana: ref.getDay(),
+      hoje: ehMesAtual ? agora.getDate() : null,
+      lidos: [...minutosPorDia.keys()],
+      destaques: [...minutosPorDia.entries()].filter(([, m]) => m >= 60).map(([d]) => d),
+    });
+  }
 
-  // Desafios ativos
-  const desafiosAtivos = await getActiveChallenges(supabase, userId);
+  // ---- Metas ------------------------------------------------------------
+  // Os três tipos aparecem SEMPRE. Sem meta cadastrada, o card mostra o número
+  // atual e convida a definir o alvo — antes, quem só tinha meta de livros
+  // nunca via minutos nem páginas.
+  const alvoPorTipo = new Map(
+    (goals ?? []).map((g) => [g.type as string, g.target_value as number]),
+  );
 
-  // Sequência (streak)
-  const diasOrdenados = Array.from(new Set(allSessions.map((s) => s.started_at?.slice(0, 10) ?? ""))).filter(Boolean).sort().reverse();
+  const metas: Meta[] = [
+    {
+      id: "minutos",
+      tipo: "minutos",
+      label: "Minutos hoje",
+      atual: minutosHoje,
+      total: alvoPorTipo.get("minutes_per_day") ?? 0,
+      unidade: "min",
+      periodo: "hoje",
+    },
+    {
+      id: "paginas",
+      tipo: "paginas",
+      label: "Páginas hoje",
+      atual: paginasHoje,
+      total: alvoPorTipo.get("pages_per_day") ?? 0,
+      unidade: "pág",
+      periodo: "hoje",
+    },
+    {
+      id: "livros",
+      tipo: "livros",
+      label: "Livros no ano",
+      atual: livrosTerminados ?? 0,
+      total: alvoPorTipo.get("books_per_year") ?? 0,
+      unidade: "livros",
+      periodo: String(anoAtual),
+    },
+  ];
+
+  // ---- Pílulas ----------------------------------------------------------
+  const diasComLeituraAno = new Set(doAno.map((s) => s.started_at.slice(0, 10)));
+
+  const diasOrdenados = [...diasComLeituraAno].sort().reverse();
   let streak = 0;
-  const todayStr = hoje;
-  for (let i = 0; i < diasOrdenados.length; i++) {
-    const esperado = new Date(todayStr);
+  for (let i = 0; i < diasOrdenados.length; i += 1) {
+    const esperado = new Date(agora);
     esperado.setDate(esperado.getDate() - i);
-    if (diasOrdenados[i] === esperado.toISOString().slice(0, 10)) streak++;
+    if (diasOrdenados[i] === iso(esperado)) streak += 1;
     else break;
   }
 
-  // Total de horas no ano
-  const totalSegundos = allSessions.reduce((sum, s) => sum + ((s.duration_seconds as number) ?? 0), 0);
-  const totalMinutos = Math.round(totalSegundos / 60);
-  const horasStr = totalMinutos >= 60 ? `${Math.floor(totalMinutos / 60)}h${totalMinutos % 60 > 0 ? `${totalMinutos % 60}` : ""}` : `${totalMinutos}min`;
+  // Média de páginas por dia efetivamente lido (não por dia do calendário).
+  const paginasAno = doAno.reduce((soma, s) => soma + paginasDa(s), 0);
+  const mediaPaginas =
+    diasComLeituraAno.size > 0 ? Math.round(paginasAno / diasComLeituraAno.size) : 0;
 
-  // Média páginas/dia (últimos 30 dias com leitura)
-  const mediaPaginas = diasComLeitura.size > 0
-    ? Math.round(allSessions.filter((s) => s.started_at?.startsWith(`${anoAtual}-${String(mesAtual.getMonth() + 1).padStart(2, "0")}`)).reduce((sum, s) => sum + Math.max(0, ((s.unit_end as number) ?? 0) - ((s.unit_start as number) ?? 0)), 0) / Math.max(1, diasComLeitura.size))
-    : 0;
+  // Velocidade: só entram sessões que registraram páginas, senão o tempo de
+  // sessões sem página derrubaria a média.
+  let paginasComTempo = 0;
+  let segundosComPaginas = 0;
+  for (const s of doAno) {
+    const pags = paginasDa(s);
+    if (pags > 0) {
+      paginasComTempo += pags;
+      segundosComPaginas += s.duration_seconds ?? 0;
+    }
+  }
+  const velocidade =
+    segundosComPaginas > 0 ? Math.round((paginasComTempo / segundosComPaginas) * 3600) : 0;
+
+  // Tempo lido na semana corrente (a última do array de semanas).
+  const minutosSemana = semanas[semanas.length - 1]!.dias.reduce((soma, d) => soma + d.min, 0);
+  const semanaTexto =
+    minutosSemana >= 60
+      ? `${Math.floor(minutosSemana / 60)}h${String(minutosSemana % 60).padStart(2, "0")}`
+      : `${minutosSemana}min`;
+
+  // Horário de ouro: a hora do dia em que mais sessões começaram.
+  const porHora = new Map<number, number>();
+  for (const s of doAno) {
+    const h = new Date(s.started_at).getHours();
+    porHora.set(h, (porHora.get(h) ?? 0) + 1);
+  }
+  let melhorHora: string | null = null;
+  let maiorContagem = 0;
+  for (const [h, n] of porHora) {
+    if (n > maiorContagem) {
+      maiorContagem = n;
+      melhorHora = `${h}h`;
+    }
+  }
+
+  const mesCurto = agora.toLocaleString("pt-BR", { month: "short" }).replace(".", "");
+
+  const desafiosAtivos = await getActiveChallenges(supabase, userId);
 
   return (
     <HomeClient
-      nomeUsuario={(profile?.display_name as string | null) ?? "Leitor"}
-      semana={semanaData}
-      mesInfo={{
-        nome: mesAtual.toLocaleString("pt-BR", { month: "long" }),
-        ano: anoAtual,
-        diasNoMes: new Date(anoAtual, mesAtual.getMonth() + 1, 0).getDate(),
-        primeiroDiaSemana: new Date(anoAtual, mesAtual.getMonth(), 1).getDay(),
-        hoje: mesAtual.getDate(),
-      }}
-      diasComLeitura={Array.from(diasComLeitura)}
+      nomeUsuario={nomeExibicao(profile?.display_name as string | null, profile?.username as string | null)}
+      avatarUrl={(profile?.avatar_url as string | null) ?? null}
+      avatarZoom={(profile?.avatar_zoom as number | null) ?? 100}
+      avatarBg={(profile?.avatar_bg as string | null) ?? AVATAR_FUNDO_PADRAO}
+      semanas={semanas}
+      meses={meses}
       metas={metas}
       desafios={desafiosAtivos.map((d, i) => ({
         id: d.id,
         nome: d.name,
         emoji: d.emoji ?? "📚",
-        tone: (["coral", "moss", "mustard"] as const)[i % 3],
+        tone: (["coral", "moss", "mustard"] as const)[i % 3]!,
       }))}
       pilulas={[
-        { id: "sequencia", label: "Sequência", valor: String(streak), unidade: "dias", tone: "moss" as const },
-        { id: "media-pag", label: "Média/dia", valor: String(mediaPaginas), unidade: "pág", tone: "paper" as const },
-        { id: "livros-ano", label: "Livros/ano", valor: String(livrosTerminados ?? 0), unidade: `em ${anoAtual}`, tone: "mustard" as const },
-        { id: "horas-ano", label: "Horas lidas", valor: horasStr, unidade: `em ${anoAtual}`, tone: "navy" as const },
+        { id: "sequencia", label: "Sequência", valor: String(streak), unidade: "dias", tone: "moss" },
+        { id: "media-dia", label: "Média/dia", valor: String(mediaPaginas), unidade: "pág", tone: "paper" },
+        { id: "velocidade", label: "Velocidade", valor: String(velocidade), unidade: "p/h", tone: "navy" },
+        { id: "min-semana", label: "Semana", valor: semanaTexto, unidade: "lidas", tone: "ink" },
+        { id: "livros-mes", label: "Livros/mês", valor: String(livrosNoMes ?? 0), unidade: `no ${mesCurto}`, tone: "mustard" },
+        { id: "melhor-hora", label: "Melhor hora", valor: melhorHora ?? "—", unidade: "pico", tone: "coral" },
       ]}
     />
   );

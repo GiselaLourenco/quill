@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 import { computeScores, daysRemaining, periodProgress, type ScoringMetric, SCORING_METRIC_UNIT } from "@/lib/challenges";
 import DesafioDetalheClient from "./detalhe-client";
+import { nomeExibicao } from "@/lib/nome-exibicao";
 
 export default async function DesafioDetalhePage({
   params,
@@ -35,6 +36,10 @@ export default async function DesafioDetalhePage({
   const unit = SCORING_METRIC_UNIT[metric];
   const diasRestantes = daysRemaining(group.ends_at as string | null) ?? 0;
   const progresso = periodProgress(group.starts_at as string | null, group.ends_at as string | null);
+  // Desafio encerrado continua visível (histórico, ranking, feed), mas fechado
+  // para novos check-ins.
+  const fim = group.ends_at as string | null;
+  const encerrado = Boolean(fim && fim < new Date().toISOString().slice(0, 10));
 
   // Check-ins + membros
   const { data: checkins } = await supabase
@@ -46,10 +51,15 @@ export default async function DesafioDetalhePage({
   const memberIds = Array.from(new Set((checkins ?? []).map((c) => c.user_id as string)));
 
   const { data: profiles } = memberIds.length
-    ? await supabase.from("profiles").select("id, display_name").in("id", memberIds)
+    ? await supabase.from("profiles").select("id, display_name, username").in("id", memberIds)
     : { data: [] };
 
-  const nameById = new Map((profiles ?? []).map((p) => [p.id as string, (p.display_name as string) ?? "membro"]));
+  const nameById = new Map(
+    (profiles ?? []).map((p) => [
+      p.id as string,
+      nomeExibicao(p.display_name as string | null, p.username as string | null),
+    ]),
+  );
   nameById.set(userId, "Você");
 
   // Ranking
@@ -148,6 +158,19 @@ export default async function DesafioDetalhePage({
 
   const codigoConvite = (group.invite_code as string | null) ?? group.id.slice(0, 8).toUpperCase();
 
+  // Livros "lendo" para o select do check-in
+  const { data: livrosRows } = await supabase
+    .from("media_items")
+    .select("id, title")
+    .eq("user_id", userId)
+    .eq("status", "reading")
+    .order("created_at", { ascending: false });
+
+  const livrosLendo = (livrosRows ?? []).map((l) => ({
+    id: l.id as string,
+    titulo: (l.title as string) ?? "Sem título",
+  }));
+
   return (
     <DesafioDetalheClient
       group={{
@@ -157,6 +180,7 @@ export default async function DesafioDetalhePage({
         metric,
         unit,
         diasRestantes: Math.max(0, diasRestantes),
+        encerrado,
         progresso,
         minhaPosicao,
         codigoConvite,
@@ -164,6 +188,7 @@ export default async function DesafioDetalhePage({
       semana={semana}
       ranking={ranking}
       atividade={atividade}
+      livros={livrosLendo}
     />
   );
 }

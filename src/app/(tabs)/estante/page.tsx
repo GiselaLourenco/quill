@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
-import { BookCover } from "@/components/book-cover";
+import { BookThumb } from "@/components/book-thumb";
 import { EstanteShelf, type ShelfBook, type DbStatus } from "@/components/estante-shelf";
 import { RecommendationsStrip } from "@/components/recommendations-strip";
-import { getFriendsShelf } from "@/lib/friends";
+import { getFriendsShelf, getFriends } from "@/lib/friends";
 import { getReceivedRecommendations } from "@/lib/recommendations";
+import { IndicarSheet, type LivroIndicavel } from "@/components/indicar-sheet";
+import { EmptyState } from "@/components/empty-state";
 
 const STATUS_LABEL: Record<string, string> = {
   want: "quero ler",
@@ -97,7 +99,7 @@ export default async function EstantePage({
       ) : isDiary ? (
         <MyDiary supabase={supabase} userId={userId} />
       ) : (
-        <MyShelf supabase={supabase} />
+        <MyShelf supabase={supabase} userId={userId} />
       )}
     </div>
   );
@@ -126,11 +128,13 @@ async function MyDiary({
 
   if (!entries || entries.length === 0) {
     return (
-      <main className="flex flex-1 flex-col items-center gap-3 px-6 py-16 text-center">
-        <h1 className="font-serif text-2xl">Seu diário está vazio</h1>
-        <p className="max-w-[240px] text-ink/70">
-          Anote uma frase ou ideia ao terminar uma sessão de leitura — aparece aqui, só pra você.
-        </p>
+      <main className="flex flex-1 flex-col">
+        <EmptyState
+          mascote="escrevendo"
+          titulo="Seu diário está vazio"
+          texto="Anote uma frase ou uma ideia ao terminar uma sessão de leitura — aparece aqui, só pra você."
+          acao={{ href: "/ler", label: "Registrar leitura" }}
+        />
       </main>
     );
   }
@@ -183,15 +187,21 @@ async function MyDiary({
 
 async function MyShelf({
   supabase,
+  userId,
 }: {
   supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
 }) {
+  // A RLS deixa amigo ler meus livros (e vice-versa) — por isso a estante
+  // PRECISA filtrar pelo dono aqui. Sem isso, os livros do amigo apareciam
+  // misturados aos meus.
   const [{ data: items }, { data: ratings }] = await Promise.all([
     supabase
       .from("media_items")
       .select("id, title, creator, cover_kind, cover_url, cover_palette, status")
+      .eq("user_id", userId)
       .order("created_at", { ascending: false }),
-    supabase.from("ratings").select("item_id, stars"),
+    supabase.from("ratings").select("item_id, stars").eq("user_id", userId),
   ]);
 
   const starsByItem = new Map((ratings ?? []).map((r) => [r.item_id, r.stars]));
@@ -217,24 +227,35 @@ async function FriendsShelf({
   supabase: Awaited<ReturnType<typeof createClient>>;
   userId: string;
 }) {
-  const [shelves, recs] = await Promise.all([
+  const [shelves, recs, amigos, { data: meusLivros }] = await Promise.all([
     getFriendsShelf(supabase, userId),
     getReceivedRecommendations(supabase, userId),
+    getFriends(supabase, userId),
+    supabase
+      .from("media_items")
+      .select("id, title, creator, cover_kind, cover_url, cover_palette")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false }),
   ]);
+
+  const livrosIndicaveis: LivroIndicavel[] = (meusLivros ?? []).map((l) => ({
+    id: l.id as string,
+    title: (l.title as string) ?? "Sem título",
+    creator: (l.creator as string | null) ?? null,
+    cover_kind: l.cover_kind as string,
+    cover_url: (l.cover_url as string | null) ?? null,
+    cover_palette: (l.cover_palette as number) ?? 0,
+  }));
 
   if (shelves.length === 0 && recs.length === 0) {
     return (
-      <main className="flex flex-1 flex-col items-center gap-3 px-6 py-16 text-center">
-        <h1 className="font-serif text-2xl">Nenhum amigo por aqui ainda</h1>
-        <p className="max-w-[240px] text-ink/70">
-          Entre num desafio pelo código de convite — quem participa junto vira seu amigo e aparece aqui.
-        </p>
-        <Link
-          href="/juntos"
-          className="mt-2 rounded-md border-2 border-ink bg-moss-dark px-4 py-2 font-display text-sm text-paper shadow-hard-sm"
-        >
-          Ver desafios
-        </Link>
+      <main className="flex flex-1 flex-col">
+        <EmptyState
+          mascote="confiante"
+          titulo="Sem estantes de amigos ainda"
+          texto="Aqui você vê o que seus amigos estão lendo, com as notas e os comentários que eles deixaram públicos. Assim que alguém virar seu amigo, a estante dessa pessoa aparece nesta aba."
+          acao={{ href: "/estante", label: "Ver minha estante" }}
+        />
       </main>
     );
   }
@@ -243,13 +264,8 @@ async function FriendsShelf({
     <main className="flex-1 px-4 pb-6 pt-4">
       <RecommendationsStrip recs={recs} />
 
-      {/* Botão "Indicar livro" */}
-      <button
-        type="button"
-        className="mb-4 flex w-full items-center justify-center gap-2 rounded-md border-2 border-ink bg-mustard px-3 py-2.5 text-sm font-semibold uppercase tracking-wider text-ink shadow-hard-sm active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
-      >
-        Indicar um livro a um amigo
-      </button>
+      {/* Indicar livro a um amigo */}
+      <IndicarSheet livros={livrosIndicaveis} amigos={amigos} />
 
       <div className="flex flex-col gap-4">
         {shelves.map((shelf) => (
@@ -267,9 +283,7 @@ async function FriendsShelf({
                   href={`/books/${it.id}`}
                   className="flex gap-3 rounded-md border-2 border-cover-border bg-white p-2.5"
                 >
-                  <div className="w-[38px] shrink-0" style={{ aspectRatio: "2/3" }}>
-                    <BookCover item={it} />
-                  </div>
+                  <BookThumb item={it} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
                       <span className="truncate text-sm font-medium">{it.title}</span>

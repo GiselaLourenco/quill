@@ -19,6 +19,26 @@ export default function SignupPage() {
           className="flex flex-col gap-4 rounded-md border-2 border-ink bg-white p-6 shadow-hard"
         >
           <label className="flex flex-col gap-1 text-sm font-medium">
+            Nome de usuário
+            <input
+              name="username"
+              type="text"
+              required
+              minLength={3}
+              maxLength={30}
+              pattern="[a-zA-Z0-9_.]+"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              autoComplete="username"
+              placeholder="comoquerserchamada"
+              className="rounded border-2 border-ink bg-paper px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-mustard"
+            />
+          </label>
+          <p className="-mt-2 text-xs text-ink/60">
+            É o nome que aparece no seu perfil e para os amigos.
+          </p>
+          <label className="flex flex-col gap-1 text-sm font-medium">
             E-mail
             <input
               name="email"

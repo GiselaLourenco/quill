@@ -3,6 +3,15 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_PATHS = ["/login", "/signup"];
 
+// Redefinição de senha: precisa abrir deslogada (o link do e-mail chega antes
+// da troca do `code`) e também logada (depois da troca já existe sessão de
+// recuperação). Fica de fora dos dois redirects abaixo.
+const RECOVERY_PATHS = ["/auth/callback", "/auth/reset"];
+
+// O ícone do app é pedido pelo navegador sem sessão (inclusive na tela de
+// login) e não pode cair em nenhum dos dois redirects abaixo.
+const OPEN_PATHS = ["/api/icone"];
+
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -36,6 +45,10 @@ export async function updateSession(request: NextRequest) {
   const isAuthenticated = !!data?.claims;
   const { pathname } = request.nextUrl;
   const isPublicPath = PUBLIC_PATHS.includes(pathname);
+
+  if (RECOVERY_PATHS.includes(pathname) || OPEN_PATHS.includes(pathname)) {
+    return response;
+  }
 
   if (!isAuthenticated && !isPublicPath) {
     const url = request.nextUrl.clone();

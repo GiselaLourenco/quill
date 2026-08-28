@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { CheckinSheet, type LivroLendo } from "@/components/checkin-sheet";
+import { leaveChallenge } from "@/app/actions/groups";
 
 type SemanaItem = { data: number; label: string; estado: "vazio" | "feito" | "hoje" | "hoje-feito" };
 type RankingItem = { posicao: number; userId: string; nome: string; metrica: string; ehVoce: boolean };
@@ -10,6 +13,7 @@ type AtividadeItem = { id: string; userId: string; nome: string; texto: string; 
 type Group = {
   id: string; nome: string; emoji: string; metric: string; unit: string;
   diasRestantes: number; progresso: number; minhaPosicao: number; codigoConvite: string;
+  encerrado: boolean;
 };
 
 const CORES = ["bg-coral text-paper", "bg-moss text-paper", "bg-mustard text-ink", "bg-navy text-paper", "bg-cover-1 text-ink", "bg-cover-2 text-ink", "bg-cover-3 text-ink", "bg-cover-4 text-paper"];
@@ -17,17 +21,23 @@ const CORES = ["bg-coral text-paper", "bg-moss text-paper", "bg-mustard text-ink
 function corPara(index: number) { return CORES[index % CORES.length]; }
 
 export default function DesafioDetalheClient({
-  group, semana, ranking, atividade,
+  group, semana, ranking, atividade, livros,
 }: {
   group: Group;
   semana: SemanaItem[];
   ranking: RankingItem[];
   atividade: AtividadeItem[];
+  livros: LivroLendo[];
 }) {
+  const router = useRouter();
   const [checkinFeito, setCheckinFeito] = useState(false);
+  const [checkinAberto, setCheckinAberto] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const [rankingAberto, setRankingAberto] = useState(false);
   const [verMais, setVerMais] = useState(false);
+  const [menuAberto, setMenuAberto] = useState(false);
+  const [confirmarSaida, setConfirmarSaida] = useState(false);
+  const [saindo, startSaida] = useTransition();
 
   const atividadeVisivel = verMais ? atividade : atividade.slice(0, 3);
 
@@ -49,6 +59,44 @@ export default function DesafioDetalheClient({
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m15 18-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </Link>
           <h1 className="font-display text-lg uppercase leading-none text-ink">{group.emoji} {group.nome}</h1>
+        </div>
+
+        <div className="relative">
+          <button
+            type="button"
+            aria-label="Opções do desafio"
+            aria-expanded={menuAberto}
+            onClick={() => setMenuAberto((v) => !v)}
+            className="shadow-hard-sm flex h-9 w-9 items-center justify-center border-2 border-ink bg-paper active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <circle cx="12" cy="5" r="2" />
+              <circle cx="12" cy="12" r="2" />
+              <circle cx="12" cy="19" r="2" />
+            </svg>
+          </button>
+          {menuAberto && (
+            <>
+              <button
+                type="button"
+                aria-label="Fechar menu"
+                className="fixed inset-0 z-10 bg-transparent"
+                onClick={() => setMenuAberto(false)}
+              />
+              <div className="shadow-hard absolute right-0 top-full z-20 mt-2 w-44 border-2 border-ink bg-card p-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuAberto(false);
+                    setConfirmarSaida(true);
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left font-display text-xs uppercase tracking-wider text-ink hover:bg-coral hover:text-paper"
+                >
+                  <span aria-hidden>🚪</span> Sair do desafio
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </header>
 
@@ -157,13 +205,64 @@ export default function DesafioDetalheClient({
 
       {/* CTA fixo */}
       <div className="pointer-events-none fixed inset-x-0 bottom-16 z-30 mx-auto max-w-[430px] px-4 pt-8">
-        <button
-          onClick={() => setCheckinFeito((v) => !v)}
-          className={["pointer-events-auto w-full border-2 border-ink py-4 font-display text-sm uppercase tracking-widest shadow-hard active:translate-x-[2px] active:translate-y-[2px] active:shadow-none", checkinFeito ? "bg-moss text-paper" : "bg-coral text-paper"].join(" ")}
-        >
-          {checkinFeito ? "Check-in feito ✓" : "Fazer check-in de hoje"}
-        </button>
+        {group.encerrado ? (
+          <div className="pointer-events-auto w-full border-2 border-ink bg-paper py-3.5 text-center shadow-hard">
+            <p className="font-display text-sm uppercase tracking-widest text-ink-soft">
+              Desafio encerrado
+            </p>
+            <p className="mt-0.5 font-serif text-xs italic text-ink-soft">
+              dá pra rever tudo, mas não dá mais pra fazer check-in
+            </p>
+          </div>
+        ) : (
+          <button
+            onClick={() => setCheckinAberto(true)}
+            className={["pointer-events-auto w-full border-2 border-ink py-4 font-display text-sm uppercase tracking-widest shadow-hard active:translate-x-[2px] active:translate-y-[2px] active:shadow-none", checkinFeito ? "bg-moss text-paper" : "bg-coral text-paper"].join(" ")}
+          >
+            {checkinFeito ? "Check-in feito ✓ · registrar outro" : "Fazer check-in de hoje"}
+          </button>
+        )}
       </div>
+
+      {checkinAberto && !group.encerrado && (
+        <CheckinSheet
+          groupId={group.id}
+          livros={livros}
+          onClose={() => setCheckinAberto(false)}
+          onFeito={() => {
+            setCheckinFeito(true);
+            router.refresh();
+          }}
+        />
+      )}
+
+      {confirmarSaida && (
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-ink/60 p-4 sm:items-center">
+          <div className="shadow-hard w-full max-w-sm border-2 border-ink bg-card p-5">
+            <p className="font-display text-lg uppercase leading-tight text-ink">Sair do desafio?</p>
+            <p className="mt-2 text-sm text-ink-soft">
+              Você perderá sua posição no ranking e não poderá voltar sem um novo convite.
+            </p>
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmarSaida(false)}
+                className="shadow-hard-sm flex-1 border-2 border-ink bg-paper py-3 font-display text-xs uppercase tracking-widest text-ink active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={saindo}
+                onClick={() => startSaida(async () => { await leaveChallenge(group.id); })}
+                className="shadow-hard-sm flex-1 border-2 border-ink bg-coral py-3 font-display text-xs uppercase tracking-widest text-paper active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-60"
+              >
+                {saindo ? "Saindo…" : "Sair"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {rankingAberto && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/60 px-4 pb-6 pt-16 sm:items-center" onClick={() => setRankingAberto(false)}>

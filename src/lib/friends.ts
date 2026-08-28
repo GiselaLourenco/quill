@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { nomeExibicao } from "@/lib/nome-exibicao";
 
 export type Friend = { id: string; name: string };
 
@@ -23,11 +24,14 @@ export async function getFriends(
 
   const { data: profiles } = await supabase
     .from("profiles")
-    .select("id, display_name")
+    .select("id, display_name, username")
     .in("id", friendIds);
 
   return (profiles ?? [])
-    .map((p) => ({ id: p.id as string, name: (p.display_name as string) ?? "amigo" }))
+    .map((p) => ({
+      id: p.id as string,
+      name: nomeExibicao(p.display_name as string | null, p.username as string | null),
+    }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -74,7 +78,7 @@ export async function getFriendsShelf(
   // Tabelas que só se ligam via auth.users não têm FK direta entre si —
   // buscamos separado e cruzamos em JS (gotcha conhecido do PostgREST).
   const [{ data: profiles }, { data: items }] = await Promise.all([
-    supabase.from("profiles").select("id, display_name").in("id", friendIds),
+    supabase.from("profiles").select("id, display_name, username").in("id", friendIds),
     supabase
       .from("media_items")
       .select(
@@ -85,7 +89,10 @@ export async function getFriendsShelf(
   ]);
 
   const nameById = new Map(
-    (profiles ?? []).map((p) => [p.id, p.display_name ?? "amigo"]),
+    (profiles ?? []).map((p) => [
+      p.id,
+      nomeExibicao(p.display_name as string | null, p.username as string | null),
+    ]),
   );
   const itemRows = items ?? [];
   const itemIds = itemRows.map((it) => it.id);
