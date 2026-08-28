@@ -59,11 +59,13 @@ export function LoginClient({ modoInicial }: { modoInicial: Modo }) {
         {/* ── Login ── */}
         {modo === "login" && (
           <form action={loginAction} className="mt-10 flex flex-col gap-4">
-            <Field id="email" label="E-mail" type="email" name="email" autoComplete="email" placeholder="voce@email.com" />
+            <Field id="email" label="E-mail ou nome de usuário" type="text" name="email" autoComplete="username" placeholder="voce@email.com ou seuusuario" />
             <Field id="password" label="Senha" type="password" name="password" autoComplete="current-password" placeholder="••••••••" />
 
             {loginState?.error && (
-              <p className="text-sm font-medium text-coral">{loginState.error}</p>
+              <p role="alert" className="text-sm font-medium text-coral">
+                {loginState.error}
+              </p>
             )}
 
             <button
@@ -160,7 +162,7 @@ export function LoginClient({ modoInicial }: { modoInicial: Modo }) {
 function Field({
   id, label, type, name, placeholder, autoComplete,
 }: {
-  id: string; label: string; type: "email" | "password"; name: string;
+  id: string; label: string; type: "email" | "password" | "text"; name: string;
   placeholder?: string; autoComplete?: string;
 }) {
   return (
@@ -172,6 +174,11 @@ function Field({
         type={type}
         autoComplete={autoComplete}
         placeholder={placeholder}
+        // O campo de login aceita e-mail ou username: nada de maiúscula
+        // automática nem corretor atrapalhando quem digita o usuário.
+        autoCapitalize={type === "password" ? undefined : "none"}
+        autoCorrect={type === "password" ? undefined : "off"}
+        spellCheck={type === "password" ? undefined : false}
         required
         className="w-full rounded-xl border-2 border-ink/80 bg-paper px-4 py-3 text-[15px] text-ink placeholder:text-ink-soft/60 focus:border-ink focus:outline-none"
       />

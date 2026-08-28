@@ -61,7 +61,17 @@ export default function SignupPage() {
           </label>
           <p className="-mt-2 text-xs text-ink/60">Pelo menos 8 caracteres.</p>
           {state?.error && (
-            <p className="text-sm font-medium text-coral">{state.error}</p>
+            <p role="alert" className="text-sm font-medium text-coral">
+              {state.error}
+            </p>
+          )}
+          {state?.sucesso && (
+            <p
+              role="status"
+              className="rounded border-2 border-ink bg-mustard/30 px-3 py-2 text-sm font-medium text-ink"
+            >
+              {state.sucesso}
+            </p>
           )}
           <button
             disabled={pending}

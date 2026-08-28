@@ -2,16 +2,89 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { siteUrl } from "@/lib/site-url";
 
-export type AuthFormState = { error: string } | undefined;
+export type AuthFormState = { error?: string; sucesso?: string } | undefined;
+
+const USERNAME_RE = /^[a-z0-9_.]{3,30}$/;
+
+// Traduz os erros do GoTrue pro português. O `code` é estável (a `message` vem
+// em inglês e muda entre versões), então a decisão é sempre pelo código.
+function mensagemDeAuth(codigo: string | undefined, status: number | undefined) {
+  switch (codigo) {
+    case "user_already_exists":
+    case "email_exists":
+      return "Já existe uma conta com esse e-mail. Tente entrar ou recuperar a senha.";
+    case "weak_password":
+      return "Senha muito fraca. Use pelo menos 8 caracteres, misturando letras e números.";
+    case "email_address_invalid":
+    case "validation_failed":
+      return "Esse e-mail não parece válido. Confira e tente de novo.";
+    case "over_email_send_rate_limit":
+      return "Muitas tentativas seguidas. Espere alguns minutos e tente de novo.";
+    case "over_request_rate_limit":
+      return "Muitas tentativas seguidas. Espere um pouco e tente de novo.";
+    case "signup_disabled":
+    case "email_provider_disabled":
+      return "O cadastro por e-mail está desativado no momento.";
+    case "email_not_confirmed":
+      return "Confirme seu e-mail antes de entrar — o link está na sua caixa de entrada.";
+    case "invalid_credentials":
+      return "E-mail, nome de usuário ou senha incorretos.";
+    default:
+      if (status === 0) {
+        return "Não conseguimos falar com o servidor. Cheque sua conexão e tente de novo.";
+      }
+      return null;
+  }
+}
+
+// Descobre o e-mail de um username. Precisa da service_role: `profiles` só é
+// legível por quem já está autenticado, e quem está no login ainda não está.
+async function emailDoUsername(username: string): Promise<string | null> {
+  const admin = createAdminClient();
+  if (!admin) return null;
+
+  const { data: perfil } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("username", username)
+    .maybeSingle();
+  if (!perfil) return null;
+
+  const { data } = await admin.auth.admin.getUserById(perfil.id);
+  return data.user?.email ?? null;
+}
 
 export async function login(
   _prevState: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
-  const email = String(formData.get("email") ?? "");
+  const identificador = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+
+  if (!identificador) {
+    return { error: "Digite seu e-mail ou nome de usuário." };
+  }
+  if (!password) {
+    return { error: "Digite sua senha." };
+  }
+
+  // Sem "@" tratamos como nome de usuário e resolvemos pro e-mail da conta —
+  // o Supabase só autentica por e-mail.
+  let email = identificador;
+  if (!identificador.includes("@")) {
+    const username = identificador.toLowerCase();
+    if (!USERNAME_RE.test(username)) {
+      return { error: "E-mail, nome de usuário ou senha incorretos." };
+    }
+    const encontrado = await emailDoUsername(username);
+    if (!encontrado) {
+      return { error: "E-mail, nome de usuário ou senha incorretos." };
+    }
+    email = encontrado;
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({
@@ -20,7 +93,12 @@ export async function login(
   });
 
   if (error) {
-    return { error: "E-mail ou senha inválidos." };
+    console.error("[login]", error.name, error.status, error.code, error.message);
+    return {
+      error:
+        mensagemDeAuth(error.code, error.status) ??
+        "E-mail, nome de usuário ou senha incorretos.",
+    };
   }
 
   redirect("/");
@@ -30,21 +108,45 @@ export async function signup(
   _prevState: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
-  const email = String(formData.get("email") ?? "");
+  const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const username = String(formData.get("username") ?? "").trim().toLowerCase();
 
   if (!username) {
     return { error: "Escolha um nome de usuário." };
   }
-  if (!/^[a-z0-9_.]{3,30}$/.test(username)) {
+  if (!USERNAME_RE.test(username)) {
     return {
       error:
         "O nome de usuário aceita de 3 a 30 caracteres, entre letras, números, ponto e underline.",
     };
   }
+  if (!email) {
+    return { error: "Digite seu e-mail." };
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: "Esse e-mail não parece válido. Confira e tente de novo." };
+  }
   if (password.length < 8) {
     return { error: "A senha precisa ter pelo menos 8 caracteres." };
+  }
+
+  // Username é `unique` em `profiles` e quem preenche é o gatilho
+  // `handle_new_user`. Quando ele estoura, o GoTrue devolve 500 e o
+  // supabase-js perde o corpo da resposta (a mensagem vira "{}"), então a
+  // checagem tem que vir ANTES do signUp pra dar uma explicação de verdade.
+  const admin = createAdminClient();
+  if (admin) {
+    const { data: existente, error: erroConsulta } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("username", username)
+      .maybeSingle();
+    if (erroConsulta) {
+      console.error("[signup] checagem de username", erroConsulta.message);
+    } else if (existente) {
+      return { error: "Esse nome de usuário já está em uso. Escolha outro." };
+    }
   }
 
   const supabase = await createClient();
@@ -57,19 +159,34 @@ export async function signup(
   });
 
   if (error) {
-    // O `username` é unique: a violação sobe do gatilho como erro do signUp.
-    if (/duplicate key|already exists|unique/i.test(error.message)) {
-      return { error: "Esse nome de usuário já está em uso." };
+    console.error("[signup]", error.name, error.status, error.code, error.message);
+    const traduzido = mensagemDeAuth(error.code, error.status);
+    if (traduzido) return { error: traduzido };
+    // 500 sem código: ou alguém pegou o username entre a checagem e o insert,
+    // ou o gatilho/envio de e-mail falhou. O corpo do erro não chega até aqui.
+    if (error.status === 500) {
+      return {
+        error:
+          "Não foi possível criar a conta. O nome de usuário pode ter acabado de ser registrado por outra pessoa — tente outro.",
+      };
     }
-    return { error: error.message };
+    return { error: "Não foi possível criar a conta. Tente de novo em instantes." };
   }
 
-  // Se a confirmação de e-mail estiver ativa no projeto Supabase, não há
-  // sessão ainda — o usuário precisa confirmar antes de entrar.
+  // O Supabase não erra quando o e-mail já existe (é proposital, pra não
+  // revelar quem tem conta): devolve um usuário sem `identities`.
+  if (data.user && data.user.identities?.length === 0) {
+    return {
+      error: "Já existe uma conta com esse e-mail. Tente entrar ou recuperar a senha.",
+    };
+  }
+
+  // Confirmação de e-mail ativa no projeto: a conta foi criada, mas ainda não
+  // há sessão. Isso é sucesso, não erro.
   if (!data.session) {
     return {
-      error:
-        "Conta criada! Confirme seu e-mail (verifique a caixa de entrada) antes de entrar.",
+      sucesso:
+        "Conta criada! Confirme seu e-mail (verifique a caixa de entrada, e o spam) antes de entrar.",
     };
   }
 
