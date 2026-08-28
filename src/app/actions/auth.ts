@@ -60,3 +60,16 @@ export async function logout() {
   await supabase.auth.signOut();
   redirect("/login");
 }
+
+export async function resetPassword(
+  _prevState: AuthFormState,
+  formData: FormData,
+): Promise<AuthFormState> {
+  const email = String(formData.get("email") ?? "");
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://quill-three-tau.vercel.app"}/auth/reset`,
+  });
+  if (error) return { error: "Não foi possível enviar o e-mail. Tente novamente." };
+  return { error: "enviado" }; // sentinel para o client saber que deu certo
+}
