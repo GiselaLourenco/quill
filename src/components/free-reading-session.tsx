@@ -27,7 +27,12 @@ export function FreeReadingSession({
     "idle" | "running" | "paused" | "stopped" | "saved"
   >("idle");
   const [startedAt, setStartedAt] = useState<string | null>(null);
-  const [elapsed, setElapsed] = useState(0);
+  // Timestamp (ms) de quando o período de running atual começou
+  const [runStartMs, setRunStartMs] = useState<number | null>(null);
+  // Segundos acumulados de períodos anteriores (antes de cada pausa)
+  const [accSeconds, setAccSeconds] = useState(0);
+  // Tick só para forçar re-render a cada segundo
+  const [, setTick] = useState(0);
   const [query, setQuery] = useState("");
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [unit, setUnit] = useState<SessionUnit>("chapters");
@@ -38,21 +43,52 @@ export function FreeReadingSession({
   const [error, setError] = useState<string | null>(null);
   const [isSaving, startSave] = useTransition();
 
+  // elapsed é sempre calculado a partir de timestamps reais — não para em background
+  const elapsed =
+    phase === "running" && runStartMs != null
+      ? accSeconds + Math.floor((Date.now() - runStartMs) / 1000)
+      : accSeconds;
+
   useEffect(() => {
     if (phase !== "running") return;
-    const interval = setInterval(() => setElapsed((s) => s + 1), 1000);
-    return () => clearInterval(interval);
+    // setInterval só dispara re-renders; o valor real vem de Date.now()
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    // visibilitychange: força re-render ao voltar do background
+    const onVisible = () => setTick((t) => t + 1);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [phase]);
 
   function handlePlay() {
     setStartedAt(new Date().toISOString());
-    setElapsed(0);
+    setAccSeconds(0);
+    setRunStartMs(Date.now());
+    setPhase("running");
+  }
+
+  function handlePause() {
+    // Congela os segundos acumulados antes de pausar
+    const current =
+      runStartMs != null
+        ? accSeconds + Math.floor((Date.now() - runStartMs) / 1000)
+        : accSeconds;
+    setAccSeconds(current);
+    setRunStartMs(null);
+    setPhase("paused");
+  }
+
+  function handleResume() {
+    setRunStartMs(Date.now());
     setPhase("running");
   }
 
   function reset() {
     setPhase("idle");
-    setElapsed(0);
+    setAccSeconds(0);
+    setRunStartMs(null);
     setStartedAt(null);
     setSelectedBook(null);
     setQuery("");
@@ -173,7 +209,7 @@ export function FreeReadingSession({
             <button
               type="button"
               aria-label="Pausar sessão"
-              onClick={() => setPhase("paused")}
+              onClick={handlePause}
               className="flex h-[64px] w-[64px] items-center justify-center rounded-full border-2 border-ink bg-mustard text-xl text-ink shadow-hard-sm"
             >
               ❚❚
@@ -182,7 +218,7 @@ export function FreeReadingSession({
             <button
               type="button"
               aria-label="Retomar sessão"
-              onClick={() => setPhase("running")}
+              onClick={handleResume}
               className="flex h-[64px] w-[64px] items-center justify-center rounded-full border-2 border-ink bg-moss-dark text-xl text-paper shadow-hard-sm"
             >
               ▶
