@@ -76,11 +76,24 @@ export const SLOT_FAVICON = "app.favicon";
 /** Arte usada como ícone enquanto o admin não escolher outra. */
 export const ICONE_PADRAO = "/img/app/icone.png";
 
-/** Estilo CSS equivalente ao ajuste — usado por `<AppImage>`. */
+/**
+ * Estilo CSS equivalente ao ajuste — usado por `<AppImage>`.
+ *
+ * A posição vira `translate`, não `object-position`: as artes são desenhadas
+ * com `object-contain`, e aí a imagem já cabe inteira na caixa — não sobra
+ * nada para o `object-position` deslocar, e mexer nele não fazia nada na tela.
+ * Com `translate` o deslocamento vale sempre, em qualquer enquadramento.
+ *
+ * 50/50 é o centro; 0 e 100 empurram meia largura (ou meia altura) para cada
+ * lado. A porcentagem do `translate` é do tamanho da própria imagem, então o
+ * arrasto anda o mesmo tanto com qualquer zoom.
+ */
 export function estiloDoAjuste(a: AjusteImagem | undefined): React.CSSProperties {
   if (!a) return {};
-  const estilo: React.CSSProperties = {};
-  if (a.zoom !== 100) estilo.transform = `scale(${a.zoom / 100})`;
-  if (a.posX !== 50 || a.posY !== 50) estilo.objectPosition = `${a.posX}% ${a.posY}%`;
-  return estilo;
+  const partes: string[] = [];
+  if (a.posX !== 50 || a.posY !== 50) {
+    partes.push(`translate(${a.posX - 50}%, ${a.posY - 50}%)`);
+  }
+  if (a.zoom !== 100) partes.push(`scale(${a.zoom / 100})`);
+  return partes.length ? { transform: partes.join(" ") } : {};
 }

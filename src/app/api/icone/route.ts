@@ -3,7 +3,7 @@ import { join } from "node:path";
 import sharp from "sharp";
 import { createClient } from "@/lib/supabase/server";
 import { getSlotsImagem, ICONE_PADRAO, SLOT_FAVICON } from "@/lib/ajustes-imagem";
-import { arteValida } from "@/lib/artes";
+import { arteValida, ehArteEnviada } from "@/lib/artes";
 
 /**
  * Ícone do app (favicon e ícone da tela de início do iOS).
@@ -20,10 +20,14 @@ export async function GET(request: Request) {
   const supabase = await createClient();
   const slots = await getSlotsImagem(supabase);
   const escolhida = slots[SLOT_FAVICON]?.src ?? null;
-  const arte = escolhida && arteValida(escolhida) ? escolhida : ICONE_PADRAO;
+  const valida = escolhida && (ehArteEnviada(escolhida) || arteValida(escolhida));
+  const arte = valida ? (escolhida as string) : ICONE_PADRAO;
 
   try {
-    const bytes = await readFile(join(process.cwd(), "public", arte.replace(/^\//, "")));
+    // Arte enviada pelo admin mora no Storage; as do código, em /public.
+    const bytes = ehArteEnviada(arte)
+      ? Buffer.from(await (await fetch(arte)).arrayBuffer())
+      : await readFile(join(process.cwd(), "public", arte.replace(/^\//, "")));
     const png = await sharp(bytes)
       .resize(tamanho, tamanho, { fit: "contain", background: { r: 245, g: 236, b: 215, alpha: 1 } })
       .png()

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 import { getAjustesImagem, getSlotsImagem } from "@/lib/ajustes-imagem";
-import { listarArtes } from "@/lib/artes";
+import { catalogoDeArtes, listarArtesOcultas } from "@/lib/artes";
 import { ehAdmin, salvarAjusteImagem, limparAjusteImagem } from "@/app/actions/admin";
 import AdminClient from "./admin-client";
 
@@ -11,14 +11,17 @@ export default async function AdminPage() {
   if (!(await ehAdmin())) notFound();
 
   const supabase = await createClient();
-  const [ajustes, slots] = await Promise.all([
+  const [ajustes, slots, artes, ocultas] = await Promise.all([
     getAjustesImagem(supabase),
     getSlotsImagem(supabase),
+    catalogoDeArtes(supabase),
+    listarArtesOcultas(supabase),
   ]);
 
   return (
     <AdminClient
-      artes={listarArtes()}
+      artes={artes}
+      ocultas={ocultas}
       ajustes={ajustes}
       slots={slots}
       onSalvar={salvarAjusteImagem}

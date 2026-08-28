@@ -3,7 +3,7 @@ import { Archivo_Black, Fraunces, Inter } from "next/font/google";
 import "./globals.css";
 import { createClient } from "@/lib/supabase/server";
 import { getAjustesImagem, getSlotsImagem, getVersaoIcone } from "@/lib/ajustes-imagem";
-import { listarArtes } from "@/lib/artes";
+import { catalogoDeArtes } from "@/lib/artes";
 import { ehAdmin } from "@/app/actions/admin";
 import { ImagensProvider } from "@/components/imagens-provider";
 
@@ -53,8 +53,9 @@ export default async function RootLayout({
     getSlotsImagem(supabase),
     ehAdmin(),
   ]);
-  // A galeria de artes só interessa a quem pode editar.
-  const catalogo = admin ? listarArtes() : [];
+  // A galeria de artes só interessa a quem pode editar. Junta as artes que
+  // vieram no código (/public) com as que o admin subiu pelo app.
+  const catalogo = admin ? await catalogoDeArtes(supabase) : [];
 
   return (
     <html
