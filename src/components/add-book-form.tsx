@@ -148,6 +148,20 @@ export function AddBookForm({ serverError }: { serverError?: string }) {
         />
       </label>
       <label className="flex flex-col gap-1 text-sm font-medium">
+        Total de capítulos <span className="font-normal text-ink/60">(opcional)</span>
+        <input
+          type="number"
+          name="total_chapters"
+          min={1}
+          placeholder="0"
+          className="rounded border-2 border-ink bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-moss-dark"
+        />
+      </label>
+      <p className="-mt-3 text-xs text-ink/60">
+        A busca não traz esse número — sumário não entra em base bibliográfica.
+      </p>
+
+      <label className="flex flex-col gap-1 text-sm font-medium">
         Playlist do Spotify <span className="font-normal text-ink/60">(opcional)</span>
         <input
           name="spotify_url"

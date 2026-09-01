@@ -46,6 +46,8 @@ create table public.media_items (
   cover_palette smallint not null default 0
               check (cover_palette between 0 and 3), -- índice na paleta leve (globals.css)
   total_units int,                           -- páginas / fases
+  total_chapters int                         -- só livros; preenchido à mão
+              check (total_chapters is null or total_chapters > 0),
   status      text not null default 'reading'
               check (status in ('want','reading','finished','abandoned','platinum')),
   spotify_url text,

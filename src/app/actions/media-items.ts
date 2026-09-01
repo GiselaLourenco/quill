@@ -18,6 +18,11 @@ export async function createMediaItem(formData: FormData) {
   const spotifyUrl = String(formData.get("spotify_url") ?? "").trim() || null;
   const totalUnitsRaw = String(formData.get("total_units") ?? "").trim();
   const totalUnits = totalUnitsRaw ? Number(totalUnitsRaw) : null;
+  const totalChaptersRaw = String(formData.get("total_chapters") ?? "").trim();
+  // 0 não é contagem de capítulo — o check da coluna recusa, então vira null
+  // aqui em vez de estourar o insert.
+  const totalChapters =
+    totalChaptersRaw && Number(totalChaptersRaw) > 0 ? Number(totalChaptersRaw) : null;
   const status = String(formData.get("status") ?? "reading");
   const coverKind = String(formData.get("cover_kind") ?? "illustrated");
   const coverUrl =
@@ -32,6 +37,7 @@ export async function createMediaItem(formData: FormData) {
     creator,
     spotify_url: spotifyUrl,
     total_units: totalUnits,
+    total_chapters: totalChapters,
     status,
     cover_kind: coverKind === "real" && coverUrl ? "real" : "illustrated",
     cover_url: coverUrl,
@@ -77,7 +83,7 @@ export async function addFriendBookToShelf(input: {
 
   const { data: source } = await supabase
     .from("media_items")
-    .select("title, creator, cover_kind, cover_url, cover_palette, total_units")
+    .select("title, creator, cover_kind, cover_url, cover_palette, total_units, total_chapters")
     .eq("id", input.sourceItemId)
     .maybeSingle();
 
@@ -99,6 +105,7 @@ export async function addFriendBookToShelf(input: {
       title: source.title,
       creator: source.creator,
       total_units: source.total_units,
+      total_chapters: source.total_chapters,
       status: input.status,
       cover_kind: source.cover_kind,
       cover_url: source.cover_url,
