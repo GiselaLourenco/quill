@@ -21,8 +21,15 @@ function mensagemDeAuth(codigo: string | undefined, status: number | undefined) 
     case "email_address_invalid":
     case "validation_failed":
       return "Esse e-mail não parece válido. Confira e tente de novo.";
+    case "email_address_not_authorized":
+      // Sem SMTP próprio, o servidor de e-mail da Supabase só entrega para
+      // endereços de quem é membro da organização do projeto.
+      return "Ainda não conseguimos enviar e-mail para esse endereço. Avise a gente pra liberar.";
     case "over_email_send_rate_limit":
-      return "Muitas tentativas seguidas. Espere alguns minutos e tente de novo.";
+      // A cota é por projeto e por hora, somando cadastro, recuperação e
+      // troca de e-mail — por isso o limite estoura mesmo no primeiro envio
+      // de quem está tentando agora.
+      return "Já enviamos muitos e-mails na última hora. Tente de novo daqui a pouco.";
     case "over_request_rate_limit":
       return "Muitas tentativas seguidas. Espere um pouco e tente de novo.";
     case "signup_disabled":
@@ -155,7 +162,12 @@ export async function signup(
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { username } },
+    options: {
+      data: { username },
+      // Sem isso o link de confirmação sai com o Site URL do projeto — que em
+      // algum momento vai estar apontando pra localhost e não abre no celular.
+      emailRedirectTo: `${siteUrl()}/auth/callback`,
+    },
   });
 
   if (error) {
@@ -210,7 +222,14 @@ export async function resetPassword(
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${siteUrl()}/auth/callback?next=${encodeURIComponent("/auth/reset")}`,
   });
-  if (error) return { error: "Não foi possível enviar o e-mail. Tente novamente." };
+  if (error) {
+    console.error("[reset]", error.name, error.status, error.code, error.message);
+    return {
+      error:
+        mensagemDeAuth(error.code, error.status) ??
+        "Não foi possível enviar o e-mail. Tente novamente.",
+    };
+  }
   return { error: "enviado" }; // sentinel para o client saber que deu certo
 }
 
