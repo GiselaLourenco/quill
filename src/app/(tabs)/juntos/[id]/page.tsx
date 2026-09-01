@@ -4,6 +4,7 @@ import { requireUserId } from "@/lib/supabase/auth";
 import { computeScores, daysRemaining, periodProgress, type ScoringMetric, SCORING_METRIC_UNIT } from "@/lib/challenges";
 import DesafioDetalheClient from "./detalhe-client";
 import { nomeExibicao } from "@/lib/nome-exibicao";
+import { AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
 
 export default async function DesafioDetalhePage({
   params,
@@ -51,16 +52,29 @@ export default async function DesafioDetalhePage({
   const memberIds = Array.from(new Set((checkins ?? []).map((c) => c.user_id as string)));
 
   const { data: profiles } = memberIds.length
-    ? await supabase.from("profiles").select("id, display_name, username").in("id", memberIds)
+    ? await supabase
+        .from("profiles")
+        .select("id, display_name, username, avatar_url, avatar_zoom, avatar_bg")
+        .in("id", memberIds)
     : { data: [] };
 
-  const nameById = new Map(
+  // Ranking e feed mostram o nome de exibição de todo mundo, inclusive o seu —
+  // quem é "você" já aparece pelo selo, então trocar o nome por "Você" só
+  // fazia os próprios check-ins ficarem sem identidade.
+  const perfilPorId = new Map(
     (profiles ?? []).map((p) => [
       p.id as string,
-      nomeExibicao(p.display_name as string | null, p.username as string | null),
+      {
+        nome: nomeExibicao(p.display_name as string | null, p.username as string | null),
+        avatarUrl: (p.avatar_url as string | null) ?? null,
+        avatarZoom: (p.avatar_zoom as number | null) ?? 100,
+        avatarBg: (p.avatar_bg as string | null) ?? AVATAR_FUNDO_PADRAO,
+      },
     ]),
   );
-  nameById.set(userId, "Você");
+
+  const perfilDe = (uid: string) =>
+    perfilPorId.get(uid) ?? { nome: "membro", avatarUrl: null, avatarZoom: 100, avatarBg: AVATAR_FUNDO_PADRAO };
 
   // Ranking
   const scores = computeScores(
@@ -80,13 +94,19 @@ export default async function DesafioDetalhePage({
 
   const ranking = Array.from(scores.entries())
     .sort((a, b) => b[1] - a[1])
-    .map(([ uid, score], i) => ({
-      posicao: i + 1,
-      userId: uid,
-      nome: nameById.get(uid) ?? "membro",
-      metrica: `${score} ${unit}`,
-      ehVoce: uid === userId,
-    }));
+    .map(([ uid, score], i) => {
+      const perfil = perfilDe(uid);
+      return {
+        posicao: i + 1,
+        userId: uid,
+        nome: perfil.nome,
+        avatarUrl: perfil.avatarUrl,
+        avatarZoom: perfil.avatarZoom,
+        avatarBg: perfil.avatarBg,
+        metrica: `${score} ${unit}`,
+        ehVoce: uid === userId,
+      };
+    });
 
   const minhaPosicao = ranking.find((r) => r.ehVoce)?.posicao ?? 0;
 
@@ -144,11 +164,15 @@ export default async function DesafioDetalhePage({
 
     const quando = formatQuando(c.created_at as string);
     const uid = c.user_id as string;
+    const perfil = perfilDe(uid);
 
     return {
       id: `${uid}-${idx}`,
       userId: uid,
-      nome: nameById.get(uid) ?? "membro",
+      nome: perfil.nome,
+      avatarUrl: perfil.avatarUrl,
+      avatarZoom: perfil.avatarZoom,
+      avatarBg: perfil.avatarBg,
       texto,
       nota: (c.note as string | null) ?? null,
       quando,

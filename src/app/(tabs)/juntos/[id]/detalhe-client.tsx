@@ -1,14 +1,17 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { CheckinSheet, type LivroLendo } from "@/components/checkin-sheet";
 import { leaveChallenge } from "@/app/actions/groups";
+import { avatarPorSrc, AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
 
+type Avatar = { avatarUrl: string | null; avatarZoom: number; avatarBg: string };
 type SemanaItem = { data: number; label: string; estado: "vazio" | "feito" | "hoje" | "hoje-feito" };
-type RankingItem = { posicao: number; userId: string; nome: string; metrica: string; ehVoce: boolean };
-type AtividadeItem = { id: string; userId: string; nome: string; texto: string; nota: string | null; quando: string; ehVoce: boolean };
+type RankingItem = Avatar & { posicao: number; userId: string; nome: string; metrica: string; ehVoce: boolean };
+type AtividadeItem = Avatar & { id: string; userId: string; nome: string; texto: string; nota: string | null; quando: string; ehVoce: boolean };
 
 type Group = {
   id: string; nome: string; emoji: string; metric: string; unit: string;
@@ -19,6 +22,36 @@ type Group = {
 const CORES = ["bg-coral text-paper", "bg-moss text-paper", "bg-mustard text-ink", "bg-navy text-paper", "bg-cover-1 text-ink", "bg-cover-2 text-ink", "bg-cover-3 text-ink", "bg-cover-4 text-paper"];
 
 function corPara(index: number) { return CORES[index % CORES.length]; }
+
+/**
+ * Foto de quem está no desafio — a mesma escolhida no perfil. Sem escolha
+ * feita, cai nas iniciais coloridas de antes.
+ */
+function AvatarMembro({
+  nome, avatarUrl, avatarZoom, avatarBg, tamanho, corFallback, className = "",
+}: Avatar & { nome: string; tamanho: number; corFallback: string; className?: string }) {
+  const arte = avatarPorSrc(avatarUrl);
+  return (
+    <div
+      className={`flex shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-ink font-display text-[11px] font-black ${arte ? "" : corFallback} ${className}`}
+      style={{ height: tamanho, width: tamanho, ...(arte ? { backgroundColor: avatarBg || AVATAR_FUNDO_PADRAO } : null) }}
+    >
+      {arte ? (
+        <Image
+          src={arte.src}
+          alt={nome}
+          width={tamanho}
+          height={tamanho}
+          className="h-full w-full object-contain"
+          style={{ transform: `scale(${avatarZoom / 100})` }}
+          draggable={false}
+        />
+      ) : (
+        nome.slice(0, 2).toUpperCase()
+      )}
+    </div>
+  );
+}
 
 export default function DesafioDetalheClient({
   group, semana, ranking, atividade, livros,
@@ -148,9 +181,9 @@ export default function DesafioDetalheClient({
             <button onClick={() => setRankingAberto(true)} className="font-display text-[10px] uppercase tracking-widest text-ink underline decoration-2 underline-offset-2">VER TUDO</button>
           </div>
           <div className="flex h-32 items-end justify-between gap-2">
-            {podio.length >= 2 && <PodioColuna posicao={2} nome={podio[1].nome} metrica={podio[1].metrica} cor={corPara(1)} altura="h-12" bg="bg-paper" />}
-            {podio.length >= 1 && <PodioColuna posicao={1} nome={podio[0].nome} metrica={podio[0].metrica} cor={corPara(0)} altura="h-20" bg="bg-mustard" destaque />}
-            {podio.length >= 3 && <PodioColuna posicao={3} nome={podio[2].nome} metrica={podio[2].metrica} cor={corPara(2)} altura="h-10" bg="bg-paper" />}
+            {podio.length >= 2 && <PodioColuna membro={podio[1]} posicao={2} cor={corPara(1)} altura="h-12" bg="bg-paper" />}
+            {podio.length >= 1 && <PodioColuna membro={podio[0]} posicao={1} cor={corPara(0)} altura="h-20" bg="bg-mustard" destaque />}
+            {podio.length >= 3 && <PodioColuna membro={podio[2]} posicao={3} cor={corPara(2)} altura="h-10" bg="bg-paper" />}
           </div>
         </section>
       )}
@@ -163,9 +196,14 @@ export default function DesafioDetalheClient({
             {atividadeVisivel.map((a, i) => (
               <li key={a.id} className="border-2 border-ink bg-paper p-3 shadow-hard-sm">
                 <div className="flex items-start gap-3">
-                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center border-2 border-ink font-display text-[11px] font-black rounded-full ${corPara(i)}`}>
-                    {a.nome.slice(0, 2).toUpperCase()}
-                  </div>
+                  <AvatarMembro
+                    nome={a.nome}
+                    avatarUrl={a.avatarUrl}
+                    avatarZoom={a.avatarZoom}
+                    avatarBg={a.avatarBg}
+                    tamanho={32}
+                    corFallback={corPara(i)}
+                  />
                   <div className="min-w-0 flex-1">
                     <p className="text-[12px] leading-tight text-ink">
                       <span className="font-display text-[11px] uppercase tracking-wider">{a.nome}</span>{" "}{a.texto}
@@ -217,9 +255,16 @@ export default function DesafioDetalheClient({
         ) : (
           <button
             onClick={() => setCheckinAberto(true)}
-            className={["pointer-events-auto w-full border-2 border-ink py-4 font-display text-sm uppercase tracking-widest shadow-hard active:translate-x-[2px] active:translate-y-[2px] active:shadow-none", checkinFeito ? "bg-moss text-paper" : "bg-coral text-paper"].join(" ")}
+            className={["pointer-events-auto w-full border-2 border-ink py-3.5 font-display text-sm uppercase leading-tight tracking-widest shadow-hard active:translate-x-[2px] active:translate-y-[2px] active:shadow-none", checkinFeito ? "bg-moss text-paper" : "bg-coral text-paper"].join(" ")}
           >
-            {checkinFeito ? "Check-in feito ✓ · registrar outro" : "Fazer check-in de hoje"}
+            {checkinFeito ? (
+              <>
+                <span className="block">Check-in feito ✓</span>
+                <span className="mt-1 block text-[11px] tracking-widest text-paper/85">registrar outro</span>
+              </>
+            ) : (
+              "Fazer check-in de hoje"
+            )}
           </button>
         )}
       </div>
@@ -278,7 +323,14 @@ export default function DesafioDetalheClient({
               {ranking.map((r, i) => (
                 <li key={r.userId} className={["flex items-center gap-3 px-4 py-3", r.ehVoce ? "bg-mustard/40" : "bg-paper"].join(" ")}>
                   <span className={["flex h-8 w-8 shrink-0 items-center justify-center border-2 border-ink font-display text-[12px]", r.posicao === 1 ? "bg-mustard text-ink" : r.posicao === 2 ? "bg-cover-2 text-ink" : r.posicao === 3 ? "bg-coral text-paper" : "bg-paper text-ink"].join(" ")}>{r.posicao}</span>
-                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-ink text-[11px] font-black ${corPara(i)}`}>{r.nome.slice(0, 2).toUpperCase()}</div>
+                  <AvatarMembro
+                    nome={r.nome}
+                    avatarUrl={r.avatarUrl}
+                    avatarZoom={r.avatarZoom}
+                    avatarBg={r.avatarBg}
+                    tamanho={36}
+                    corFallback={corPara(i)}
+                  />
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-display text-[12px] uppercase tracking-wider text-ink">
                       {r.nome}
@@ -296,19 +348,27 @@ export default function DesafioDetalheClient({
   );
 }
 
-function PodioColuna({ posicao, nome, metrica, cor, altura, bg, destaque = false }: {
-  posicao: number; nome: string; metrica: string; cor: string;
+function PodioColuna({ membro, posicao, cor, altura, bg, destaque = false }: {
+  membro: RankingItem; posicao: number; cor: string;
   altura: string; bg: string; destaque?: boolean;
 }) {
+  const tamanho = destaque ? 56 : 44;
   return (
     <div className="flex flex-1 flex-col items-center">
-      <div className={`relative mb-1 flex items-center justify-center rounded-full border-2 border-ink text-[11px] font-black ${destaque ? "h-14 w-14" : "h-11 w-11"} ${cor}`}>
-        {nome.slice(0, 2).toUpperCase()}
+      <div className="relative mb-1">
+        <AvatarMembro
+          nome={membro.nome}
+          avatarUrl={membro.avatarUrl}
+          avatarZoom={membro.avatarZoom}
+          avatarBg={membro.avatarBg}
+          tamanho={tamanho}
+          corFallback={cor}
+        />
         {destaque && <span className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-45 border-2 border-ink bg-coral" />}
       </div>
       <div className={`flex w-full flex-col items-center justify-center border-2 border-ink shadow-hard-sm ${altura} ${bg}`}>
         <span className="font-display text-[11px] uppercase leading-none text-ink">{posicao}º</span>
-        <span className="mt-0.5 font-display text-[9px] uppercase tracking-widest text-ink-soft">{metrica}</span>
+        <span className="mt-0.5 font-display text-[9px] uppercase tracking-widest text-ink-soft">{membro.metrica}</span>
       </div>
     </div>
   );
