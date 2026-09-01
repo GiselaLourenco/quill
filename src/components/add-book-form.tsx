@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import Image from "next/image";
-import { createMediaItem, searchBookCovers, type CoverCandidate } from "@/app/actions/media-items";
+import { createMediaItem } from "@/app/actions/media-items";
+import { BuscaLivro } from "@/components/busca-livro";
 import { IllustratedCover } from "@/components/illustrated-cover";
 import { paletteIndexForTitle } from "@/lib/covers";
+import type { LivroEncontrado } from "@/lib/open-library";
 
 const STATUS_OPTIONS = [
   { value: "want", label: "quero ler" },
@@ -16,18 +18,28 @@ const STATUS_OPTIONS = [
 export function AddBookForm({ serverError }: { serverError?: string }) {
   const [title, setTitle] = useState("");
   const [creator, setCreator] = useState("");
-  const [coverKind, setCoverKind] = useState<"real" | "illustrated">("real");
-  const [candidates, setCandidates] = useState<CoverCandidate[]>([]);
-  const [searched, setSearched] = useState(false);
-  const [isSearching, startSearch] = useTransition();
+  const [paginas, setPaginas] = useState("");
+  const [coverKind, setCoverKind] = useState<"real" | "illustrated">("illustrated");
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [escolhido, setEscolhido] = useState<LivroEncontrado | null>(null);
 
-  function handleSearch() {
-    startSearch(async () => {
-      const query = [title, creator].filter(Boolean).join(" ");
-      const result = await searchBookCovers(query);
-      setCandidates(result);
-      setSearched(true);
-    });
+  function preencherCom(livro: LivroEncontrado) {
+    setEscolhido(livro);
+    setTitle(livro.titulo);
+    if (livro.autor) setCreator(livro.autor);
+    if (livro.paginas) setPaginas(String(livro.paginas));
+    // Sem capa na Open Library o livro não fica sem capa: cai na ilustração
+    // que o app gera a partir do título.
+    if (livro.capaGrande) {
+      setCoverUrl(livro.capaGrande);
+      setCoverKind("real");
+    }
+  }
+
+  function voltarABuscar() {
+    setEscolhido(null);
+    setCoverUrl(null);
+    setCoverKind("illustrated");
   }
 
   return (
@@ -36,17 +48,25 @@ export function AddBookForm({ serverError }: { serverError?: string }) {
         <p className="text-sm font-medium text-coral">{serverError}</p>
       )}
 
-      <label className="flex flex-col gap-1 text-sm font-medium">
-        Título
-        <input
-          name="title"
-          required
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Nome do livro"
-          className="rounded border-2 border-ink bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-moss-dark"
+      <div className="flex flex-col gap-2">
+        <label className="flex flex-col gap-1 text-sm font-medium">
+          Título
+          <input
+            name="title"
+            required
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Nome do livro"
+            className="rounded border-2 border-ink bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-moss-dark"
+          />
+        </label>
+        <BuscaLivro
+          termo={title}
+          escolhido={escolhido}
+          onEscolher={preencherCom}
+          onLimpar={voltarABuscar}
         />
-      </label>
+      </div>
 
       <label className="flex flex-col gap-1 text-sm font-medium">
         Autor <span className="font-normal text-ink/60">(opcional)</span>
@@ -91,46 +111,22 @@ export function AddBookForm({ serverError }: { serverError?: string }) {
         </div>
       </div>
 
-      {coverKind === "real" ? (
-        <div className="flex flex-col gap-2">
-          <button
-            type="button"
-            onClick={handleSearch}
-            disabled={!title.trim() || isSearching}
-            className="self-start rounded-md border-2 border-ink bg-white px-3 py-1.5 text-sm font-medium disabled:opacity-50"
-          >
-            {isSearching ? "Buscando…" : "Buscar capa"}
-          </button>
-
-          {searched && !isSearching && candidates.length === 0 && (
-            <p className="text-sm text-ink/60">
-              Nenhuma capa encontrada — pode usar a ilustração Quill.
-            </p>
-          )}
-
-          {candidates.length > 0 && (
-            <div className="flex gap-2 overflow-x-auto pb-1" role="radiogroup" aria-label="Capas encontradas">
-              {candidates.map((c, i) => (
-                <label key={c.id} className="shrink-0">
-                  <input
-                    type="radio"
-                    name="cover_url"
-                    value={c.largeUrl}
-                    defaultChecked={i === 0}
-                    className="peer sr-only"
-                  />
-                  <Image
-                    src={c.thumbUrl}
-                    alt={`${c.title}${c.author ? ` — ${c.author}` : ""}`}
-                    width={56}
-                    height={84}
-                    className="cursor-pointer rounded border-2 border-ink/30 object-cover peer-checked:border-moss-dark peer-checked:shadow-hard-sm"
-                  />
-                </label>
-              ))}
-            </div>
-          )}
+      {coverKind === "real" && coverUrl ? (
+        <div className="flex flex-col items-center gap-1">
+          <input type="hidden" name="cover_url" value={coverUrl} />
+          <Image
+            src={coverUrl}
+            alt={`Capa de ${title}`}
+            width={100}
+            height={150}
+            className="h-[150px] w-[100px] rounded border-2 border-ink object-cover"
+          />
         </div>
+      ) : coverKind === "real" ? (
+        <p className="text-sm text-ink/60">
+          Escolha um livro na busca acima pra trazer a capa real — ou fique na
+          ilustração Quill.
+        </p>
       ) : (
         <div className="mx-auto h-[150px] w-[100px]">
           <IllustratedCover
@@ -145,6 +141,8 @@ export function AddBookForm({ serverError }: { serverError?: string }) {
         <input
           type="number"
           name="total_units"
+          value={paginas}
+          onChange={(e) => setPaginas(e.target.value)}
           placeholder="0"
           className="rounded border-2 border-ink bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-moss-dark"
         />

@@ -6,51 +6,6 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 import { paletteIndexForTitle } from "@/lib/covers";
 
-export type CoverCandidate = {
-  id: string;
-  title: string;
-  author: string | null;
-  thumbUrl: string;
-  largeUrl: string;
-};
-
-type OpenLibraryDoc = {
-  title?: string;
-  author_name?: string[];
-  cover_i?: number;
-};
-
-export async function searchBookCovers(
-  query: string,
-): Promise<CoverCandidate[]> {
-  const trimmed = query.trim();
-  if (!trimmed) return [];
-
-  const url = new URL("https://openlibrary.org/search.json");
-  url.searchParams.set("q", trimmed);
-  url.searchParams.set("fields", "title,author_name,cover_i");
-  url.searchParams.set("limit", "6");
-
-  const res = await fetch(url, {
-    headers: { "User-Agent": "Quill (personal reading app)" },
-  });
-  if (!res.ok) return [];
-
-  const data = (await res.json()) as { docs?: OpenLibraryDoc[] };
-
-  return (data.docs ?? [])
-    .filter((doc): doc is OpenLibraryDoc & { cover_i: number } =>
-      Boolean(doc.cover_i),
-    )
-    .map((doc) => ({
-      id: String(doc.cover_i),
-      title: doc.title ?? trimmed,
-      author: doc.author_name?.[0] ?? null,
-      thumbUrl: `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`,
-      largeUrl: `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`,
-    }));
-}
-
 export async function createMediaItem(formData: FormData) {
   const userId = await requireUserId();
 
