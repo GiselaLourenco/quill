@@ -24,7 +24,7 @@ export function weekKey(iso: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-function uniqueSortedDays(sessions: SessionRow[]): string[] {
+function uniqueSortedDays(sessions: Pick<SessionRow, "started_at">[]): string[] {
   return [...new Set(sessions.map((s) => dateKey(s.started_at)))].sort();
 }
 
@@ -32,7 +32,7 @@ function uniqueSortedWeeks(sessions: SessionRow[]): string[] {
   return [...new Set(sessions.map((s) => weekKey(s.started_at)))].sort();
 }
 
-export function computeStreak(sessions: SessionRow[]): {
+export function computeStreak(sessions: Pick<SessionRow, "started_at">[]): {
   current: number;
   record: number;
 } {

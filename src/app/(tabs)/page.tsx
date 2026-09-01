@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 import { getActiveChallenges } from "@/lib/challenges";
+import { computeStreak } from "@/lib/gamification";
 import { nomeExibicao } from "@/lib/nome-exibicao";
 import { AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
 import HomeClient, { type Meta, type SemanaDados, type MesCalendario } from "./home-client";
@@ -99,13 +100,6 @@ export default async function HomePage() {
   const todas = (sessionRows ?? []) as SessionLite[];
   const doAno = todas.filter((s) => s.started_at?.startsWith(String(anoAtual)));
 
-  // ---- Stats de hoje --------------------------------------------------
-  const deHoje = todas.filter((s) => s.started_at?.slice(0, 10) === hoje);
-  const minutosHoje = Math.round(
-    deHoje.reduce((soma, s) => soma + (s.duration_seconds ?? 0), 0) / 60,
-  );
-  const paginasHoje = deHoje.reduce((soma, s) => soma + paginasDa(s), 0);
-
   // ---- Semanas navegáveis ---------------------------------------------
   const semanas: SemanaDados[] = [];
   for (let i = SEMANAS_VISIVEIS - 1; i >= 0; i -= 1) {
@@ -156,31 +150,43 @@ export default async function HomePage() {
   }
 
   // ---- Metas ------------------------------------------------------------
-  // Os três tipos aparecem SEMPRE. Sem meta cadastrada, o card mostra o número
-  // atual e convida a definir o alvo — antes, quem só tinha meta de livros
-  // nunca via minutos nem páginas.
+  // As três dimensões são exatamente as que a tela de Metas configura
+  // (`books_per_year`, `hours_per_month`, `streak_days`). Ler tipo diferente
+  // daqui é o que fazia os cards nascerem zerados mesmo com meta traçada.
+  // Os três aparecem SEMPRE: sem alvo cadastrado, o card mostra o número atual
+  // e convida a definir.
   const alvoPorTipo = new Map(
     (goals ?? []).map((g) => [g.type as string, g.target_value as number]),
   );
 
+  // Mesmas contas da tela de Metas, pra os dois números nunca divergirem.
+  const prefixoMes = `${anoAtual}-${String(agora.getMonth() + 1).padStart(2, "0")}`;
+  const horasNoMes = Math.round(
+    todas
+      .filter((s) => s.started_at?.startsWith(prefixoMes))
+      .reduce((soma, s) => soma + (s.duration_seconds ?? 0), 0) / 3600,
+  );
+  const streak = computeStreak(todas).current;
+  const mesNome = agora.toLocaleString("pt-BR", { month: "long" });
+
   const metas: Meta[] = [
     {
-      id: "minutos",
-      tipo: "minutos",
-      label: "Minutos hoje",
-      atual: minutosHoje,
-      total: alvoPorTipo.get("minutes_per_day") ?? 0,
-      unidade: "min",
+      id: "sequencia",
+      tipo: "sequencia",
+      label: "Dias seguidos",
+      atual: streak,
+      total: alvoPorTipo.get("streak_days") ?? 0,
+      unidade: "dias",
       periodo: "hoje",
     },
     {
-      id: "paginas",
-      tipo: "paginas",
-      label: "Páginas hoje",
-      atual: paginasHoje,
-      total: alvoPorTipo.get("pages_per_day") ?? 0,
-      unidade: "pág",
-      periodo: "hoje",
+      id: "horas",
+      tipo: "horas",
+      label: "Horas lidas",
+      atual: horasNoMes,
+      total: alvoPorTipo.get("hours_per_month") ?? 0,
+      unidade: "h",
+      periodo: mesNome,
     },
     {
       id: "livros",
@@ -195,15 +201,6 @@ export default async function HomePage() {
 
   // ---- Pílulas ----------------------------------------------------------
   const diasComLeituraAno = new Set(doAno.map((s) => s.started_at.slice(0, 10)));
-
-  const diasOrdenados = [...diasComLeituraAno].sort().reverse();
-  let streak = 0;
-  for (let i = 0; i < diasOrdenados.length; i += 1) {
-    const esperado = new Date(agora);
-    esperado.setDate(esperado.getDate() - i);
-    if (diasOrdenados[i] === iso(esperado)) streak += 1;
-    else break;
-  }
 
   // Média de páginas por dia efetivamente lido (não por dia do calendário).
   const paginasAno = doAno.reduce((soma, s) => soma + paginasDa(s), 0);

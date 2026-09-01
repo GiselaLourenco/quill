@@ -6,7 +6,7 @@ import { AppImage } from "@/components/app-image";
 import { avatarDeExibicao, AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
 import { useMemo, useState } from "react";
 
-type MetaTipo = "minutos" | "paginas" | "livros";
+type MetaTipo = "sequencia" | "horas" | "livros";
 type PilulaTone = "coral" | "paper" | "mustard" | "moss" | "navy" | "ink";
 type DesafioTone = "coral" | "moss" | "mustard";
 
@@ -34,8 +34,8 @@ export type MesCalendario = {
 };
 
 const TONE_META: Record<MetaTipo, { bg: string; ring: string; accent: string }> = {
-  minutos: { bg: "bg-moss", ring: "var(--color-mustard)", accent: "text-mustard" },
-  paginas: { bg: "bg-navy", ring: "var(--color-coral)", accent: "text-coral" },
+  sequencia: { bg: "bg-moss", ring: "var(--color-mustard)", accent: "text-mustard" },
+  horas: { bg: "bg-navy", ring: "var(--color-coral)", accent: "text-coral" },
   livros: { bg: "bg-coral", ring: "var(--color-ink)", accent: "text-ink" },
 };
 
@@ -55,8 +55,8 @@ const TONE_DESAFIO: Record<DesafioTone, { bg: string; title: string; chip: strin
 };
 
 const LABEL_TIPO: Record<MetaTipo, string> = {
-  minutos: "Minutos",
-  paginas: "Páginas",
+  sequencia: "Dias",
+  horas: "Horas",
   livros: "Livros",
 };
 
@@ -144,7 +144,7 @@ export default function HomeClient({
 }
 
 function MetasHero({ metas }: { metas: Meta[] }) {
-  const [ativa, setAtiva] = useState<MetaTipo>(metas[0]?.tipo ?? "minutos");
+  const [ativa, setAtiva] = useState<MetaTipo>(metas[0]?.tipo ?? "sequencia");
   const m = metas.find((x) => x.tipo === ativa) ?? metas[0]!;
   const semAlvo = m.total <= 0;
   const pct = semAlvo ? 0 : Math.min(100, Math.round((m.atual / m.total) * 100));
