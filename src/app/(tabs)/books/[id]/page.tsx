@@ -313,7 +313,7 @@ async function FriendBookView({
         </h1>
       </header>
 
-      <div className="flex-1 overflow-y-auto pb-40">
+      <div className="flex-1 pb-40">
         {/* Hero */}
         <section className="flex gap-5 px-5 pt-6">
           <BookThumb item={item} className="shadow-[4px_4px_0_0_var(--color-ink)]" />
@@ -389,8 +389,13 @@ async function FriendBookView({
         </section>
       </div>
 
-      {/* Fixed CTAs */}
-      <div className="sticky bottom-0 flex flex-col gap-2 border-t-2 border-ink bg-paper p-4">
+      {/* CTAs presos logo acima da tab bar. Eram `sticky bottom-0` dentro do
+          rolador interno: o "Adicionar à minha estante" desenhava no rodapé mas
+          o toque caía noutro ponto. */}
+      <div
+        className="fixed inset-x-0 z-20 mx-auto flex w-full max-w-[390px] flex-col gap-2 border-t-2 border-ink bg-paper p-4"
+        style={{ bottom: "var(--tabbar-h)" }}
+      >
         <LivroAmigoCtas item={item} friends={friends} />
       </div>
     </div>

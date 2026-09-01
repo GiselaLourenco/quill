@@ -6,11 +6,18 @@ export default function TabsLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="h-dvh bg-paper">
-      <div className="mx-auto flex h-dvh w-full max-w-[390px] flex-col bg-paper">
-        <main className="flex-1 overflow-y-auto">{children}</main>
-        <TabBar />
+    // Quem rola é o documento, não uma <main> com `overflow-y-auto` dentro de
+    // uma caixa de altura travada. Aquele arranjo aninhava roladores, e no
+    // celular isso desalinha a área de toque dos elementos `sticky` — o botão
+    // aparecia num lugar e respondia em outro.
+    <div className="bg-paper">
+      <div
+        className="mx-auto flex min-h-dvh w-full max-w-[390px] flex-col bg-paper"
+        style={{ paddingBottom: "var(--tabbar-h)" }}
+      >
+        <main className="flex flex-1 flex-col">{children}</main>
       </div>
+      <TabBar />
     </div>
   );
 }

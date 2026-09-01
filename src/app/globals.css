@@ -1,6 +1,11 @@
 @import "tailwindcss";
 
 :root {
+  /* Altura real da tab bar fixa: link h-14 (56px) + py-1.5 do ul (12px) +
+     borda de cima (2px), mais a faixa de gestos do aparelho. Quem precisa
+     ficar acima dela usa este token em vez de adivinhar. */
+  --tabbar-h: calc(70px + env(safe-area-inset-bottom));
+
   --color-paper: #f5ecd7;
   --color-card: #ffffff;
   --color-ink: #2c2c2a;

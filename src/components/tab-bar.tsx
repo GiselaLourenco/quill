@@ -65,11 +65,15 @@ export function TabBar() {
   const pathname = usePathname();
 
   return (
+    // `fixed` e não item de flex: presa ao viewport, ela para de subir e descer
+    // junto com a barra de endereço do navegador no celular. z-20 fica acima do
+    // conteúdo (cabeçalhos sticky são z-10) e abaixo das folhas (z-30 pra cima),
+    // que precisam cobri-la.
     <nav
       aria-label="Navegação principal"
-      className="shrink-0 border-t-2 border-ink bg-paper pb-[env(safe-area-inset-bottom)]"
+      className="fixed inset-x-0 bottom-0 z-20 border-t-2 border-ink bg-paper pb-[env(safe-area-inset-bottom)]"
     >
-      <ul className="mx-auto flex w-full items-stretch justify-between gap-1 px-2 py-1.5">
+      <ul className="mx-auto flex w-full max-w-[390px] items-stretch justify-between gap-1 px-2 py-1.5">
         {TABS.map((tab) => {
           const active = tab.exact
             ? pathname === tab.href
