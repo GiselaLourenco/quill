@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { Friend, FriendShelf } from "@/lib/friends";
-import { AVATARES, AVATAR_FUNDOS, AVATAR_FUNDO_PADRAO, avatarPorSrc } from "@/lib/avatares";
+import { AVATARES, AVATAR_FUNDOS, AVATAR_FUNDO_PADRAO, avatarDeExibicao, avatarPorSrc } from "@/lib/avatares";
 import { nomeExibicao } from "@/lib/nome-exibicao";
 import { faseDaImagem } from "@/lib/gamification";
 import { BookThumb } from "@/components/book-thumb";
@@ -86,7 +86,11 @@ export function PerfilClient({
   toggleCompeteAction,
 }: Props) {
   const [aberto, setAberto] = useState<DialogId>(null);
+  // `avatarPorSrc` responde "houve escolha?" — é o que o rascunho do editor
+  // precisa saber. `avatarDeExibicao` responde "o que desenhar?", e aí o
+  // padrão entra pra quem nunca escolheu.
   const avatarAtual = avatarPorSrc(avatarUrl);
+  const avatarExibido = avatarDeExibicao(avatarUrl);
   const [rascunhoAvatar, setRascunhoAvatar] = useState<string>(avatarAtual?.id ?? AVATARES[0].id);
   const [rascunhoZoom, setRascunhoZoom] = useState(avatarZoom);
   const [rascunhoFundo, setRascunhoFundo] = useState(avatarBg || AVATAR_FUNDO_PADRAO);
@@ -94,7 +98,6 @@ export function PerfilClient({
   const [rascunhoUsername, setRascunhoUsername] = useState(username ?? "");
 
   const nome = nomeExibicao(displayName, username);
-  const inicial = nome.trim().charAt(0).toUpperCase() || "Q";
   const metaPercent =
     annualTarget > 0 ? Math.min(100, Math.round((totalFinished / annualTarget) * 100)) : 0;
 
@@ -112,20 +115,16 @@ export function PerfilClient({
         <div className="relative">
           <div
             className="shadow-hard flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-2 border-ink bg-coral"
-            style={avatarAtual ? { backgroundColor: avatarBg || AVATAR_FUNDO_PADRAO } : undefined}
+            style={{ backgroundColor: avatarBg || AVATAR_FUNDO_PADRAO }}
           >
-            {avatarAtual ? (
-              <Image
-                src={avatarAtual.src}
-                alt={avatarAtual.nome}
-                width={96}
-                height={96}
-                className="h-full w-full object-contain"
-                style={{ transform: `scale(${avatarZoom / 100})` }}
-              />
-            ) : (
-              <span className="font-display text-4xl text-paper">{inicial}</span>
-            )}
+            <Image
+              src={avatarExibido.src}
+              alt={avatarExibido.nome}
+              width={96}
+              height={96}
+              className="h-full w-full object-contain"
+              style={{ transform: `scale(${avatarZoom / 100})` }}
+            />
           </div>
           <button
             type="button"

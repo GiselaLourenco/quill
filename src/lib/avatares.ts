@@ -30,3 +30,16 @@ export function avatarPorSrc(src: string | null): AvatarOpcao | null {
   if (!src) return null;
   return AVATARES.find((a) => a.src === src) ?? null;
 }
+
+/** Foto de quem ainda não escolheu: todo perfil já nasce com o Quill ok. */
+export const AVATAR_PADRAO: AvatarOpcao = AVATARES[0];
+
+/**
+ * A arte a mostrar para um perfil. Ao contrário de `avatarPorSrc`, nunca
+ * devolve null — sem escolha, ou com um `src` que saiu do catálogo, cai no
+ * padrão. É esta que as telas usam; `avatarPorSrc` fica pra quem precisa
+ * saber se houve escolha de verdade (o editor de perfil).
+ */
+export function avatarDeExibicao(src: string | null): AvatarOpcao {
+  return avatarPorSrc(src) ?? AVATAR_PADRAO;
+}

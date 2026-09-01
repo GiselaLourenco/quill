@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { AppImage } from "@/components/app-image";
-import { avatarPorSrc, AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
+import { avatarDeExibicao, AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
 import { useMemo, useState } from "react";
 
 type MetaTipo = "minutos" | "paginas" | "livros";
@@ -88,7 +88,7 @@ export default function HomeClient({
     month: "long",
   });
 
-  const avatarPerfil = avatarPorSrc(avatarUrl);
+  const avatarPerfil = avatarDeExibicao(avatarUrl);
 
   const mesAtualIdx = Math.max(0, meses.findIndex((m) => m.hoje !== null));
 
@@ -104,35 +104,23 @@ export default function HomeClient({
             {dataStr}
           </p>
         </div>
-        {/* Ícone de perfil — espelha a foto escolhida no perfil; sem escolha, cai no mascote */}
+        {/* Ícone de perfil — espelha a foto do perfil, que sempre existe */}
         <Link href="/profile" className="shrink-0" aria-label="Ir para o perfil">
           <div
             className="shadow-hard-sm relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-2 border-ink bg-coral transition-transform hover:-translate-x-0.5 hover:-translate-y-0.5 active:translate-x-0 active:translate-y-0"
-            style={avatarPerfil ? { backgroundColor: avatarBg || AVATAR_FUNDO_PADRAO } : undefined}
+            style={{ backgroundColor: avatarBg || AVATAR_FUNDO_PADRAO }}
           >
-            {avatarPerfil ? (
-              // Foto de perfil não passa por AppImage: quem ajusta é a própria
-              // pessoa, no editor de perfil — não o admin.
-              <Image
-                src={avatarPerfil.src}
-                alt={avatarPerfil.nome}
-                width={64}
-                height={64}
-                className="h-full w-full object-contain"
-                style={{ transform: `scale(${avatarZoom / 100})` }}
-                draggable={false}
-              />
-            ) : (
-              <AppImage
-                slot="home.avatar"
-                src="/img/mascot/quill-explorando.webp"
-                alt="Quill, o mascote"
-                width={64}
-                height={64}
-                className="h-full w-full object-contain p-1"
-                draggable={false}
-              />
-            )}
+            {/* Foto de perfil não passa por AppImage: quem ajusta é a própria
+                pessoa, no editor de perfil — não o admin. */}
+            <Image
+              src={avatarPerfil.src}
+              alt={avatarPerfil.nome}
+              width={64}
+              height={64}
+              className="h-full w-full object-contain"
+              style={{ transform: `scale(${avatarZoom / 100})` }}
+              draggable={false}
+            />
           </div>
         </Link>
       </header>

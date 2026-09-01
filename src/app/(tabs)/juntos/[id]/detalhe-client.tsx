@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { CheckinSheet, type LivroLendo } from "@/components/checkin-sheet";
 import { leaveChallenge } from "@/app/actions/groups";
-import { avatarPorSrc, AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
+import { avatarDeExibicao, AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
 
 type Avatar = { avatarUrl: string | null; avatarZoom: number; avatarBg: string };
 type SemanaItem = { data: number; label: string; estado: "vazio" | "feito" | "hoje" | "hoje-feito" };
@@ -19,36 +19,25 @@ type Group = {
   encerrado: boolean;
 };
 
-const CORES = ["bg-coral text-paper", "bg-moss text-paper", "bg-mustard text-ink", "bg-navy text-paper", "bg-cover-1 text-ink", "bg-cover-2 text-ink", "bg-cover-3 text-ink", "bg-cover-4 text-paper"];
-
-function corPara(index: number) { return CORES[index % CORES.length]; }
-
-/**
- * Foto de quem está no desafio — a mesma escolhida no perfil. Sem escolha
- * feita, cai nas iniciais coloridas de antes.
- */
+/** Foto de quem está no desafio — a mesma escolhida no perfil. */
 function AvatarMembro({
-  nome, avatarUrl, avatarZoom, avatarBg, tamanho, corFallback, className = "",
-}: Avatar & { nome: string; tamanho: number; corFallback: string; className?: string }) {
-  const arte = avatarPorSrc(avatarUrl);
+  nome, avatarUrl, avatarZoom, avatarBg, tamanho, className = "",
+}: Avatar & { nome: string; tamanho: number; className?: string }) {
+  const arte = avatarDeExibicao(avatarUrl);
   return (
     <div
-      className={`flex shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-ink font-display text-[11px] font-black ${arte ? "" : corFallback} ${className}`}
-      style={{ height: tamanho, width: tamanho, ...(arte ? { backgroundColor: avatarBg || AVATAR_FUNDO_PADRAO } : null) }}
+      className={`flex shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-ink ${className}`}
+      style={{ height: tamanho, width: tamanho, backgroundColor: avatarBg || AVATAR_FUNDO_PADRAO }}
     >
-      {arte ? (
-        <Image
-          src={arte.src}
-          alt={nome}
-          width={tamanho}
-          height={tamanho}
-          className="h-full w-full object-contain"
-          style={{ transform: `scale(${avatarZoom / 100})` }}
-          draggable={false}
-        />
-      ) : (
-        nome.slice(0, 2).toUpperCase()
-      )}
+      <Image
+        src={arte.src}
+        alt={nome}
+        width={tamanho}
+        height={tamanho}
+        className="h-full w-full object-contain"
+        style={{ transform: `scale(${avatarZoom / 100})` }}
+        draggable={false}
+      />
     </div>
   );
 }
@@ -181,9 +170,9 @@ export default function DesafioDetalheClient({
             <button onClick={() => setRankingAberto(true)} className="font-display text-[10px] uppercase tracking-widest text-ink underline decoration-2 underline-offset-2">VER TUDO</button>
           </div>
           <div className="flex h-32 items-end justify-between gap-2">
-            {podio.length >= 2 && <PodioColuna membro={podio[1]} posicao={2} cor={corPara(1)} altura="h-12" bg="bg-paper" />}
-            {podio.length >= 1 && <PodioColuna membro={podio[0]} posicao={1} cor={corPara(0)} altura="h-20" bg="bg-mustard" destaque />}
-            {podio.length >= 3 && <PodioColuna membro={podio[2]} posicao={3} cor={corPara(2)} altura="h-10" bg="bg-paper" />}
+            {podio.length >= 2 && <PodioColuna membro={podio[1]} posicao={2} altura="h-12" bg="bg-paper" />}
+            {podio.length >= 1 && <PodioColuna membro={podio[0]} posicao={1} altura="h-20" bg="bg-mustard" destaque />}
+            {podio.length >= 3 && <PodioColuna membro={podio[2]} posicao={3} altura="h-10" bg="bg-paper" />}
           </div>
         </section>
       )}
@@ -193,7 +182,7 @@ export default function DesafioDetalheClient({
         <section className="px-4 pt-8">
           <h2 className="mb-3 font-display text-sm uppercase tracking-wider text-ink">Atividade recente</h2>
           <ul className="space-y-2">
-            {atividadeVisivel.map((a, i) => (
+            {atividadeVisivel.map((a) => (
               <li key={a.id} className="border-2 border-ink bg-paper p-3 shadow-hard-sm">
                 <div className="flex items-start gap-3">
                   <AvatarMembro
@@ -202,7 +191,6 @@ export default function DesafioDetalheClient({
                     avatarZoom={a.avatarZoom}
                     avatarBg={a.avatarBg}
                     tamanho={32}
-                    corFallback={corPara(i)}
                   />
                   <div className="min-w-0 flex-1">
                     <p className="text-[12px] leading-tight text-ink">
@@ -320,7 +308,7 @@ export default function DesafioDetalheClient({
               <span className="font-display text-[9px] uppercase tracking-widest text-ink-soft">{ranking.length}</span>
             </div>
             <ol className="flex-1 divide-y-2 divide-ink overflow-y-auto">
-              {ranking.map((r, i) => (
+              {ranking.map((r) => (
                 <li key={r.userId} className={["flex items-center gap-3 px-4 py-3", r.ehVoce ? "bg-mustard/40" : "bg-paper"].join(" ")}>
                   <span className={["flex h-8 w-8 shrink-0 items-center justify-center border-2 border-ink font-display text-[12px]", r.posicao === 1 ? "bg-mustard text-ink" : r.posicao === 2 ? "bg-cover-2 text-ink" : r.posicao === 3 ? "bg-coral text-paper" : "bg-paper text-ink"].join(" ")}>{r.posicao}</span>
                   <AvatarMembro
@@ -329,7 +317,6 @@ export default function DesafioDetalheClient({
                     avatarZoom={r.avatarZoom}
                     avatarBg={r.avatarBg}
                     tamanho={36}
-                    corFallback={corPara(i)}
                   />
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-display text-[12px] uppercase tracking-wider text-ink">
@@ -348,8 +335,8 @@ export default function DesafioDetalheClient({
   );
 }
 
-function PodioColuna({ membro, posicao, cor, altura, bg, destaque = false }: {
-  membro: RankingItem; posicao: number; cor: string;
+function PodioColuna({ membro, posicao, altura, bg, destaque = false }: {
+  membro: RankingItem; posicao: number;
   altura: string; bg: string; destaque?: boolean;
 }) {
   const tamanho = destaque ? 56 : 44;
@@ -362,7 +349,6 @@ function PodioColuna({ membro, posicao, cor, altura, bg, destaque = false }: {
           avatarZoom={membro.avatarZoom}
           avatarBg={membro.avatarBg}
           tamanho={tamanho}
-          corFallback={cor}
         />
         {destaque && <span className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-45 border-2 border-ink bg-coral" />}
       </div>
