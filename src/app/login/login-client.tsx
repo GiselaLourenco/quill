@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { ZigZag } from "@/components/zig-zag";
 import { login, resetPassword } from "@/app/actions/auth";
+import { CampoSenha } from "@/components/campo-senha";
 
 type Modo = "login" | "recuperar" | "enviado";
 
@@ -26,12 +27,14 @@ export function LoginClient({ modoInicial }: { modoInicial: Modo }) {
     setModoEscolhido(destino);
   }
 
+  // No login não vai frase nenhuma: as duas que sobraram dizem em que ponto do
+  // fluxo a pessoa está, e no login isso já é óbvio pelo formulário.
   const tagline =
     modo === "recuperar"
       ? "a gente te ajuda a voltar."
       : modo === "enviado"
       ? "confere sua caixa de entrada."
-      : "sua leitura, viva.";
+      : null;
 
   return (
     <div className="min-h-screen bg-paper">
@@ -53,14 +56,16 @@ export function LoginClient({ modoInicial }: { modoInicial: Modo }) {
           <h1 className="font-display text-6xl leading-none tracking-tight text-ink">
             Quill
           </h1>
-          <p className="font-serif text-[17px] italic text-ink-soft">{tagline}</p>
+          {tagline && (
+            <p className="font-serif text-[17px] italic text-ink-soft">{tagline}</p>
+          )}
         </header>
 
         {/* ── Login ── */}
         {modo === "login" && (
           <form action={loginAction} className="mt-10 flex flex-col gap-4">
             <Field id="email" label="E-mail ou nome de usuário" type="text" name="email" autoComplete="username" placeholder="voce@email.com ou seuusuario" />
-            <Field id="password" label="Senha" type="password" name="password" autoComplete="current-password" placeholder="••••••••" />
+            <CampoSenha id="password" label="Senha" name="password" autoComplete="current-password" />
 
             {loginState?.error && (
               <p role="alert" className="text-sm font-medium text-coral">
@@ -162,7 +167,7 @@ export function LoginClient({ modoInicial }: { modoInicial: Modo }) {
 function Field({
   id, label, type, name, placeholder, autoComplete,
 }: {
-  id: string; label: string; type: "email" | "password" | "text"; name: string;
+  id: string; label: string; type: "email" | "text"; name: string;
   placeholder?: string; autoComplete?: string;
 }) {
   return (
@@ -175,10 +180,11 @@ function Field({
         autoComplete={autoComplete}
         placeholder={placeholder}
         // O campo de login aceita e-mail ou username: nada de maiúscula
-        // automática nem corretor atrapalhando quem digita o usuário.
-        autoCapitalize={type === "password" ? undefined : "none"}
-        autoCorrect={type === "password" ? undefined : "off"}
-        spellCheck={type === "password" ? undefined : false}
+        // automática nem corretor atrapalhando quem digita o usuário. A senha
+        // tem componente próprio (CampoSenha), então não passa por aqui.
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
         required
         className="w-full rounded-xl border-2 border-ink/80 bg-paper px-4 py-3 text-[15px] text-ink placeholder:text-ink-soft/60 focus:border-ink focus:outline-none"
       />

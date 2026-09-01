@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 import { AppImage } from "@/components/app-image";
 import { ZigZag } from "@/components/zig-zag";
 import { updatePassword } from "@/app/actions/auth";
+import { CampoSenha } from "@/components/campo-senha";
 
 type Estado = "form" | "sucesso" | "expirado";
 
@@ -156,62 +157,6 @@ export function ResetClient({ linkValido }: { linkValido: boolean }) {
         </p>
       </div>
     </div>
-  );
-}
-
-function CampoSenha({
-  id, label, name, autoComplete, erro,
-}: {
-  id: string; label: string; name: string; autoComplete: string; erro?: boolean;
-}) {
-  const [visivel, setVisivel] = useState(false);
-
-  return (
-    <label htmlFor={id} className="flex flex-col gap-1.5">
-      <span className="text-sm font-semibold text-ink">{label}</span>
-      <div
-        className={`flex items-center gap-2 rounded-xl border-2 bg-paper px-4 py-3 focus-within:border-ink ${
-          erro ? "border-coral" : "border-ink/80"
-        }`}
-      >
-        <input
-          id={id}
-          name={name}
-          type={visivel ? "text" : "password"}
-          autoComplete={autoComplete}
-          placeholder="••••••••"
-          required
-          className="w-full bg-transparent text-[15px] text-ink placeholder:text-ink-soft/60 focus:outline-none"
-        />
-        <button
-          type="button"
-          onClick={() => setVisivel((v) => !v)}
-          aria-label={visivel ? "Ocultar senha" : "Mostrar senha"}
-          className="shrink-0 text-ink-soft hover:text-ink"
-        >
-          {visivel ? <OlhoFechado /> : <Olho />}
-        </button>
-      </div>
-    </label>
-  );
-}
-
-function Olho() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  );
-}
-
-function OlhoFechado() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M3 3 21 21" />
-      <path d="M10.6 5.2A9.9 9.9 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.2M6.5 6.6A17.4 17.4 0 0 0 2 12s3.5 7 10 7a9.6 9.6 0 0 0 4-.8" />
-      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
-    </svg>
   );
 }
 
