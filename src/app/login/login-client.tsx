@@ -37,8 +37,8 @@ export function LoginClient({ modoInicial }: { modoInicial: Modo }) {
       : null;
 
   return (
-    <div className="min-h-screen bg-paper">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col px-6 pb-6 pt-8">
+    <div className="min-h-dvh bg-paper">
+      <div className="mx-auto flex min-h-dvh w-full max-w-[390px] flex-col px-6 pb-6 pt-8">
 
         {/* Mascote + wordmark */}
         <header className="flex flex-col items-center gap-2 text-center">
@@ -152,13 +152,13 @@ export function LoginClient({ modoInicial }: { modoInicial: Modo }) {
           </p>
         )}
 
-        <div className="mt-6 flex justify-center" aria-hidden>
+        <div className="mt-5 flex justify-center" aria-hidden>
           <ZigZag />
         </div>
 
         {/* Era só um rótulo. Vira a porta da história — que fica no login de
             propósito: quem ainda não tem conta pode conhecer o Quill antes. */}
-        <div className="mt-auto pt-6 text-center">
+        <div className="mt-5 pb-2 text-center">
           <Link
             href="/lore"
             className="text-[13px] font-semibold text-ink underline underline-offset-4 hover:text-coral"
