@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/signup"];
+const PUBLIC_PATHS = ["/login", "/signup", "/lore"];
 
 // Redefinição de senha: precisa abrir deslogada (o link do e-mail chega antes
 // da troca do `code`) e também logada (depois da troca já existe sessão de

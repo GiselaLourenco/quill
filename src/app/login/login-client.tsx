@@ -156,9 +156,16 @@ export function LoginClient({ modoInicial }: { modoInicial: Modo }) {
           <ZigZag />
         </div>
 
-        <p className="mt-auto pt-10 text-center text-[11px] text-ink-soft">
-          Quill · app de leitura
-        </p>
+        {/* Era só um rótulo. Vira a porta da história — que fica no login de
+            propósito: quem ainda não tem conta pode conhecer o Quill antes. */}
+        <div className="mt-auto pt-10 text-center">
+          <Link
+            href="/lore"
+            className="text-[13px] font-semibold text-ink underline underline-offset-4 hover:text-coral"
+          >
+            conheça a história do Quill
+          </Link>
+        </div>
       </div>
     </div>
   );
