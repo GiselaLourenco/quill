@@ -298,3 +298,67 @@ export async function deleteAccount(): Promise<{ error: string } | void> {
   await supabase.auth.signOut();
   redirect("/login");
 }
+
+export type TrocaSenhaState =
+  | { error: string; campo?: "atual" | "nova" | "confirmar" }
+  | { ok: true }
+  | undefined;
+
+/**
+ * Troca de senha com a senha atual, sem passar por e-mail.
+ *
+ * O Supabase não tem "trocar senha conferindo a antiga": `updateUser` confia
+ * na sessão e aceita qualquer senha nova. Então a conferência é feita
+ * entrando de novo com a senha atual — se o login passa, a pessoa é mesmo
+ * quem diz ser. Sem isso, um celular esquecido destravado trocaria a senha da
+ * conta em dois toques.
+ */
+export async function trocarSenha(
+  _prevState: TrocaSenhaState,
+  formData: FormData,
+): Promise<TrocaSenhaState> {
+  const atual = String(formData.get("senha-atual") ?? "");
+  const nova = String(formData.get("senha-nova") ?? "");
+  const confirmacao = String(formData.get("senha-confirmar") ?? "");
+
+  if (!atual) return { error: "Digite sua senha atual.", campo: "atual" };
+  if (nova.length < 8) {
+    return { error: "A senha nova precisa ter pelo menos 8 caracteres.", campo: "nova" };
+  }
+  if (nova !== confirmacao) {
+    return { error: "As duas senhas não conferem.", campo: "confirmar" };
+  }
+  if (nova === atual) {
+    return { error: "A senha nova é igual à atual.", campo: "nova" };
+  }
+
+  const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  const email = claims?.claims?.email as string | undefined;
+  if (!email) return { error: "Sessão expirada. Entre de novo e tente outra vez." };
+
+  const { error: erroLogin } = await supabase.auth.signInWithPassword({
+    email,
+    password: atual,
+  });
+  if (erroLogin) {
+    console.error("[trocarSenha] conferência", erroLogin.code, erroLogin.status);
+    // Rate limit do Supabase precisa aparecer como tal — senão parece que a
+    // senha certa foi recusada.
+    const traduzido = mensagemDeAuth(erroLogin.code, erroLogin.status);
+    if (erroLogin.code === "over_request_rate_limit" && traduzido) {
+      return { error: traduzido };
+    }
+    return { error: "Senha atual incorreta.", campo: "atual" };
+  }
+
+  const { error } = await supabase.auth.updateUser({ password: nova });
+  if (error) {
+    console.error("[trocarSenha]", error.code, error.status, error.message);
+    return {
+      error: mensagemDeAuth(error.code, error.status) ?? "Não foi possível trocar a senha.",
+    };
+  }
+
+  return { ok: true };
+}

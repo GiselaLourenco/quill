@@ -68,15 +68,26 @@ export async function getVersaoIcone(supabase: SupabaseClient): Promise<string> 
     .select("updated_at")
     .eq("slot", SLOT_FAVICON)
     .maybeSingle();
-  if (!data?.updated_at) return "0";
-  return String(Date.parse(data.updated_at as string) || "0");
+  if (!data?.updated_at) return VERSAO_ICONE_PADRAO;
+  return String(Date.parse(data.updated_at as string) || VERSAO_ICONE_PADRAO);
 }
+
+/**
+ * Versão do ícone quando ninguém escolheu arte no /admin.
+ *
+ * Precisa ser BUMPADA à mão sempre que `ICONE_PADRAO` mudar de arquivo: o
+ * `?v=` só reflete o banco, e a rota manda cachear por um ano. Sem bumpar,
+ * trocar o ícone no código não chega em quem já visitou.
+ */
+const VERSAO_ICONE_PADRAO = "2";
 
 /** Slot do ícone do app (favicon + ícone da tela de início do iOS). */
 export const SLOT_FAVICON = "app.favicon";
 
 /** Arte usada como ícone enquanto o admin não escolher outra. */
-export const ICONE_PADRAO = "/img/app/icone.png";
+// SVG e não PNG: a rota do ícone rasteriza pra 32, 180, 192 e 512, e a partir
+// do vetor cada tamanho sai nítido em vez de reamostrado de um PNG só.
+export const ICONE_PADRAO = "/img/app/icone.svg";
 
 /**
  * Estilo CSS equivalente ao ajuste — usado por `<AppImage>`.

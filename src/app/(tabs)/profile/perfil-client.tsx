@@ -1,13 +1,15 @@
 "use client";
 
 import Image from "next/image";
+import { CampoSenha } from "@/components/campo-senha";
+import { trocarSenha } from "@/app/actions/auth";
 import { AdicionarAmigo, Avatar } from "@/components/adicionar-amigo";
 import { aceitarPedido, recusarPedido } from "@/app/actions/friends";
 import type { PedidoRecebido } from "@/lib/friends";
 import { AppImage } from "@/components/app-image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useActionState, useState, useTransition } from "react";
 import type { Friend, FriendShelf } from "@/lib/friends";
 import { AVATARES, AVATAR_FUNDOS, AVATAR_FUNDO_PADRAO, avatarDeExibicao, avatarPorSrc } from "@/lib/avatares";
 import { nomeExibicao } from "@/lib/nome-exibicao";
@@ -1038,18 +1040,83 @@ function BadgesDialog({ badges, onClose }: { badges: BadgeView[]; onClose: () =>
   );
 }
 
+/**
+ * Troca de senha ali mesmo, conferindo a senha atual.
+ *
+ * Antes mandava pro fluxo de e-mail — que existe pra quem ESQUECEU a senha.
+ * Quem lembra dela não precisa sair do app, abrir a caixa de entrada e voltar.
+ * O link por e-mail continua no login, pra quem não lembra.
+ */
 function SenhaDialog({ onClose }: { onClose: () => void }) {
+  const [state, action, pendente] = useActionState(trocarSenha, undefined);
+  const erro = state && "error" in state ? state : null;
+  const pronto = state && "ok" in state;
+
+  if (pronto) {
+    return (
+      <DialogShell title="Senha alterada" onClose={onClose}>
+        <p className="flex items-start gap-2 rounded-md border-2 border-moss bg-moss/15 px-3 py-3 text-sm text-moss-dark">
+          <span aria-hidden>✓</span>
+          Senha trocada. Use a nova da próxima vez que entrar.
+        </p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="shadow-hard mt-4 w-full rounded-md border-2 border-ink bg-moss py-3 font-display text-xs uppercase tracking-widest text-paper active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+        >
+          Fechar
+        </button>
+      </DialogShell>
+    );
+  }
+
   return (
     <DialogShell title="Alterar senha" onClose={onClose}>
-      <p className="mb-3 font-serif text-sm text-ink-soft">
-        Por segurança, a troca de senha é feita pelo link enviado por e-mail.
-      </p>
-      <Link
-        href="/login?recuperar=1"
-        className="shadow-hard block rounded-md border-2 border-ink bg-moss py-3 text-center font-display text-xs uppercase tracking-widest text-paper active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
-      >
-        Enviar link por e-mail
-      </Link>
+      <form action={action} className="flex flex-col gap-4">
+        <CampoSenha
+          id="senha-atual"
+          label="Senha atual"
+          name="senha-atual"
+          autoComplete="current-password"
+          tom="compacto"
+          erro={erro?.campo === "atual"}
+        />
+        <CampoSenha
+          id="senha-nova"
+          label="Senha nova"
+          name="senha-nova"
+          autoComplete="new-password"
+          minLength={8}
+          tom="compacto"
+          erro={erro?.campo === "nova"}
+        />
+        <CampoSenha
+          id="senha-confirmar"
+          label="Confirmar senha nova"
+          name="senha-confirmar"
+          autoComplete="new-password"
+          tom="compacto"
+          erro={erro?.campo === "confirmar"}
+        />
+        <p className="-mt-2 text-xs text-ink-soft">Mínimo de 8 caracteres.</p>
+
+        {erro && <p className="text-sm font-medium text-coral">{erro.error}</p>}
+
+        <button
+          type="submit"
+          disabled={pendente}
+          className="shadow-hard rounded-md border-2 border-ink bg-moss py-3 font-display text-xs uppercase tracking-widest text-paper active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-60"
+        >
+          {pendente ? "Trocando…" : "Trocar senha"}
+        </button>
+
+        <Link
+          href="/login?recuperar=1"
+          className="text-center text-xs text-ink-soft underline underline-offset-2"
+        >
+          esqueci minha senha atual
+        </Link>
+      </form>
     </DialogShell>
   );
 }
