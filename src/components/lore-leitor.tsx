@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 const TOTAL = 9;
@@ -22,6 +22,7 @@ const LIMIAR_PX = 50;
  * quadrinho usa.
  */
 export function LoreLeitor() {
+  const router = useRouter();
   const [pagina, setPagina] = useState(0);
   const [ampliado, setAmpliado] = useState(false);
   const inicioX = useRef<number | null>(null);
@@ -39,9 +40,17 @@ export function LoreLeitor() {
   return (
     <div className="fixed inset-0 flex flex-col bg-ink">
       <header className="flex shrink-0 items-center justify-between gap-2 px-3 py-2 text-paper">
-        <Link href="/login" aria-label="Fechar a história" className="px-1 text-xl leading-none">
+        {/* Volta pra de onde veio: a história é alcançável do login e do
+            perfil, e mandar sempre pro login tirava quem já está logado do
+            lugar onde estava. */}
+        <button
+          type="button"
+          onClick={() => router.back()}
+          aria-label="Fechar a história"
+          className="px-1 text-xl leading-none"
+        >
           ✕
-        </Link>
+        </button>
         <span className="font-display text-[10px] uppercase tracking-widest">
           A história do Quill
         </span>

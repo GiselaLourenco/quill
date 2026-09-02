@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/lore"];
+const PUBLIC_PATHS = ["/login", "/signup"];
 
 // Redefinição de senha: precisa abrir deslogada (o link do e-mail chega antes
 // da troca do `code`) e também logada (depois da troca já existe sessão de
@@ -10,9 +10,11 @@ const RECOVERY_PATHS = ["/auth/callback", "/auth/reset"];
 
 // O ícone do app é pedido pelo navegador sem sessão (inclusive na tela de
 // login) e não pode cair em nenhum dos dois redirects abaixo.
-// O ícone e o manifest são pedidos pelo navegador sem sessão — inclusive na
-// hora de instalar o app pela tela de início.
-const OPEN_PATHS = ["/api/icone", "/manifest.webmanifest"];
+// Rotas que valem para os dois lados: sem sessão não mandam pro login, e com
+// sessão não mandam pra home. `/lore` estava em PUBLIC_PATHS, que é a lista do
+// login e do cadastro — e de lá quem está logado é EXPULSO pra home. Era por
+// isso que o link da história no perfil caía na aba Quill.
+const OPEN_PATHS = ["/api/icone", "/manifest.webmanifest", "/lore"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
