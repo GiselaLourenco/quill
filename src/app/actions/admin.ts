@@ -160,7 +160,10 @@ const TIPOS_ARTE: Record<string, string> = {
   "image/svg+xml": "svg",
 };
 
-const TAMANHO_MAXIMO = 5 * 1024 * 1024;
+// 4 MB e não 5: acima disso o corpo da requisição (arquivo + multipart)
+// encosta no teto de 4,5 MB da Vercel e a falha vira genérica. Melhor recusar
+// aqui, com mensagem, do que deixar a plataforma cortar.
+const TAMANHO_MAXIMO = 4 * 1024 * 1024;
 
 /**
  * Sobe uma arte nova pelo próprio app.
@@ -181,7 +184,7 @@ export async function enviarArte(
   }
   const extensao = TIPOS_ARTE[arquivo.type];
   if (!extensao) return { url: null, error: "Formato não aceito (use PNG, WEBP, JPG ou SVG)." };
-  if (arquivo.size > TAMANHO_MAXIMO) return { url: null, error: "A imagem passa de 5 MB." };
+  if (arquivo.size > TAMANHO_MAXIMO) return { url: null, error: "A imagem passa de 4 MB." };
 
   // Nome legível na galeria, sem acento nem espaço, com sufixo para duas artes
   // de mesmo nome não se atropelarem.
