@@ -10,6 +10,7 @@
  * rótulo cai no próprio id, que já é legível.
  */
 export const ROTULOS_SLOT: Record<string, string> = {
+  "perfil.lore": "Perfil — a história do Quill",
   "app.favicon": "Ícone do app (favicon)",
   "login.mascote": "Mascote do login",
   "home.avatar": "Avatar da home",

@@ -260,6 +260,33 @@ export function PerfilClient({
         </div>
       </div>
 
+      {/* A história do Quill — fora de Preferências e de Conta de propósito:
+          não é ajuste nem dado, é leitura. Fica logo depois das badges, que é
+          onde o perfil deixa de falar de números. */}
+      <Link
+        href="/lore"
+        className="shadow-hard mt-8 flex w-full items-center gap-3 rounded-md border-2 border-ink bg-card p-4 transition-all active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+      >
+        <AppImage
+          slot="perfil.lore"
+          src="/img/mascot/quill-lendo.webp"
+          alt=""
+          aria-hidden
+          width={44}
+          height={44}
+          className="h-11 w-11 shrink-0 object-contain"
+        />
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-bold uppercase tracking-wide">
+            A história do Quill
+          </span>
+          <span className="block text-[11px] text-ink-soft">
+            de onde vem o cheiro de livro novo
+          </span>
+        </span>
+        <span className="text-lg">›</span>
+      </Link>
+
       {/* Preferências — só o que existe de fato no banco */}
       <div className="mt-8 space-y-3">
         <h2 className="font-display text-sm uppercase tracking-tight">Preferências</h2>
