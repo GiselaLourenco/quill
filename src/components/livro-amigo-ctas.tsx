@@ -8,20 +8,8 @@ import { addFriendBookToShelf } from "@/app/actions/media-items";
 import { recommendBook } from "@/app/actions/recommendations";
 import type { Friend } from "@/lib/friends";
 
-type StatusInicial = "want" | "reading";
-
-const STATUS_LABEL: Record<StatusInicial, string> = {
-  want: "Quero ler",
-  reading: "Lendo",
-};
-
-const STATUS_STYLE: Record<StatusInicial, string> = {
-  want: "bg-mustard text-ink",
-  reading: "bg-moss text-paper",
-};
-
-// CTAs da página do livro de um amigo: adicionar à minha estante (escolhendo o
-// status inicial) e indicar o livro a outros amigos.
+// CTAs da página do livro de um amigo: adicionar à minha estante e indicar o
+// livro a outros amigos.
 export function LivroAmigoCtas({
   item,
   friends,
@@ -32,7 +20,6 @@ export function LivroAmigoCtas({
   const [sheet, setSheet] = useState<null | "indicar" | "adicionar">(null);
   const [feito, setFeito] = useState(false);
   const [mensagemFeito, setMensagemFeito] = useState("");
-  const [statusInicial, setStatusInicial] = useState<StatusInicial>("want");
   const [selecionados, setSelecionados] = useState<string[]>([]);
   const [mensagem, setMensagem] = useState("");
   const [erro, setErro] = useState<string | null>(null);
@@ -49,10 +36,7 @@ export function LivroAmigoCtas({
   function adicionar() {
     setErro(null);
     startAction(async () => {
-      const r = await addFriendBookToShelf({
-        sourceItemId: item.id,
-        status: statusInicial,
-      });
+      const r = await addFriendBookToShelf({ sourceItemId: item.id });
       if (r.error && !r.itemId) {
         setErro(r.error);
         return;
@@ -60,7 +44,7 @@ export function LivroAmigoCtas({
       setMensagemFeito(
         r.error
           ? r.error
-          : `“${item.title}” entrou como ${STATUS_LABEL[statusInicial].toLowerCase()}.`,
+          : `“${item.title}” está na sua estante, sem status. Escolha um quando quiser.`,
       );
       setFeito(true);
     });
@@ -121,26 +105,13 @@ export function LivroAmigoCtas({
                 </div>
               </div>
 
-              <p className="mt-5 font-display text-xs uppercase tracking-wider text-ink">
-                Começar como
+              {/* Sem "começar como": a decisão entre quero ler e lendo não
+                  existe na cabeça de quem está olhando a estante de outra
+                  pessoa. O livro entra sem status e você resolve na sua. */}
+              <p className="mt-4 font-serif text-sm italic text-ink-soft">
+                Vai pra sua estante sem status — você decide depois se é pra ler
+                agora ou algum dia.
               </p>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                {(["want", "reading"] as StatusInicial[]).map((s) => {
-                  const ativo = statusInicial === s;
-                  return (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => setStatusInicial(s)}
-                      className={`shadow-hard-sm border-2 border-ink py-3 font-display text-xs uppercase tracking-wider active:translate-x-[2px] active:translate-y-[2px] active:shadow-none ${
-                        ativo ? STATUS_STYLE[s] : "bg-card text-ink"
-                      }`}
-                    >
-                      {STATUS_LABEL[s]}
-                    </button>
-                  );
-                })}
-              </div>
 
               {erro && <p className="mt-3 text-sm font-medium text-coral">{erro}</p>}
 

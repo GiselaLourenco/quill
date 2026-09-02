@@ -1,30 +1,15 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
-import { BookThumb } from "@/components/book-thumb";
 import { EstanteShelf, type ShelfBook, type DbStatus } from "@/components/estante-shelf";
 import { RecommendationsStrip } from "@/components/recommendations-strip";
 import { getFriendsShelf, getFriends } from "@/lib/friends";
 import { getReceivedRecommendations } from "@/lib/recommendations";
 import { IndicarSheet, type LivroIndicavel } from "@/components/indicar-sheet";
+import { AmigosEstantes } from "@/components/amigos-estantes";
 import { EmptyState } from "@/components/empty-state";
 
-const STATUS_LABEL: Record<string, string> = {
-  want: "quero ler",
-  reading: "lendo",
-  finished: "terminei",
-  recomendado: "recomendado",
-  abandoned: "abandonei",
-};
 
-function Stars({ stars }: { stars: number }) {
-  return (
-    <span aria-label={`${stars} de 5 estrelas`} className="text-xs tracking-tight">
-      <span className="text-mustard">{"★".repeat(stars)}</span>
-      <span className="text-ink/25">{"★".repeat(5 - stars)}</span>
-    </span>
-  );
-}
 
 export default async function EstantePage({
   searchParams,
@@ -259,53 +244,7 @@ async function FriendsShelf({
       {/* Indicar livro a um amigo */}
       <IndicarSheet livros={livrosIndicaveis} amigos={amigos} />
 
-      <div className="flex flex-col gap-4">
-        {shelves.map((shelf) => (
-          <section key={shelf.friendId}>
-            <div className="mb-2 flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-ink bg-mustard text-xs font-semibold uppercase">
-                {shelf.name.charAt(0)}
-              </span>
-              <span className="text-sm font-semibold">{shelf.name}</span>
-            </div>
-            <div className="flex flex-col gap-2">
-              {shelf.items.map((it) => (
-                <Link
-                  key={it.id}
-                  href={`/books/${it.id}`}
-                  className="flex gap-3 rounded-md border-2 border-cover-border bg-white p-2.5"
-                >
-                  <BookThumb item={it} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="truncate text-sm font-medium">{it.title}</span>
-                      <span className="shrink-0 text-[10.5px] text-ink/55">
-                        {STATUS_LABEL[it.status] ?? it.status}
-                        {it.progressLabel ? ` · ${it.progressLabel}` : ""}
-                      </span>
-                    </div>
-                    {it.stars != null && (
-                      <div className="mt-0.5">
-                        <Stars stars={it.stars} />
-                      </div>
-                    )}
-                    {it.lastComment && (
-                      <p className="mt-1 rounded bg-paper px-2 py-1 text-[11.5px] text-ink/80">
-                        {it.lastComment.chapterRef != null && (
-                          <span className="text-ink/50">
-                            cap. {it.lastComment.chapterRef} ·{" "}
-                          </span>
-                        )}
-                        {it.lastComment.content}
-                      </p>
-                    )}
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </section>
-        ))}
-      </div>
+      <AmigosEstantes shelves={shelves} />
     </main>
   );
 }

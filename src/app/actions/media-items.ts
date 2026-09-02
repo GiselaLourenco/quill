@@ -76,7 +76,6 @@ export async function updateItemStatus(itemId: string, status: string) {
 // Não mexe no item do amigo — cada pessoa tem o seu próprio media_item.
 export async function addFriendBookToShelf(input: {
   sourceItemId: string;
-  status: "want" | "reading";
 }): Promise<{ itemId: string | null; error: string | null }> {
   const userId = await requireUserId();
   const supabase = await createClient();
@@ -106,7 +105,13 @@ export async function addFriendBookToShelf(input: {
       creator: source.creator,
       total_units: source.total_units,
       total_chapters: source.total_chapters,
-      status: input.status,
+      // Chega sem decisão tomada. Antes o fluxo obrigava a escolher entre
+      // "quero ler" e "lendo" na hora de adicionar — decisão que ninguém tem
+      // no momento em que está passeando pela estante de outra pessoa.
+      // `recomendado` é o status que já significa "veio de um amigo, ainda não
+      // decidi": é o mesmo que a indicação de livro usa, e tem chip próprio na
+      // estante pra filtrar depois.
+      status: "recomendado",
       cover_kind: source.cover_kind,
       cover_url: source.cover_url,
       cover_palette: source.cover_palette ?? paletteIndexForTitle(source.title),
