@@ -33,7 +33,21 @@ export async function GET(request: Request) {
     const bytes = ehArteEnviada(arte)
       ? Buffer.from(await (await fetch(arte)).arrayBuffer())
       : await readFile(join(process.cwd(), "public", arte.replace(/^\//, "")));
-    const png = await sharp(bytes)
+    // `density` alta antes de qualquer coisa: SVG rasteriza no tamanho pedido,
+    // e aparar um bitmap já pequeno perderia detalhe.
+    const original = sharp(bytes, { density: 600 });
+
+    // `trim()` come a margem uniforme da arte. Sem isso o ícone ficava
+    // letterboxed: as ilustrações têm bastante espaço em volta do Quill, então
+    // num quadrado sobrava tarja e o personagem virava um pontinho — ruim no
+    // favicon e pior ainda na tela de abertura do PWA. Vale pra qualquer arte,
+    // inclusive as que o admin sobe.
+    const aparada = await original
+      .trim()
+      .toBuffer()
+      .catch(() => bytes); // arte sem borda uniforme: segue como veio
+
+    const png = await sharp(aparada, { density: 600 })
       .resize(tamanho, tamanho, { fit: "contain", background: { r: 245, g: 236, b: 215, alpha: 1 } })
       .png()
       .toBuffer();

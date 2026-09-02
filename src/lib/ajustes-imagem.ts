@@ -79,7 +79,7 @@ export async function getVersaoIcone(supabase: SupabaseClient): Promise<string> 
  * `?v=` só reflete o banco, e a rota manda cachear por um ano. Sem bumpar,
  * trocar o ícone no código não chega em quem já visitou.
  */
-const VERSAO_ICONE_PADRAO = "2";
+const VERSAO_ICONE_PADRAO = "3";
 
 /** Slot do ícone do app (favicon + ícone da tela de início do iOS). */
 export const SLOT_FAVICON = "app.favicon";
