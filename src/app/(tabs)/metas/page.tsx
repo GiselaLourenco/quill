@@ -146,14 +146,17 @@ export default async function MetasPage({
                   style={{ width: `${progress.percent}%` }}
                 />
               </div>
-              <div className="mt-3 flex items-end justify-around rounded-md border border-dashed border-cover-border bg-[#fdf3dd] px-2 pb-1.5 pt-2.5">
+              <div className="mt-3 flex items-end justify-around rounded-md border border-dashed border-cover-border bg-[#fdf3dd] px-2 pb-3 pt-4">
                 {QUILL_PHASES.map((p) => {
                   const active = p.key === phase.key;
                   return (
                     <div
                       key={p.key}
+                      // As fases que ainda não chegaram ficam apagadas, mas não
+                      // invisíveis: a 45% o jovem e o adulto sumiam contra o
+                      // creme do bloco e a faixa não comunicava a progressão.
                       className={`flex flex-col items-center rounded-md px-2 py-1 text-center ${
-                        active ? "outline-2 outline-moss-dark" : "opacity-45"
+                        active ? "outline-2 outline-moss-dark" : "opacity-70"
                       }`}
                     >
                       <AppImage
@@ -161,9 +164,13 @@ export default async function MetasPage({
                         src={p.img}
                         alt=""
                         aria-hidden
-                        width={active ? 44 : 34}
-                        height={active ? 44 : 34}
-                        className={active ? "h-11 w-11 object-contain" : "h-[34px] w-[34px] object-contain"}
+                        // 80/64 em vez de 56/44: as artes têm zoom alto
+                        // configurado (186–227%), então numa caixa pequena o
+                        // enquadramento cortava o Quill e sobrava pouco do
+                        // desenho pra ler.
+                        width={active ? 80 : 64}
+                        height={active ? 80 : 64}
+                        className={active ? "h-20 w-20 object-contain" : "h-16 w-16 object-contain"}
                       />
                       <span
                         className={`text-[10px] font-bold ${active ? "text-moss-dark" : ""}`}
