@@ -35,7 +35,10 @@ export function CheckinSheet({
   const [paginas, setPaginas] = useState("");
   const [capitulos, setCapitulos] = useState("");
   const [comentario, setComentario] = useState("");
-  const [publico, setPublico] = useState(true);
+  // Sem seletor de visibilidade: check-in de desafio existe pra aparecer no
+  // desafio. Quem quer anotar só pra si registra a leitura pela aba Ler, onde
+  // a nota nasce privada.
+  const publico = true;
   const [salvo, setSalvo] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, startSave] = useTransition();
@@ -44,6 +47,14 @@ export function CheckinSheet({
   // Uma casa decimal: "1,5 h" é uma forma normal de contar leitura; mais que
   // isso vira precisão falsa.
   const valorExibido = emHoras ? Math.round((minutos / 60) * 10) / 10 : minutos;
+
+  function trocarUnidade(u: Unidade) {
+    setUnidade(u);
+    // Em horas, 30 min viraria "0,5" — número quebrado e nenhum atalho aceso.
+    // Cai em 1h, a não ser que o valor já seja hora cheia (120 → 2h), aí não
+    // faz sentido descartar o que a pessoa tinha posto.
+    if (u === "h" && (minutos < 60 || minutos % 60 !== 0)) setMinutos(60);
+  }
 
   function aoMudarValor(bruto: number) {
     const emMinutos = emHoras ? bruto * 60 : bruto;
@@ -193,7 +204,7 @@ export function CheckinSheet({
                       <button
                         key={u}
                         type="button"
-                        onClick={() => setUnidade(u)}
+                        onClick={() => trocarUnidade(u)}
                         aria-pressed={unidade === u}
                         className={`px-3 py-1.5 font-display text-[10px] uppercase tracking-widest ${
                           unidade === u ? "bg-ink text-paper" : "bg-paper text-ink-soft"
@@ -276,23 +287,6 @@ export function CheckinSheet({
                 placeholder="O que rolou nessa leitura?"
                 className="shadow-hard-sm w-full rounded-md border-2 border-ink bg-card px-3 py-3 font-serif text-sm italic text-ink placeholder:text-ink-soft"
               />
-              <div className="mt-2 flex items-center gap-2">
-                <label
-                  htmlFor="checkin-visivel"
-                  className="font-display text-[9px] uppercase tracking-widest text-ink-soft"
-                >
-                  Visível
-                </label>
-                <select
-                  id="checkin-visivel"
-                  value={publico ? "publico" : "privado"}
-                  onChange={(e) => setPublico(e.target.value === "publico")}
-                  className="rounded-md border-2 border-ink bg-card px-2 py-1 font-display text-[10px] uppercase tracking-widest text-ink"
-                >
-                  <option value="publico">para o desafio</option>
-                  <option value="privado">só para mim</option>
-                </select>
-              </div>
             </div>
 
             {erro && <p className="text-sm font-medium text-coral">{erro}</p>}
