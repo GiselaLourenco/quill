@@ -152,19 +152,36 @@ export function CheckinSheet({
               >
                 Livro
               </label>
-              <select
-                id="checkin-livro"
-                value={livroId}
-                onChange={(e) => setLivroId(e.target.value)}
-                className="shadow-hard-sm w-full rounded-md border-2 border-ink bg-card px-3 py-3 font-serif text-sm italic text-ink"
-              >
-                {livros.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.titulo}
-                  </option>
-                ))}
-                <option value="manual">Sem livro vinculado</option>
-              </select>
+              {/* `appearance-none` + seta desenhada: a seta nativa é um traço
+                  fino e acinzentado, que destoa da borda de 2px e do resto dos
+                  controles. A nossa usa o mesmo `ink` e a mesma espessura. */}
+              <div className="relative">
+                <select
+                  id="checkin-livro"
+                  value={livroId}
+                  onChange={(e) => setLivroId(e.target.value)}
+                  className="shadow-hard-sm w-full appearance-none rounded-md border-2 border-ink bg-card py-3 pl-3 pr-11 font-serif text-sm italic text-ink"
+                >
+                  {livros.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.titulo}
+                    </option>
+                  ))}
+                  <option value="manual">Sem livro vinculado</option>
+                </select>
+                <svg
+                  viewBox="0 0 24 24"
+                  className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </div>
               {semLivro && livros.length === 0 && (
                 <p className="mt-2 font-serif text-xs italic text-ink-soft">
                   Você não tem nenhum livro marcado como “lendo” — o check-in vale pelo tempo.
