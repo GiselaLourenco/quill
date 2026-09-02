@@ -105,7 +105,6 @@ export default function NovoDesafioWizard({ amigos }: { amigos: Amigo[] }) {
     if (formRef.current) {
       const form = formRef.current;
       (form.elements.namedItem("name") as HTMLInputElement).value = nome.trim();
-      (form.elements.namedItem("emoji") as HTMLInputElement).value = "📚";
       (form.elements.namedItem("scoring_metric") as HTMLInputElement).value = metrica;
       (form.elements.namedItem("starts_at") as HTMLInputElement).value = hoje;
       (form.elements.namedItem("ends_at") as HTMLInputElement).value = fimStr;
@@ -128,7 +127,6 @@ export default function NovoDesafioWizard({ amigos }: { amigos: Amigo[] }) {
     <div className="flex h-full flex-col bg-paper">
       <form ref={formRef} action={createChallenge} className="hidden" aria-hidden>
         <input name="name" defaultValue="" />
-        <input name="emoji" defaultValue="" />
         <input name="scoring_metric" defaultValue="" />
         <input name="starts_at" defaultValue="" />
         <input name="ends_at" defaultValue="" />

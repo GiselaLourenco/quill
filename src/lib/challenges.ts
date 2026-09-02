@@ -3,7 +3,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export type ActiveChallenge = {
   id: string;
   name: string;
-  emoji: string | null;
   scoring_metric: string;
 };
 
@@ -16,14 +15,13 @@ export async function getActiveChallenges(
   const today = new Date().toISOString().slice(0, 10);
   const { data: memberships } = await supabase
     .from("group_members")
-    .select("groups!inner(id, name, emoji, format, starts_at, ends_at, scoring_metric)")
+    .select("groups!inner(id, name, format, starts_at, ends_at, scoring_metric)")
     .eq("user_id", userId);
 
   type GroupRow = {
     id: string;
     name: string;
-    emoji: string | null;
-    format: string;
+      format: string;
     starts_at: string | null;
     ends_at: string | null;
     scoring_metric: string | null;
@@ -41,7 +39,6 @@ export async function getActiveChallenges(
     .map((g) => ({
       id: g.id,
       name: g.name,
-      emoji: g.emoji,
       scoring_metric: g.scoring_metric ?? "active_days",
     }));
 }

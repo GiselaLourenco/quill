@@ -11,7 +11,6 @@ import { nomeExibicao } from "@/lib/nome-exibicao";
 type GroupRow = {
   id: string;
   name: string;
-  emoji: string | null;
   scoring_metric: string;
   starts_at: string | null;
   ends_at: string | null;
@@ -68,7 +67,7 @@ export default async function JuntosPage({
   const { data: memberships } = await supabase
     .from("group_members")
     .select(
-      "group_id, groups!inner(id, name, emoji, format, scoring_metric, starts_at, ends_at)",
+      "group_id, groups!inner(id, name, format, scoring_metric, starts_at, ends_at)",
     )
     .eq("user_id", userId);
 
@@ -201,7 +200,7 @@ export default async function JuntosPage({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2 pr-[120px]">
                         <h3 className="min-w-0 font-serif text-base font-semibold">
-                          {group.emoji} {group.name}
+                          {group.name}
                         </h3>
                       </div>
                       {capa && (
@@ -257,7 +256,7 @@ export default async function JuntosPage({
               <div key={g.id} className="rounded-md border-2 border-cover-border px-3 py-3 opacity-75">
                 <div className="flex items-center justify-between">
                   <h3 className="font-serif text-base font-semibold">
-                    {g.emoji} {g.name}
+                    {g.name}
                   </h3>
                   <span className="text-[10.5px] text-ink/60">encerrado</span>
                 </div>

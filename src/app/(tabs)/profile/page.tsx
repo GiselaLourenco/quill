@@ -69,7 +69,7 @@ export default async function ProfilePage() {
       .eq("user_id", userId),
     supabase
       .from("group_members")
-      .select("competes, groups!inner(id, name, emoji, format)")
+      .select("competes, groups!inner(id, name, format)")
       .eq("user_id", userId),
     getFriends(supabase, userId),
     getFriendsShelf(supabase, userId),
@@ -108,7 +108,7 @@ export default async function ProfilePage() {
     alvo: achievement.criteria.target,
   }));
 
-  type GroupRow = { id: string; name: string; emoji: string | null; format: string };
+  type GroupRow = { id: string; name: string; format: string };
   const desafios: DesafioRanking[] = (memberships ?? [])
     .map((m) => {
       const g = m.groups as unknown as GroupRow | GroupRow[];
@@ -117,7 +117,6 @@ export default async function ProfilePage() {
       return {
         id: grupo.id,
         nome: grupo.name,
-        emoji: grupo.emoji ?? "📚",
         competes: Boolean(m.competes),
       };
     })

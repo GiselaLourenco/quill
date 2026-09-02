@@ -18,7 +18,7 @@ export default async function DesafioDetalhePage({
   // Dados do grupo
   const { data: group } = await supabase
     .from("groups")
-    .select("id, name, emoji, scoring_metric, starts_at, ends_at, invite_code")
+    .select("id, name, scoring_metric, starts_at, ends_at, invite_code")
     .eq("id", id)
     .single();
 
@@ -200,7 +200,6 @@ export default async function DesafioDetalhePage({
       group={{
         id: group.id as string,
         nome: group.name as string,
-        emoji: (group.emoji as string | null) ?? "📚",
         metric,
         unit,
         diasRestantes: Math.max(0, diasRestantes),

@@ -284,7 +284,6 @@ export default async function HomePage() {
       desafios={desafiosAtivos.map((d, i) => ({
         id: d.id,
         nome: d.name,
-        emoji: d.emoji ?? "📚",
         tone: (["coral", "moss", "mustard"] as const)[i % 3]!,
       }))}
       pilulas={pilulas}

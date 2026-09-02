@@ -20,7 +20,7 @@ export type Meta = {
   periodo: string;
 };
 export type Pilula = { id: string; label: string; valor: string; unidade: string; tone: PilulaTone };
-export type Desafio = { id: string; nome: string; emoji: string; tone: DesafioTone };
+export type Desafio = { id: string; nome: string; tone: DesafioTone };
 export type DiaSemana = { d: string; min: number; hoje?: boolean };
 export type SemanaDados = { inicio: string; fim: string; dias: DiaSemana[] };
 export type MesCalendario = {
@@ -545,7 +545,7 @@ function DesafiosCard({ desafios }: { desafios: Desafio[] }) {
               Você está no
             </p>
             <h3 className={`mt-1 font-serif text-2xl font-bold italic leading-tight ${t.title}`}>
-              {d.emoji} {d.nome}
+              {d.nome}
             </h3>
           </div>
           <div

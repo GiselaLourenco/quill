@@ -746,11 +746,6 @@ function TelaRegistro({
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium">
-                          {d.emoji && (
-                            <span className="mr-1" aria-hidden>
-                              {d.emoji}
-                            </span>
-                          )}
                           {d.name}
                         </span>
                         <span className="block text-[11px] text-ink-soft">

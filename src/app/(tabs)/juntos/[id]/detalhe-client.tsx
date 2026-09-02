@@ -14,7 +14,7 @@ type RankingItem = Avatar & { posicao: number; userId: string; nome: string; met
 type AtividadeItem = Avatar & { id: string; userId: string; nome: string; texto: string; nota: string | null; quando: string; ehVoce: boolean };
 
 type Group = {
-  id: string; nome: string; emoji: string; metric: string; unit: string;
+  id: string; nome: string; metric: string; unit: string;
   diasRestantes: number; progresso: number; minhaPosicao: number; codigoConvite: string;
   encerrado: boolean;
 };
@@ -80,7 +80,7 @@ export default function DesafioDetalheClient({
           <Link href="/juntos" aria-label="Voltar" className="flex h-9 w-9 items-center justify-center border-2 border-ink bg-paper shadow-hard-sm active:translate-x-[2px] active:translate-y-[2px] active:shadow-none">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m15 18-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </Link>
-          <h1 className="font-display text-lg uppercase leading-none text-ink">{group.emoji} {group.nome}</h1>
+          <h1 className="font-display text-lg uppercase leading-none text-ink">{group.nome}</h1>
         </div>
 
         <div className="relative">

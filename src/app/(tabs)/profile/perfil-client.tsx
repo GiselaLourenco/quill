@@ -29,7 +29,6 @@ export type BadgeView = {
 export type DesafioRanking = {
   id: string;
   nome: string;
-  emoji: string;
   competes: boolean;
 };
 
@@ -977,7 +976,7 @@ function RankingDialog({
           {desafios.map((d) => (
             <li key={d.id} className="rounded-md border-2 border-ink bg-card p-3">
               <Toggle
-                titulo={`${d.emoji} ${d.nome}`}
+                titulo={d.nome}
                 desc={estado[d.id] ? "você aparece no placar" : "você fica fora do placar"}
                 ativo={Boolean(estado[d.id])}
                 onToggle={() => {
