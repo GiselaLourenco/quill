@@ -1,4 +1,6 @@
 import { readdirSync, statSync } from "node:fs";
+import { unstable_cache } from "next/cache";
+import { createPublicClient, TAG_ARTES } from "@/lib/supabase/publico";
 import { join } from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -107,3 +109,14 @@ export async function catalogoDeArtes(supabase: SupabaseClient): Promise<string[
   const escondidas = new Set(ocultas);
   return [...enviadas, ...listarArtes().filter((arte) => !escondidas.has(arte))];
 }
+
+
+/**
+ * Catálogo cacheado. É a leitura mais cara do layout — lista o bucket inteiro
+ * do Storage — e só interessa a quem é admin, mas rodava em toda navegação.
+ */
+export const catalogoDeArtesCache = unstable_cache(
+  async () => catalogoDeArtes(createPublicClient()),
+  ["catalogo-artes"],
+  { tags: [TAG_ARTES] },
+);

@@ -1,4 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { unstable_cache } from "next/cache";
+import { createPublicClient, TAG_ARTES } from "@/lib/supabase/publico";
 
 /**
  * Ajuste de enquadramento de uma imagem do app.
@@ -97,3 +99,31 @@ export function estiloDoAjuste(a: AjusteImagem | undefined): React.CSSProperties
   if (a.zoom !== 100) partes.push(`scale(${a.zoom / 100})`);
   return partes.length ? { transform: partes.join(" ") } : {};
 }
+
+
+/* -------------------------------------------------------------------------
+ * Versões cacheadas — usadas pelo layout raiz, que roda em TODA navegação.
+ *
+ * Sem isto, trocar de aba custava três consultas ao banco só pra montar a
+ * moldura: ajustes, slots e a versão do ícone. São dados globais que mudam
+ * quando alguém mexe no editor de artes, não a cada toque — e toda ação do
+ * /admin invalida a tag, então a troca continua aparecendo na hora.
+ * ---------------------------------------------------------------------- */
+
+export const getAjustesImagemCache = unstable_cache(
+  async () => getAjustesImagem(createPublicClient()),
+  ["ajustes-imagem"],
+  { tags: [TAG_ARTES] },
+);
+
+export const getSlotsImagemCache = unstable_cache(
+  async () => getSlotsImagem(createPublicClient()),
+  ["slots-imagem"],
+  { tags: [TAG_ARTES] },
+);
+
+export const getVersaoIconeCache = unstable_cache(
+  async () => getVersaoIcone(createPublicClient()),
+  ["versao-icone"],
+  { tags: [TAG_ARTES] },
+);

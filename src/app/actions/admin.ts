@@ -1,6 +1,7 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag, unstable_cache } from "next/cache";
+import { createPublicClient, TAG_ARTES } from "@/lib/supabase/publico";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 import {
@@ -24,13 +25,28 @@ export async function ehAdmin(): Promise<boolean> {
   const { data: claims } = await supabase.auth.getClaims();
   const userId = claims?.claims?.sub;
   if (!userId) return false;
-  const { data } = await supabase
-    .from("profiles")
-    .select("is_admin")
-    .eq("id", userId)
-    .maybeSingle();
-  return Boolean(data?.is_admin);
+  return ehAdminPorId(userId);
 }
+
+/**
+ * `is_admin` de um usuário, cacheado.
+ *
+ * Roda no layout raiz, ou seja, em toda navegação — e a resposta praticamente
+ * nunca muda. Cinco minutos: promover alguém a admin não precisa valer no
+ * mesmo segundo, e o custo era uma ida ao banco por troca de aba.
+ */
+const ehAdminPorId = unstable_cache(
+  async (userId: string) => {
+    const { data } = await createPublicClient()
+      .from("profiles")
+      .select("is_admin")
+      .eq("id", userId)
+      .maybeSingle();
+    return Boolean(data?.is_admin);
+  },
+  ["is-admin"],
+  { revalidate: 300 },
+);
 
 export async function salvarAjusteImagem(input: {
   path: string;
@@ -66,6 +82,7 @@ export async function salvarAjusteImagem(input: {
   if (error) return { error: "Não foi possível salvar o ajuste." };
 
   // O ajuste vale para o app inteiro assim que salva — sem novo deploy.
+  updateTag(TAG_ARTES);
   revalidatePath("/", "layout");
   return { error: null };
 }
@@ -76,6 +93,7 @@ export async function limparAjusteImagem(path: string): Promise<{ error: string 
 
   const supabase = await createClient();
   await supabase.from("image_adjustments").delete().eq("path", path);
+  updateTag(TAG_ARTES);
   revalidatePath("/", "layout");
   return { error: null };
 }
@@ -126,6 +144,7 @@ export async function salvarSlotImagem(input: {
   if (error) return { error: "Não foi possível salvar." };
 
   // Vale para o app inteiro assim que salva — sem novo deploy.
+  updateTag(TAG_ARTES);
   revalidatePath("/", "layout");
   return { error: null };
 }
@@ -136,6 +155,7 @@ export async function limparSlotImagem(slot: string): Promise<{ error: string | 
 
   const supabase = await createClient();
   await supabase.from("image_slots").delete().eq("slot", slot);
+  updateTag(TAG_ARTES);
   revalidatePath("/", "layout");
   return { error: null };
 }
@@ -192,6 +212,7 @@ export async function enviarArte(
 
   if (error) return { url: null, error: "Não foi possível enviar a imagem." };
 
+  updateTag(TAG_ARTES);
   revalidatePath("/", "layout");
   return { url: `${PREFIXO_ARTES_ENVIADAS}${nome}`, error: null };
 }
@@ -223,6 +244,7 @@ export async function removerArte(src: string): Promise<{ error: string | null }
     if (error) return { error: "Não foi possível esconder a arte." };
   }
 
+  updateTag(TAG_ARTES);
   revalidatePath("/", "layout");
   return { error: null };
 }
@@ -234,6 +256,7 @@ export async function restaurarArte(path: string): Promise<{ error: string | nul
 
   const supabase = await createClient();
   await supabase.from("artes_ocultas").delete().eq("path", path);
+  updateTag(TAG_ARTES);
   revalidatePath("/", "layout");
   return { error: null };
 }

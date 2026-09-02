@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import { Archivo_Black, Fraunces, Inter } from "next/font/google";
 import "./globals.css";
-import { createClient } from "@/lib/supabase/server";
-import { getAjustesImagem, getSlotsImagem, getVersaoIcone } from "@/lib/ajustes-imagem";
-import { catalogoDeArtes } from "@/lib/artes";
+import {
+  getAjustesImagemCache,
+  getSlotsImagemCache,
+  getVersaoIconeCache,
+} from "@/lib/ajustes-imagem";
+import { catalogoDeArtesCache } from "@/lib/artes";
 import { ehAdmin } from "@/app/actions/admin";
 import { ImagensProvider } from "@/components/imagens-provider";
 
@@ -26,8 +29,7 @@ const inter = Inter({
 export async function generateMetadata(): Promise<Metadata> {
   // O ícone é servido por rota (a arte vem do banco). O `?v=` muda quando o
   // admin troca a arte — sem isso o navegador segue mostrando o favicon antigo.
-  const supabase = await createClient();
-  const v = await getVersaoIcone(supabase);
+  const v = await getVersaoIconeCache();
 
   return {
     title: "Quill",
@@ -60,15 +62,14 @@ export default async function RootLayout({
   // Os ajustes de imagem entram uma vez por navegação e descem por contexto,
   // para nenhuma tela precisar buscar por conta própria. Ficam na raiz (e não
   // no layout das tabs) porque o login também tem arte com slot.
-  const supabase = await createClient();
   const [ajustes, slots, admin] = await Promise.all([
-    getAjustesImagem(supabase),
-    getSlotsImagem(supabase),
+    getAjustesImagemCache(),
+    getSlotsImagemCache(),
     ehAdmin(),
   ]);
   // A galeria de artes só interessa a quem pode editar. Junta as artes que
   // vieram no código (/public) com as que o admin subiu pelo app.
-  const catalogo = admin ? await catalogoDeArtes(supabase) : [];
+  const catalogo = admin ? await catalogoDeArtesCache() : [];
 
   return (
     <html
