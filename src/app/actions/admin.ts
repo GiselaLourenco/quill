@@ -102,7 +102,10 @@ export async function salvarSlotImagem(input: {
   const userId = await requireUserId();
   if (!(await ehAdmin())) return { error: "Só o admin ajusta as imagens." };
 
-  if (!/^[a-z0-9.\-]{3,60}$/.test(input.slot)) return { error: "Slot inválido." };
+  // O `_` faz parte: os slots de conquista saem da chave da conquista, e todas
+  // são snake_case (`conquista.first_session`, `conquista.streak_3`). Sem ele a
+  // validação recusava as nove — nenhuma arte de conquista era ajustável.
+  if (!/^[a-z0-9._-]{3,60}$/.test(input.slot)) return { error: "Slot inválido." };
 
   const supabase = await createClient();
 
