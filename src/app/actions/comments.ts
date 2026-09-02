@@ -42,3 +42,32 @@ export async function createComment(input: {
 
   revalidatePath(`/books/${input.itemId}`);
 }
+
+/**
+ * Apaga uma anotação minha.
+ *
+ * O `.eq("user_id", ...)` é redundante com a RLS ("own comments - all"), e é
+ * de propósito: se um dia alguém afrouxar a policy, a ação continua não
+ * apagando nota dos outros.
+ */
+export async function excluirComentario(input: {
+  id: string;
+  itemId: string;
+}): Promise<{ error: string | null }> {
+  const userId = await requireUserId();
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("comments")
+    .delete()
+    .eq("id", input.id)
+    .eq("user_id", userId);
+
+  if (error) return { error: "Não foi possível excluir a nota." };
+
+  revalidatePath(`/books/${input.itemId}`);
+  // A mesma nota aparece no diário; sem isto ela sobreviveria lá até o cache
+  // daquela rota vencer.
+  revalidatePath("/estante/diario");
+  return { error: null };
+}

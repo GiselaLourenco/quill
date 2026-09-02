@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NotaItem } from "@/components/nota-item";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
@@ -203,34 +204,7 @@ export default async function BookPage({
           ) : (
             <ul className="space-y-3">
               {(comments ?? []).map((c) => (
-                <li
-                  key={c.id}
-                  className="border-2 border-ink border-l-8 border-l-navy bg-paper p-4 shadow-hard-sm"
-                >
-                  <div className="mb-2 flex items-center gap-2">
-                    {c.scope === "chapter" && c.chapter_ref != null && (
-                      <span className="border border-ink bg-mustard px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-ink">
-                        cap. {c.chapter_ref}
-                      </span>
-                    )}
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-soft">
-                      {c.is_public ? "🌍 público" : "🔒 privado"}
-                    </span>
-                  </div>
-                  {c.content && (
-                    <p className="font-serif text-sm leading-relaxed text-ink">
-                      {c.content}
-                    </p>
-                  )}
-                  {c.gif_url && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={c.gif_url}
-                      alt="GIF"
-                      className="mt-1.5 max-h-32 border-2 border-cover-border"
-                    />
-                  )}
-                </li>
+                <NotaItem key={c.id} nota={c} itemId={item.id} />
               ))}
             </ul>
           )}
