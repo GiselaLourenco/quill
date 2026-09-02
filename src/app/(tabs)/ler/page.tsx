@@ -42,7 +42,7 @@ export default async function LerPage() {
   }));
 
   return (
-    <div className="min-h-full">
+    <div className="flex-1">
       <FreeReadingSession books={bookOptions} activeChallenges={activeChallenges} />
     </div>
   );

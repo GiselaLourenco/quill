@@ -102,7 +102,7 @@ export default async function BookPage({
   const statusLabel = STATUS_LABEL[item.status] ?? item.status;
 
   return (
-    <div className="flex min-h-full flex-col bg-paper">
+    <div className="flex flex-1 flex-col bg-paper">
       {/* Header mustard — Lovable style */}
       <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b-2 border-ink bg-mustard px-3 py-3">
         <div className="flex items-center gap-3">
@@ -295,7 +295,7 @@ async function FriendBookView({
   const statusLabel = STATUS_LABEL[item.status] ?? item.status;
 
   return (
-    <div className="flex min-h-full flex-col bg-paper">
+    <div className="flex flex-1 flex-col bg-paper">
       {/* Header */}
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b-2 border-ink bg-paper px-3 py-3">
         <Link

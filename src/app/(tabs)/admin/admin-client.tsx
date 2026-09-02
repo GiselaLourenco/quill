@@ -32,7 +32,7 @@ export default function AdminClient({
   const personalizados = Object.keys(slots).filter((s) => !especiais.includes(s)).sort();
 
   return (
-    <div className="min-h-full bg-paper px-5 pb-10 pt-6">
+    <div className="flex-1 bg-paper px-5 pb-10 pt-6">
       <header className="mb-5">
         <h1 className="font-display text-3xl uppercase leading-none tracking-tight text-ink">
           Ajustar imagens

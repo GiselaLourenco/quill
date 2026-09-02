@@ -64,7 +64,10 @@ export function BuscaLivro({ termo, escolhido, onEscolher, onLimpar }: Props) {
       <div className="flex flex-col gap-1.5">
         <p className="flex items-start gap-2 rounded-md border-2 border-moss bg-moss/15 px-2.5 py-2 text-xs leading-snug text-moss-dark">
           <span aria-hidden>✓</span>
-          Preenchido pela Open Library — pode editar tudo.
+          <span>
+            Autor, páginas e capa vieram da Open Library — pode editar tudo. O
+            título é o que você escreveu.
+          </span>
         </p>
         <button
           type="button"
@@ -133,6 +136,9 @@ export function BuscaLivro({ termo, escolhido, onEscolher, onLimpar }: Props) {
                 <span className="h-9 w-[26px] shrink-0 rounded-sm border border-ink/40 bg-cover-3" />
               )}
               <span className="min-w-0 flex-1">
+                {/* O catálogo indexa a obra pelo nome original, então este
+                    título pode vir em outro idioma. Serve pra confirmar que é o
+                    livro certo; o que vai pro cadastro é o que você digitou. */}
                 <span className="block truncate text-xs font-medium">{livro.titulo}</span>
                 <span className="block truncate text-[11px] text-ink/60">
                   {livro.autor ?? "autor desconhecido"}

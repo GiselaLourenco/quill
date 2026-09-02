@@ -81,7 +81,7 @@ export default function CompartilharClient({
   const [mes, ano] = periodo.rotulo.split(" ");
 
   return (
-    <div className="min-h-full bg-paper px-5 pb-10 pt-6">
+    <div className="flex-1 bg-paper px-5 pb-10 pt-6">
       {/* topo */}
       <header className="mb-5 flex items-center justify-between gap-3">
         <Link

@@ -20,6 +20,7 @@ export function AppImage({
   slot,
   alt,
   style,
+  className,
   ...props
 }: ImageProps & { src: string; slot?: string }) {
   const config = useSlot(slot);
@@ -32,6 +33,13 @@ export function AppImage({
     <Image
       src={srcFinal}
       alt={alt}
+      // `pointer-events-none` porque arte é decoração e nunca deve interceptar
+      // clique. Sem isto, um slot com zoom (o `vazio.lendo` está em 185%, com
+      // deslocamento pra baixo) transborda a própria caixa e cobre o que vem
+      // depois — e como elemento com `transform` pinta acima do conteúdo em
+      // fluxo normal, o botão embaixo parava de responder na área coberta.
+      // AppImage dentro de botão continua clicável: o evento vai pro botão.
+      className={`pointer-events-none ${className ?? ""}`}
       style={{ ...estiloDoAjuste(ajuste), ...style }}
       // O editor do admin acha as imagens editáveis por estes atributos —
       // `data-padrao` é a arte que o código define, para o botão "restaurar".

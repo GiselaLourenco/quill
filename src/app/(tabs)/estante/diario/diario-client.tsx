@@ -63,7 +63,7 @@ export default function DiarioClient({ entradas }: { entradas: EntradaDiario[] }
   }, [entradas, filtro]);
 
   return (
-    <div className="flex min-h-full flex-col bg-paper">
+    <div className="flex flex-1 flex-col bg-paper">
       <header className="sticky top-0 z-20 border-b-2 border-ink bg-paper px-4 pb-3 pt-4">
         <div className="flex items-center justify-between gap-2">
           <Link

@@ -33,6 +33,8 @@ export type DesafioRanking = {
 type DialogId = "amigos" | "metas" | "badges" | "pilulas" | "ranking" | "senha" | "excluir" | "foto" | null;
 
 type Props = {
+  /** Rótulos das pílulas que a pessoa escolheu, na ordem em que aparecem. */
+  pilulas: string[];
   displayName: string | null;
   username: string | null;
   avatarUrl: string | null;
@@ -63,6 +65,7 @@ type Props = {
 };
 
 export function PerfilClient({
+  pilulas,
   displayName,
   username,
   avatarUrl,
@@ -109,7 +112,7 @@ export function PerfilClient({
       : [...badges].sort((a, b) => b.progresso / b.alvo - a.progresso / a.alvo).slice(0, 3);
 
   return (
-    <div className="min-h-full bg-paper px-6 pb-24 pt-8 text-ink">
+    <div className="flex-1 bg-paper px-6 pb-24 pt-8 text-ink">
       {/* Cabeçalho de identidade */}
       <div className="flex flex-col items-center gap-3">
         <div className="relative">
@@ -363,7 +366,9 @@ export function PerfilClient({
                 onClose={() => setAberto(null)}
               />
             )}
-            {aberto === "pilulas" && <PilulasDialog onClose={() => setAberto(null)} />}
+            {aberto === "pilulas" && (
+              <PilulasDialog pilulas={pilulas} onClose={() => setAberto(null)} />
+            )}
             {aberto === "ranking" && (
               <RankingDialog
                 desafios={desafios}
@@ -822,11 +827,13 @@ function EditarPerfilDialog({
   );
 }
 
-function PilulasDialog({ onClose }: { onClose: () => void }) {
+// Mostra o que a pessoa realmente escolheu. Antes a lista era fixa no código,
+// com nomes de métricas que nem existem mais no catálogo.
+function PilulasDialog({ pilulas, onClose }: { pilulas: string[]; onClose: () => void }) {
   return (
     <DialogShell title="Pílulas do painel" onClose={onClose}>
       <ul className="space-y-2">
-        {["Streak", "Minutos hoje", "Páginas por dia", "Páginas por hora"].map((p) => (
+        {pilulas.map((p) => (
           <li
             key={p}
             className="flex items-center justify-between rounded-md border-2 border-ink bg-card px-3 py-2"

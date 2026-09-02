@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Portal } from "@/components/portal";
 import { BookThumb } from "@/components/book-thumb";
 import { type CoverFields } from "@/components/book-cover";
 import { addFriendBookToShelf } from "@/app/actions/media-items";
@@ -245,6 +246,10 @@ function Sheet({
   children: React.ReactNode;
 }) {
   return (
+    // Portal porque esta folha é declarada dentro da barra de CTAs, que é
+    // `fixed z-20` e portanto cria contexto de empilhamento: sem sair de lá, o
+    // z-30 dela valeria 20 e a tab bar cortaria a folha ao meio.
+    <Portal>
     <div className="fixed inset-0 z-30 flex justify-center">
       <button
         type="button"
@@ -269,6 +274,7 @@ function Sheet({
         {children}
       </div>
     </div>
+    </Portal>
   );
 }
 

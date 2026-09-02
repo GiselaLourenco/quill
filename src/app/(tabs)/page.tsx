@@ -1,7 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 import { getActiveChallenges } from "@/lib/challenges";
-import { computeStreak } from "@/lib/gamification";
+import {
+  computeStreak,
+  computeChaptersPerWeek,
+  computeMaxSessionPages,
+  type SessionRow,
+} from "@/lib/gamification";
+import { pillsEscolhidas, pillDisplay, type PillStats } from "@/lib/pills";
 import { nomeExibicao } from "@/lib/nome-exibicao";
 import { AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
 import HomeClient, { type Meta, type SemanaDados, type MesCalendario } from "./home-client";
@@ -27,16 +33,9 @@ function domingoDa(d: Date): Date {
   return out;
 }
 
-type SessionLite = {
-  started_at: string;
-  duration_seconds: number | null;
-  unit_start: number | null;
-  unit_end: number | null;
-};
-
-function paginasDa(s: SessionLite): number {
-  return Math.max(0, (s.unit_end ?? 0) - (s.unit_start ?? 0));
-}
+// A home lê as mesmas colunas que `SessionRow` de gamification.ts — é o que
+// `computeChaptersPerWeek` e `computeMaxSessionPages` esperam.
+type SessionLite = SessionRow;
 
 export default async function HomePage() {
   const userId = await requireUserId();
@@ -64,16 +63,15 @@ export default async function HomePage() {
     { data: sessionRows },
     { data: goals },
     { count: livrosTerminados },
-    { count: livrosNoMes },
   ] = await Promise.all([
       supabase
         .from("profiles")
-        .select("display_name, username, avatar_url, avatar_zoom, avatar_bg")
+        .select("display_name, username, avatar_url, avatar_zoom, avatar_bg, metrics_prefs")
         .eq("id", userId)
         .maybeSingle(),
       supabase
         .from("sessions")
-        .select("started_at, duration_seconds, unit_start, unit_end")
+        .select("started_at, duration_seconds, unit_start, unit_end, chapter_start, chapter_end, quality_tags, item_id")
         .eq("user_id", userId)
         .gte("started_at", `${janelaInicio}T00:00:00`),
       supabase
@@ -85,20 +83,9 @@ export default async function HomePage() {
         .select("id", { count: "exact", head: true })
         .eq("user_id", userId)
         .eq("status", "finished"),
-      supabase
-        .from("media_items")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", userId)
-        .eq("status", "finished")
-        .gte("finished_at", `${anoAtual}-${String(agora.getMonth() + 1).padStart(2, "0")}-01`)
-        .lte(
-          "finished_at",
-          iso(new Date(anoAtual, agora.getMonth() + 1, 0)),
-        ),
-    ]);
+]);
 
   const todas = (sessionRows ?? []) as SessionLite[];
-  const doAno = todas.filter((s) => s.started_at?.startsWith(String(anoAtual)));
 
   // ---- Semanas navegáveis ---------------------------------------------
   const semanas: SemanaDados[] = [];
@@ -166,7 +153,6 @@ export default async function HomePage() {
       .filter((s) => s.started_at?.startsWith(prefixoMes))
       .reduce((soma, s) => soma + (s.duration_seconds ?? 0), 0) / 3600,
   );
-  const streak = computeStreak(todas).current;
   const mesNome = agora.toLocaleString("pt-BR", { month: "long" });
 
   const metas: Meta[] = [
@@ -174,7 +160,7 @@ export default async function HomePage() {
       id: "sequencia",
       tipo: "sequencia",
       label: "Dias seguidos",
-      atual: streak,
+      atual: computeStreak(todas).current,
       total: alvoPorTipo.get("streak_days") ?? 0,
       unidade: "dias",
       periodo: "hoje",
@@ -200,50 +186,21 @@ export default async function HomePage() {
   ];
 
   // ---- Pílulas ----------------------------------------------------------
-  const diasComLeituraAno = new Set(doAno.map((s) => s.started_at.slice(0, 10)));
-
-  // Média de páginas por dia efetivamente lido (não por dia do calendário).
-  const paginasAno = doAno.reduce((soma, s) => soma + paginasDa(s), 0);
-  const mediaPaginas =
-    diasComLeituraAno.size > 0 ? Math.round(paginasAno / diasComLeituraAno.size) : 0;
-
-  // Velocidade: só entram sessões que registraram páginas, senão o tempo de
-  // sessões sem página derrubaria a média.
-  let paginasComTempo = 0;
-  let segundosComPaginas = 0;
-  for (const s of doAno) {
-    const pags = paginasDa(s);
-    if (pags > 0) {
-      paginasComTempo += pags;
-      segundosComPaginas += s.duration_seconds ?? 0;
-    }
-  }
-  const velocidade =
-    segundosComPaginas > 0 ? Math.round((paginasComTempo / segundosComPaginas) * 3600) : 0;
-
-  // Tempo lido na semana corrente (a última do array de semanas).
-  const minutosSemana = semanas[semanas.length - 1]!.dias.reduce((soma, d) => soma + d.min, 0);
-  const semanaTexto =
-    minutosSemana >= 60
-      ? `${Math.floor(minutosSemana / 60)}h${String(minutosSemana % 60).padStart(2, "0")}`
-      : `${minutosSemana}min`;
-
-  // Horário de ouro: a hora do dia em que mais sessões começaram.
-  const porHora = new Map<number, number>();
-  for (const s of doAno) {
-    const h = new Date(s.started_at).getHours();
-    porHora.set(h, (porHora.get(h) ?? 0) + 1);
-  }
-  let melhorHora: string | null = null;
-  let maiorContagem = 0;
-  for (const [h, n] of porHora) {
-    if (n > maiorContagem) {
-      maiorContagem = n;
-      melhorHora = `${h}h`;
-    }
-  }
-
-  const mesCurto = agora.toLocaleString("pt-BR", { month: "short" }).replace(".", "");
+  // O que aparece aqui é escolha da pessoa em /personalizar. Antes a home
+  // cravava seis pílulas no código e ignorava `metrics_prefs` — daí a opção
+  // existir no perfil e não mudar nada na tela.
+  const streakCompleto = computeStreak(todas);
+  const stats: PillStats = {
+    booksPerYear: livrosTerminados ?? 0,
+    hoursPerMonth: horasNoMes,
+    streakDays: streakCompleto.current,
+    chaptersPerWeek: computeChaptersPerWeek(todas),
+    maxSessionPages: computeMaxSessionPages(todas),
+    longestStreakEver: streakCompleto.record,
+  };
+  const pilulas = pillsEscolhidas(profile?.metrics_prefs).map((chave) =>
+    pillDisplay(chave, stats),
+  );
 
   const desafiosAtivos = await getActiveChallenges(supabase, userId);
 
@@ -262,14 +219,7 @@ export default async function HomePage() {
         emoji: d.emoji ?? "📚",
         tone: (["coral", "moss", "mustard"] as const)[i % 3]!,
       }))}
-      pilulas={[
-        { id: "sequencia", label: "Sequência", valor: String(streak), unidade: "dias", tone: "moss" },
-        { id: "media-dia", label: "Média/dia", valor: String(mediaPaginas), unidade: "pág", tone: "paper" },
-        { id: "velocidade", label: "Velocidade", valor: String(velocidade), unidade: "p/h", tone: "navy" },
-        { id: "min-semana", label: "Semana", valor: semanaTexto, unidade: "lidas", tone: "ink" },
-        { id: "livros-mes", label: "Livros/mês", valor: String(livrosNoMes ?? 0), unidade: `no ${mesCurto}`, tone: "mustard" },
-        { id: "melhor-hora", label: "Melhor hora", valor: melhorHora ?? "—", unidade: "pico", tone: "coral" },
-      ]}
+      pilulas={pilulas}
     />
   );
 }

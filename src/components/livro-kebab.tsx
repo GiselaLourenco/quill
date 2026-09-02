@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Portal } from "@/components/portal";
 import { deleteMediaItem } from "@/app/actions/media-items";
 
 // Kebab (3 pontos) do meu livro: por enquanto só "Excluir livro", com
@@ -50,6 +51,7 @@ export function LivroKebab({ itemId, titulo }: { itemId: string; titulo: string 
       )}
 
       {confirmar && (
+        <Portal>
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-ink/60 p-4 sm:items-center">
           <div className="shadow-hard w-full max-w-sm border-2 border-ink bg-card p-5">
             <p className="font-display text-lg uppercase leading-tight text-ink">Excluir livro?</p>
@@ -77,6 +79,7 @@ export function LivroKebab({ itemId, titulo }: { itemId: string; titulo: string 
             </div>
           </div>
         </div>
+        </Portal>
       )}
     </div>
   );

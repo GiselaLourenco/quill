@@ -8,6 +8,13 @@ import { IllustratedCover } from "@/components/illustrated-cover";
 import { paletteIndexForTitle } from "@/lib/covers";
 import type { LivroEncontrado } from "@/lib/open-library";
 
+/** Compara títulos ignorando caixa, acento e pontuação. */
+function mesmoTitulo(a: string, b: string) {
+  const limpar = (t: string) =>
+    t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return limpar(a) === limpar(b);
+}
+
 const STATUS_OPTIONS = [
   { value: "want", label: "quero ler" },
   { value: "reading", label: "lendo" },
@@ -25,7 +32,13 @@ export function AddBookForm({ serverError }: { serverError?: string }) {
 
   function preencherCom(livro: LivroEncontrado) {
     setEscolhido(livro);
-    setTitle(livro.titulo);
+    // O título digitado MANDA. A Open Library indexa a obra pelo nome
+    // original, então "Harry Potter e a Pedra Filosofal" acha o registro certo
+    // mas devolve "Harry Potter and the Philosopher's Stone" — sobrescrever
+    // trocaria o nome em português por um em inglês. Só aceitamos o título de
+    // lá quando é o mesmo que a pessoa escreveu, aí ganhamos a acentuação e as
+    // maiúsculas certas.
+    if (mesmoTitulo(title, livro.titulo)) setTitle(livro.titulo);
     if (livro.autor) setCreator(livro.autor);
     if (livro.paginas) setPaginas(String(livro.paginas));
     // Sem capa na Open Library o livro não fica sem capa: cai na ilustração
@@ -34,6 +47,14 @@ export function AddBookForm({ serverError }: { serverError?: string }) {
       setCoverUrl(livro.capaGrande);
       setCoverKind("real");
     }
+  }
+
+  // Editar o título depois de escolher volta a buscar. Sem isto a busca ficava
+  // congelada até apertar "buscar de novo", e quem corrigia o nome não via
+  // opção nenhuma aparecer.
+  function aoDigitarTitulo(valor: string) {
+    setTitle(valor);
+    if (escolhido && !mesmoTitulo(valor, escolhido.titulo)) setEscolhido(null);
   }
 
   function voltarABuscar() {
@@ -55,7 +76,7 @@ export function AddBookForm({ serverError }: { serverError?: string }) {
             name="title"
             required
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => aoDigitarTitulo(e.target.value)}
             placeholder="Nome do livro"
             className="rounded border-2 border-ink bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-moss-dark"
           />

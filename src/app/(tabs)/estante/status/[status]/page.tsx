@@ -64,7 +64,7 @@ export default async function StatusGridPage({
   }));
 
   return (
-    <div className="flex min-h-full flex-col bg-paper">
+    <div className="flex flex-1 flex-col bg-paper">
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b-2 border-ink bg-paper px-3 py-3">
         <Link
           href="/estante"

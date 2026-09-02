@@ -39,7 +39,7 @@ export default async function EstantePage({
   const supabase = await createClient();
 
   return (
-    <div className="flex min-h-full flex-col bg-paper">
+    <div className="flex flex-1 flex-col bg-paper">
       {/* Cabeçalho estilo Lovable: toggle Minha/Amigos + ações (diário, adicionar) */}
       <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b-2 border-ink bg-paper px-4 py-3">
         <div

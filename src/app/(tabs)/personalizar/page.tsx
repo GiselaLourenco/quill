@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 import { updateMetricsPrefs } from "@/app/actions/pills";
-import { PILL_CATALOG, DEFAULT_PILLS, isPillKey } from "@/lib/pills";
+import { PILL_CATALOG, MAX_PILLS, pillsEscolhidas } from "@/lib/pills";
 
 export default async function PersonalizarPage() {
   const userId = await requireUserId();
@@ -14,12 +14,7 @@ export default async function PersonalizarPage() {
     .eq("id", userId)
     .single();
 
-  const rawPrefs = Array.isArray(profile?.metrics_prefs)
-    ? (profile!.metrics_prefs as string[])
-    : [];
-  const selected = new Set(
-    rawPrefs.filter(isPillKey).length > 0 ? rawPrefs.filter(isPillKey) : DEFAULT_PILLS,
-  );
+  const selected = new Set(pillsEscolhidas(profile?.metrics_prefs));
 
   return (
     <>
@@ -31,7 +26,7 @@ export default async function PersonalizarPage() {
       </header>
       <main className="mx-auto w-full max-w-sm flex-1 px-4 py-6">
         <p className="mb-4 text-sm text-ink/65">
-          Escolha o que aparece no seu painel.
+          Escolha o que aparece no painel da home — até {MAX_PILLS} números.
         </p>
         <form action={updateMetricsPrefs} className="flex flex-col gap-3">
           {PILL_CATALOG.map((pill) => (
