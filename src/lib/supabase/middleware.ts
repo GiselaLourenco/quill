@@ -10,7 +10,9 @@ const RECOVERY_PATHS = ["/auth/callback", "/auth/reset"];
 
 // O ícone do app é pedido pelo navegador sem sessão (inclusive na tela de
 // login) e não pode cair em nenhum dos dois redirects abaixo.
-const OPEN_PATHS = ["/api/icone"];
+// O ícone e o manifest são pedidos pelo navegador sem sessão — inclusive na
+// hora de instalar o app pela tela de início.
+const OPEN_PATHS = ["/api/icone", "/manifest.webmanifest"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });

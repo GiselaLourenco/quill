@@ -36,6 +36,19 @@ export async function generateMetadata(): Promise<Metadata> {
       icon: [{ url: `/api/icone?tamanho=32&v=${v}`, type: "image/png", sizes: "32x32" }],
       apple: [{ url: `/api/icone?tamanho=180&v=${v}`, type: "image/png", sizes: "180x180" }],
     },
+    // O iOS ignora `display: standalone` do manifest e olha esta meta: sem ela,
+    // o atalho da tela de início continua abrindo aba no Safari.
+    appleWebApp: {
+      capable: true,
+      title: "Quill",
+      statusBarStyle: "default",
+    },
+    other: {
+      // O Next emite só o `mobile-web-app-capable` padronizado, que o Safari
+      // passou a entender no 17.4. O nome antigo cobre iPhone mais velho —
+      // sem ele, ali o atalho volta a abrir aba.
+      "apple-mobile-web-app-capable": "yes",
+    },
   };
 }
 

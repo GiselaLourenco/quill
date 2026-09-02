@@ -5,8 +5,10 @@ import { createClient } from "@/lib/supabase/server";
 import { getSlotsImagem, ICONE_PADRAO, SLOT_FAVICON } from "@/lib/ajustes-imagem";
 import { arteValida, ehArteEnviada } from "@/lib/artes";
 
+const TAMANHOS = [32, 180, 192, 512] as const;
+
 /**
- * Ícone do app (favicon e ícone da tela de início do iOS).
+ * Ícone do app (favicon, ícone da tela de início do iOS e os do manifest).
  *
  * A arte é escolhida no /admin e sai do banco, então trocar não pede deploy.
  * Converte para PNG porque as artes são WebP e nem todo navegador aceita WebP
@@ -15,7 +17,10 @@ import { arteValida, ehArteEnviada } from "@/lib/artes";
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const tamanho = searchParams.get("tamanho") === "180" ? 180 : 32;
+  // 32 favicon · 180 iOS · 192 e 512 manifest (o Android exige os dois pra
+  // instalar como app). Tamanho fora da lista cai no favicon.
+  const pedido = Number(searchParams.get("tamanho"));
+  const tamanho = (TAMANHOS as readonly number[]).includes(pedido) ? pedido : 32;
 
   const supabase = await createClient();
   const slots = await getSlotsImagem(supabase);
