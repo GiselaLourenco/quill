@@ -79,15 +79,27 @@ export async function getVersaoIcone(supabase: SupabaseClient): Promise<string> 
  * `?v=` só reflete o banco, e a rota manda cachear por um ano. Sem bumpar,
  * trocar o ícone no código não chega em quem já visitou.
  */
-const VERSAO_ICONE_PADRAO = "3";
+const VERSAO_ICONE_PADRAO = "4";
 
 /** Slot do ícone do app (favicon + ícone da tela de início do iOS). */
 export const SLOT_FAVICON = "app.favicon";
 
-/** Arte usada como ícone enquanto o admin não escolher outra. */
-// SVG e não PNG: a rota do ícone rasteriza pra 32, 180, 192 e 512, e a partir
-// do vetor cada tamanho sai nítido em vez de reamostrado de um PNG só.
+/**
+ * Arte do ícone do APP — tela de início, e a abertura do PWA, que usa o de 512.
+ *
+ * SVG e não PNG: a rota rasteriza pra 32, 180, 192 e 512, e a partir do vetor
+ * cada tamanho sai nítido em vez de reamostrado de um PNG só.
+ */
 export const ICONE_PADRAO = "/img/app/icone.svg";
+
+/**
+ * Arte da ABA do navegador, separada do ícone do app.
+ *
+ * São enquadramentos diferentes de propósito: no atalho da tela de início a
+ * figura sozinha lê melhor, e na aba a cena do Quill escrevendo é mais
+ * reconhecível — foi o que a versão antiga do atalho do Chrome mostrava.
+ */
+export const FAVICON_PADRAO = "/img/app/favicon.svg";
 
 /**
  * Estilo CSS equivalente ao ajuste — usado por `<AppImage>`.

@@ -2,7 +2,12 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
 import { createClient } from "@/lib/supabase/server";
-import { getSlotsImagem, ICONE_PADRAO, SLOT_FAVICON } from "@/lib/ajustes-imagem";
+import {
+  getSlotsImagem,
+  FAVICON_PADRAO,
+  ICONE_PADRAO,
+  SLOT_FAVICON,
+} from "@/lib/ajustes-imagem";
 import { arteValida, ehArteEnviada } from "@/lib/artes";
 
 const TAMANHOS = [32, 180, 192, 512] as const;
@@ -26,7 +31,11 @@ export async function GET(request: Request) {
   const slots = await getSlotsImagem(supabase);
   const escolhida = slots[SLOT_FAVICON]?.src ?? null;
   const valida = escolhida && (ehArteEnviada(escolhida) || arteValida(escolhida));
-  const arte = valida ? (escolhida as string) : ICONE_PADRAO;
+  // Só o 32 é aba de navegador; 180, 192 e 512 são ícone do app e abertura do
+  // PWA. Cada um tem sua arte padrão porque o enquadramento que funciona num
+  // não funciona no outro. Escolha do admin, quando existe, vale pros dois.
+  const padrao = tamanho === 32 ? FAVICON_PADRAO : ICONE_PADRAO;
+  const arte = valida ? (escolhida as string) : padrao;
 
   try {
     // Arte enviada pelo admin mora no Storage; as do código, em /public.
