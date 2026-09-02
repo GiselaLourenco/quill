@@ -28,7 +28,7 @@ const inter = Inter({
 
 /**
  * `viewport-fit: cover` é o que faz `env(safe-area-inset-*)` devolver valor.
- * Sem ele a função resolve zero, e o `pb-[env(...)]` da tab bar não empurrava
+ * Sem ele a função resolve zero, e o padding de baixo da tab bar não empurrava
  * nada — a barra terminava debaixo da faixa de gestos do aparelho, com os
  * rótulos cortados até um scroll forçar o navegador a redesenhar.
  */
