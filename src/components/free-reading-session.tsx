@@ -525,7 +525,8 @@ function TelaRegistro({
         <Passo numero="01" titulo="Em qual livro?">
           {disponiveis.length === 0 ? (
             <p className="rounded-md border-2 border-dashed border-ink bg-card p-4 text-center font-serif text-sm italic text-ink-soft">
-              Sua estante está vazia — a sessão vai valer só pelo tempo.
+              Você não tem nenhum livro marcado como “lendo” — a sessão vale
+              pelo tempo.
             </p>
           ) : (
             <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
