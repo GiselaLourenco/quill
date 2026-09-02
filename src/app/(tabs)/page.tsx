@@ -37,6 +37,10 @@ function domingoDa(d: Date): Date {
 // `computeChaptersPerWeek` e `computeMaxSessionPages` esperam.
 type SessionLite = SessionRow;
 
+function paginasDa(s: SessionLite): number {
+  return Math.max(0, (s.unit_end ?? 0) - (s.unit_start ?? 0));
+}
+
 export default async function HomePage() {
   const userId = await requireUserId();
   const supabase = await createClient();
@@ -63,6 +67,7 @@ export default async function HomePage() {
     { data: sessionRows },
     { data: goals },
     { count: livrosTerminados },
+    { count: livrosNoMes },
   ] = await Promise.all([
       supabase
         .from("profiles")
@@ -83,7 +88,18 @@ export default async function HomePage() {
         .select("id", { count: "exact", head: true })
         .eq("user_id", userId)
         .eq("status", "finished"),
-]);
+      // Livros terminados dentro do mês corrente — a pílula "Livros/mês".
+      supabase
+        .from("media_items")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("status", "finished")
+        .gte("finished_at", `${anoAtual}-${String(agora.getMonth() + 1).padStart(2, "0")}-01`)
+        .lte(
+          "finished_at",
+          iso(new Date(anoAtual, agora.getMonth() + 1, 0)),
+        ),
+    ]);
 
   const todas = (sessionRows ?? []) as SessionLite[];
 
@@ -186,14 +202,66 @@ export default async function HomePage() {
   ];
 
   // ---- Pílulas ----------------------------------------------------------
-  // O que aparece aqui é escolha da pessoa em /personalizar. Antes a home
-  // cravava seis pílulas no código e ignorava `metrics_prefs` — daí a opção
-  // existir no perfil e não mudar nada na tela.
+  // Quais aparecem é escolha da pessoa em /personalizar; sem escolha, valem as
+  // seis padrão. Todas as contas ficam prontas aqui — são baratas em cima das
+  // sessões já carregadas, e assim trocar a seleção não exige tocar na home.
+  const doAno = todas.filter((s) => s.started_at?.startsWith(String(anoAtual)));
+  const diasComLeituraAno = new Set(doAno.map((s) => s.started_at.slice(0, 10)));
+
+  // Média de páginas por dia efetivamente lido (não por dia do calendário).
+  const paginasAno = doAno.reduce((soma, s) => soma + paginasDa(s), 0);
+  const mediaPaginas =
+    diasComLeituraAno.size > 0 ? Math.round(paginasAno / diasComLeituraAno.size) : 0;
+
+  // Velocidade: só entram sessões que registraram páginas, senão o tempo de
+  // sessões sem página derrubaria a média.
+  let paginasComTempo = 0;
+  let segundosComPaginas = 0;
+  for (const s of doAno) {
+    const pags = paginasDa(s);
+    if (pags > 0) {
+      paginasComTempo += pags;
+      segundosComPaginas += s.duration_seconds ?? 0;
+    }
+  }
+  const velocidade =
+    segundosComPaginas > 0 ? Math.round((paginasComTempo / segundosComPaginas) * 3600) : 0;
+
+  // Tempo lido na semana corrente (a última do array de semanas).
+  const minutosSemana = semanas[semanas.length - 1]!.dias.reduce((soma, d) => soma + d.min, 0);
+  const semanaTexto =
+    minutosSemana >= 60
+      ? `${Math.floor(minutosSemana / 60)}h${String(minutosSemana % 60).padStart(2, "0")}`
+      : `${minutosSemana}min`;
+
+  // Horário de ouro: a hora do dia em que mais sessões começaram.
+  const porHora = new Map<number, number>();
+  for (const s of doAno) {
+    const h = new Date(s.started_at).getHours();
+    porHora.set(h, (porHora.get(h) ?? 0) + 1);
+  }
+  let melhorHora: string | null = null;
+  let maiorContagem = 0;
+  for (const [h, n] of porHora) {
+    if (n > maiorContagem) {
+      maiorContagem = n;
+      melhorHora = `${h}h`;
+    }
+  }
+
+  const mesCurto = agora.toLocaleString("pt-BR", { month: "short" }).replace(".", "");
   const streakCompleto = computeStreak(todas);
+
   const stats: PillStats = {
+    streak: streakCompleto.current,
+    pagesPerDay: mediaPaginas,
+    speedPagesPerHour: velocidade,
+    minutesThisWeek: semanaTexto,
+    booksThisMonth: livrosNoMes ?? 0,
+    mesCurto,
+    bestTime: melhorHora,
     booksPerYear: livrosTerminados ?? 0,
     hoursPerMonth: horasNoMes,
-    streakDays: streakCompleto.current,
     chaptersPerWeek: computeChaptersPerWeek(todas),
     maxSessionPages: computeMaxSessionPages(todas),
     longestStreakEver: streakCompleto.record,

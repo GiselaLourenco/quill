@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { PILL_CATALOG, pillsEscolhidas } from "@/lib/pills";
+import { pillsEscolhidas, rotuloDaPill } from "@/lib/pills";
 import { requireUserId } from "@/lib/supabase/auth";
 import { updateAvatar } from "@/app/actions/profile";
 import { logout, deleteAccount } from "@/app/actions/auth";
@@ -130,9 +130,7 @@ export default async function ProfilePage() {
 
   return (
     <PerfilClient
-      pilulas={pillsEscolhidas(profile?.metrics_prefs).map(
-        (k) => PILL_CATALOG.find((p) => p.key === k)!.label,
-      )}
+      pilulas={pillsEscolhidas(profile?.metrics_prefs).map(rotuloDaPill)}
       displayName={profile?.display_name ?? null}
       username={profile?.username ?? null}
       avatarUrl={(profile?.avatar_url as string | null) ?? null}
