@@ -83,17 +83,21 @@ export default function CompartilharClient({
   return (
     <div className="flex-1 bg-paper px-5 pb-10 pt-6">
       {/* topo */}
-      <header className="mb-5 flex items-center justify-between gap-3">
+      {/* Mesmo cabeçalho da tela do livro: quadrado só com o chevron e título
+          à esquerda. O botão anterior tinha a palavra "Voltar" em
+          `tracking-widest` dentro de um `justify-between` — espremido entre o
+          título e o espaçador, ele quebrava em duas linhas. */}
+      <header className="mb-5 flex items-center gap-3">
         <Link
           href="/"
-          className="shadow-hard-sm rounded-md border-2 border-ink bg-card px-3 py-2 font-display text-[10px] uppercase tracking-widest text-ink"
+          aria-label="Voltar para a home"
+          className="shadow-hard-sm flex h-9 w-9 shrink-0 items-center justify-center rounded-md border-2 border-ink bg-card font-display text-lg leading-none text-ink active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
         >
-          ‹ Voltar
+          ‹
         </Link>
-        <h1 className="font-display text-sm uppercase tracking-tight text-ink">
+        <h1 className="font-display text-lg uppercase leading-none tracking-tight text-ink">
           Compartilhar metas
         </h1>
-        <span className="w-[72px]" />
       </header>
 
       {/* seletor de período */}
