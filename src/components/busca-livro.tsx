@@ -11,6 +11,8 @@ type Props = {
   escolhido: LivroEncontrado | null;
   onEscolher: (livro: LivroEncontrado) => void;
   onLimpar: () => void;
+  /** Fecha a lista sem escolher nada. */
+  onDispensar: () => void;
 };
 
 /**
@@ -20,7 +22,7 @@ type Props = {
  *
  * O formulário inteiro segue utilizável enquanto isto carrega (ou falha).
  */
-export function BuscaLivro({ termo, escolhido, onEscolher, onLimpar }: Props) {
+export function BuscaLivro({ termo, escolhido, onEscolher, onLimpar, onDispensar }: Props) {
   // A resposta carrega o termo que a gerou: enquanto a pessoa digita, a lista
   // antiga não fica pendurada embaixo de um título que já mudou.
   const [resposta, setResposta] = useState<{
@@ -154,9 +156,21 @@ export function BuscaLivro({ termo, escolhido, onEscolher, onLimpar }: Props) {
           </li>
         ))}
       </ul>
-      <p className="font-serif text-xs italic text-ink/60">
-        toque pra preencher, ou siga digitando
-      </p>
+      {/* A Open Library casa por palavra solta, então uma lista sem nada a ver
+          é resultado normal — e antes ela ficava plantada na tela enquanto a
+          pessoa preenchia o resto do formulário. */}
+      <div className="flex items-center justify-between gap-2">
+        <p className="font-serif text-xs italic text-ink/60">
+          toque pra preencher, ou siga digitando
+        </p>
+        <button
+          type="button"
+          onClick={onDispensar}
+          className="shrink-0 text-xs font-semibold text-ink/60 underline underline-offset-2 hover:text-coral"
+        >
+          nenhum desses
+        </button>
+      </div>
     </div>
   );
 }

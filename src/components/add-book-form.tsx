@@ -29,6 +29,10 @@ export function AddBookForm({ serverError }: { serverError?: string }) {
   const [coverKind, setCoverKind] = useState<"real" | "illustrated">("illustrated");
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [escolhido, setEscolhido] = useState<LivroEncontrado | null>(null);
+  // A lista de resultados só faz sentido enquanto a atenção está no título.
+  // Sem isto ela seguia aberta empurrando Autor, Capa e o resto pra baixo,
+  // mesmo depois da pessoa desistir de achar o livro ali.
+  const [buscaAberta, setBuscaAberta] = useState(true);
 
   function preencherCom(livro: LivroEncontrado) {
     setEscolhido(livro);
@@ -54,6 +58,8 @@ export function AddBookForm({ serverError }: { serverError?: string }) {
   // opção nenhuma aparecer.
   function aoDigitarTitulo(valor: string) {
     setTitle(valor);
+    // Voltar a digitar é pedir a lista de novo.
+    setBuscaAberta(true);
     if (escolhido && !mesmoTitulo(valor, escolhido.titulo)) setEscolhido(null);
   }
 
@@ -69,7 +75,17 @@ export function AddBookForm({ serverError }: { serverError?: string }) {
         <p className="text-sm font-medium text-coral">{serverError}</p>
       )}
 
-      <div className="flex flex-col gap-2">
+      <div
+        className="flex flex-col gap-2"
+        onFocus={() => setBuscaAberta(true)}
+        onBlur={(e) => {
+          // Só fecha quando o foco sai do grupo inteiro — senão tocar num
+          // resultado fecharia a lista antes do clique registrar.
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+            setBuscaAberta(false);
+          }
+        }}
+      >
         <label className="flex flex-col gap-1 text-sm font-medium">
           Título
           <input
@@ -81,12 +97,15 @@ export function AddBookForm({ serverError }: { serverError?: string }) {
             className="rounded border-2 border-ink bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-moss-dark"
           />
         </label>
-        <BuscaLivro
-          termo={title}
-          escolhido={escolhido}
-          onEscolher={preencherCom}
-          onLimpar={voltarABuscar}
-        />
+        {(buscaAberta || escolhido) && (
+          <BuscaLivro
+            termo={title}
+            escolhido={escolhido}
+            onEscolher={preencherCom}
+            onLimpar={voltarABuscar}
+            onDispensar={() => setBuscaAberta(false)}
+          />
+        )}
       </div>
 
       <label className="flex flex-col gap-1 text-sm font-medium">
