@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BotaoFlutuante } from "@/components/botao-flutuante";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 import { joinChallengeByCode } from "@/app/actions/groups";
@@ -152,7 +153,7 @@ export default async function JuntosPage({
   );
 
   return (
-    <div className="min-h-full bg-paper px-4 pt-5 pb-8">
+    <div className="flex-1 bg-paper px-4 pt-5 pb-24">
       {/* Header */}
       <header className="mb-6 flex items-start justify-between gap-3">
         <div>
@@ -161,13 +162,6 @@ export default async function JuntosPage({
             Desafios coletivos e clubes de leitura
           </p>
         </div>
-        <Link
-          href="/juntos/novo"
-          aria-label="Criar desafio"
-          className="flex h-11 w-11 shrink-0 items-center justify-center border-2 border-ink bg-mustard font-display text-2xl leading-none text-ink shadow-hard-sm active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
-        >
-          +
-        </Link>
       </header>
 
       {error && <p className="mb-4 text-sm font-medium text-coral">{error}</p>}
@@ -276,11 +270,17 @@ export default async function JuntosPage({
         </>
       )}
 
+      {/* Só com desafio na lista: vazia, o estado vazio já tem o botão grande
+          de criar, e dois CTAs pra mesma coisa competiriam — igual à estante. */}
+      {(challengeCards.length > 0 || ended.length > 0) && (
+        <BotaoFlutuante href="/juntos/novo" rotulo="Criar desafio" />
+      )}
+
       {challengeCards.length === 0 && ended.length === 0 && (
         <EmptyState
           mascote="confiante"
           titulo="Nenhum desafio ainda"
-          texto="Desafio é ler junto: cada um faz seu check-in e o placar acompanha. Crie o seu no + acima, ou entre no de um amigo com o código de convite."
+          texto="Desafio é ler junto: cada um faz seu check-in e o placar acompanha. Crie o seu aqui embaixo, ou entre no de um amigo com o código de convite."
           acao={{ href: "/juntos/novo", label: "Criar desafio" }}
         />
       )}
