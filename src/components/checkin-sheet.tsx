@@ -2,6 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { createSession, publishSession, saveSessionMemory } from "@/app/actions/sessions";
+import {
+  MAX_MINUTOS,
+  minutosAoTrocarUnidade,
+  minutosDoValor,
+  valorNaUnidade,
+  type UnidadeTempo,
+} from "@/lib/tempo";
 
 export type LivroLendo = { id: string; titulo: string };
 
@@ -9,9 +16,6 @@ export type LivroLendo = { id: string; titulo: string };
 // horas" não quer marcar 120.
 const PRESETS_MIN = [15, 30, 60];
 const PRESETS_H = [1, 2, 3];
-const MAX_MINUTOS = 600;
-
-type Unidade = "min" | "h";
 
 // Sheet de check-in do desafio: grava uma sessão de leitura de verdade e
 // publica o check-in no grupo. O comentário vira nota do check-in e, quando
@@ -31,7 +35,7 @@ export function CheckinSheet({
   // `minutos` continua sendo a verdade — é o que vira `durationSeconds`. A
   // unidade só muda como o número é mostrado e digitado.
   const [minutos, setMinutos] = useState(30);
-  const [unidade, setUnidade] = useState<Unidade>("min");
+  const [unidade, setUnidade] = useState<UnidadeTempo>("min");
   const [paginas, setPaginas] = useState("");
   const [capitulos, setCapitulos] = useState("");
   const [comentario, setComentario] = useState("");
@@ -44,21 +48,15 @@ export function CheckinSheet({
   const [salvando, startSave] = useTransition();
 
   const emHoras = unidade === "h";
-  // Uma casa decimal: "1,5 h" é uma forma normal de contar leitura; mais que
-  // isso vira precisão falsa.
-  const valorExibido = emHoras ? Math.round((minutos / 60) * 10) / 10 : minutos;
+  const valorExibido = valorNaUnidade(minutos, unidade);
 
-  function trocarUnidade(u: Unidade) {
+  function trocarUnidade(u: UnidadeTempo) {
     setUnidade(u);
-    // Em horas, 30 min viraria "0,5" — número quebrado e nenhum atalho aceso.
-    // Cai em 1h, a não ser que o valor já seja hora cheia (120 → 2h), aí não
-    // faz sentido descartar o que a pessoa tinha posto.
-    if (u === "h" && (minutos < 60 || minutos % 60 !== 0)) setMinutos(60);
+    setMinutos((m) => minutosAoTrocarUnidade(m, u));
   }
 
   function aoMudarValor(bruto: number) {
-    const emMinutos = emHoras ? bruto * 60 : bruto;
-    setMinutos(Math.max(0, Math.min(MAX_MINUTOS, Math.round(emMinutos))));
+    setMinutos(minutosDoValor(bruto, unidade));
   }
 
   const semLivro = livroId === "manual";
@@ -217,7 +215,7 @@ export function CheckinSheet({
                     role="group"
                     aria-label="Unidade do tempo lido"
                   >
-                    {(["min", "h"] as Unidade[]).map((u) => (
+                    {(["min", "h"] as UnidadeTempo[]).map((u) => (
                       <button
                         key={u}
                         type="button"

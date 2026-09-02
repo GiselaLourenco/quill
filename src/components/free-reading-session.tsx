@@ -1,6 +1,11 @@
 "use client";
 
 import { AppImage } from "@/components/app-image";
+import {
+  minutosDoValor,
+  valorNaUnidade,
+  type UnidadeTempo,
+} from "@/lib/tempo";
 import { BookThumb } from "@/components/book-thumb";
 import type { CoverFields } from "@/components/book-cover";
 import { useEffect, useState, useTransition } from "react";
@@ -26,7 +31,10 @@ const TAG_OPTIONS: { value: string; label: string; positiva: boolean }[] = [
   { value: "hard", label: "foi difícil", positiva: false },
 ];
 
-const PRESETS = [15, 30, 45, 60];
+// Quatro atalhos porque a grade da tela é de quatro colunas. Em horas os
+// passos são inteiros: quem pensa "li duas horas" não quer marcar 120.
+const PRESETS_MIN = [15, 30, 45, 60];
+const PRESETS_H = [1, 2, 3, 4];
 
 function metricLabel(metric: string): string {
   switch (metric) {
@@ -382,7 +390,10 @@ function TelaRegistro({
   const [livroId, setLivroId] = useState<string | null>(disponiveis[0]?.id ?? null);
   const [unidade, setUnidade] = useState<SessionUnit>("pages");
   const [quantidade, setQuantidade] = useState(0);
+  // `total` é sempre minuto — é o que a sessão grava. A unidade só muda como o
+  // número aparece e é digitado, igual ao check-in de desafio.
   const [total, setTotal] = useState(minutosIniciais);
+  const [unidadeTempo, setUnidadeTempo] = useState<UnidadeTempo>("min");
   const [tags, setTags] = useState<Set<string>>(new Set());
   const [nota, setNota] = useState("");
   const [visibilidade, setVisibilidade] = useState<"eu" | "amigos">("eu");
@@ -620,35 +631,62 @@ function TelaRegistro({
         {/* 03 — Tempo */}
         <Passo numero="03" titulo="Por quanto tempo?">
           <div className="grid grid-cols-4 gap-2">
-            {PRESETS.map((m) => (
+            {(unidadeTempo === "h" ? PRESETS_H : PRESETS_MIN).map((p) => (
               <button
-                key={m}
+                key={p}
                 type="button"
-                onClick={() => setTotal(m)}
+                onClick={() => setTotal(minutosDoValor(p, unidadeTempo))}
                 className={`rounded-md border-2 border-ink py-2.5 font-display text-xs tracking-wide active:translate-y-0.5 ${
-                  total === m ? "shadow-hard-sm bg-coral text-card" : "bg-card"
+                  valorNaUnidade(total, unidadeTempo) === p
+                    ? "shadow-hard-sm bg-coral text-card"
+                    : "bg-card"
                 }`}
               >
-                {m}m
+                {p}
+                {unidadeTempo === "h" ? "h" : "m"}
               </button>
             ))}
           </div>
-          <label className="shadow-hard-sm mt-2 flex cursor-text items-baseline justify-center gap-1 rounded-md border-2 border-ink bg-card py-3 transition-colors focus-within:bg-paper">
-            <input
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={total}
-              onChange={(e) => {
-                const digits = e.target.value.replace(/\D/g, "").slice(0, 3);
-                setTotal(digits === "" ? 0 : Math.min(600, Number(digits)));
-              }}
-              onBlur={() => setTotal((t) => Math.max(1, t))}
-              aria-label="Tempo lido em minutos"
-              className="w-16 bg-transparent text-center font-serif text-3xl font-bold focus:outline-none"
-            />
-            <span className="font-display text-sm tracking-wide">min</span>
-          </label>
+          <div className="mt-2 flex items-stretch gap-2">
+            <label className="shadow-hard-sm flex flex-1 cursor-text items-baseline justify-center gap-1 rounded-md border-2 border-ink bg-card py-3 transition-colors focus-within:bg-paper">
+              <input
+                type="text"
+                inputMode="decimal"
+                value={valorNaUnidade(total, unidadeTempo)}
+                onChange={(e) => {
+                  // Vírgula também: no teclado do celular ela é o separador
+                  // decimal, e "1,5" precisa virar 1h30 e não zero.
+                  const limpo = e.target.value.replace(",", ".").replace(/[^0-9.]/g, "");
+                  setTotal(minutosDoValor(Number(limpo) || 0, unidadeTempo));
+                }}
+                onBlur={() => setTotal((t) => Math.max(1, t))}
+                aria-label={`Tempo lido em ${unidadeTempo === "h" ? "horas" : "minutos"}`}
+                className="w-16 bg-transparent text-center font-serif text-3xl font-bold focus:outline-none"
+              />
+            </label>
+            <div
+              className="flex shrink-0 overflow-hidden rounded-md border-2 border-ink"
+              role="group"
+              aria-label="Unidade do tempo lido"
+            >
+              {(["min", "h"] as UnidadeTempo[]).map((u) => (
+                <button
+                  key={u}
+                  type="button"
+                  // Ao contrário do check-in, aqui trocar de unidade NÃO mexe
+                  // no valor: ele pode ter vindo do cronômetro, e virar 90 min
+                  // em 1h apagaria leitura que aconteceu. Mostra 1,5 h mesmo.
+                  onClick={() => setUnidadeTempo(u)}
+                  aria-pressed={unidadeTempo === u}
+                  className={`px-3 font-display text-[10px] uppercase tracking-widest ${
+                    unidadeTempo === u ? "bg-ink text-paper" : "bg-card text-ink-soft"
+                  }`}
+                >
+                  {u}
+                </button>
+              ))}
+            </div>
+          </div>
           <p className="mt-2 text-center text-[11px] text-ink-soft">
             {origem === "timer"
               ? "tempo medido pelo cronômetro — toque para ajustar"
