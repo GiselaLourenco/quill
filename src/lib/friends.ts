@@ -174,3 +174,39 @@ export async function getFriendsShelf(
     .filter((s) => s.items.length > 0)
     .sort((a, b) => a.name.localeCompare(b.name));
 }
+
+export type PedidoRecebido = {
+  id: string;
+  nome: string;
+  username: string | null;
+  avatarUrl: string | null;
+  avatarBg: string;
+};
+
+/** Quem pediu pra te adicionar e ainda está esperando resposta. */
+export async function getPedidosRecebidos(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<PedidoRecebido[]> {
+  const { data: pedidos } = await supabase
+    .from("friendships")
+    .select("user_id")
+    .eq("friend_id", userId)
+    .eq("status", "pending");
+
+  const ids = (pedidos ?? []).map((p) => p.user_id as string);
+  if (ids.length === 0) return [];
+
+  const { data: perfis } = await supabase
+    .from("profiles")
+    .select("id, display_name, username, avatar_url, avatar_bg")
+    .in("id", ids);
+
+  return (perfis ?? []).map((p) => ({
+    id: p.id as string,
+    nome: nomeExibicao(p.display_name as string | null, p.username as string | null),
+    username: (p.username as string | null) ?? null,
+    avatarUrl: (p.avatar_url as string | null) ?? null,
+    avatarBg: (p.avatar_bg as string | null) ?? "#6D6885",
+  }));
+}

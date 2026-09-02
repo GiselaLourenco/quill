@@ -1,6 +1,9 @@
 "use client";
 
 import Image from "next/image";
+import { AdicionarAmigo, Avatar } from "@/components/adicionar-amigo";
+import { aceitarPedido, recusarPedido } from "@/app/actions/friends";
+import type { PedidoRecebido } from "@/lib/friends";
 import { AppImage } from "@/components/app-image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -35,6 +38,8 @@ type DialogId = "amigos" | "metas" | "badges" | "pilulas" | "ranking" | "senha" 
 type Props = {
   /** Rótulos das pílulas que a pessoa escolheu, na ordem em que aparecem. */
   pilulas: string[];
+  /** Quem pediu pra te adicionar e ainda espera resposta. */
+  pedidos: PedidoRecebido[];
   displayName: string | null;
   username: string | null;
   avatarUrl: string | null;
@@ -66,6 +71,7 @@ type Props = {
 
 export function PerfilClient({
   pilulas,
+  pedidos,
   displayName,
   username,
   avatarUrl,
@@ -348,7 +354,7 @@ export function PerfilClient({
             onClick={(e) => e.stopPropagation()}
           >
             {aberto === "amigos" && (
-              <AmigosDialog amigos={amigos} estantes={estantes} onClose={() => setAberto(null)} />
+              <AmigosDialog amigos={amigos} estantes={estantes} pedidos={pedidos} onClose={() => setAberto(null)} />
             )}
             {aberto === "foto" && (
               <EditarPerfilDialog
@@ -484,13 +490,78 @@ const STATUS_AMIGO: Record<string, string> = {
   platinum: "platinei",
 };
 
+/**
+ * Pedidos que chegaram pra mim. Aceitar vira o status da linha que a outra
+ * pessoa criou — não existe linha recíproca, `getFriends` lê os dois sentidos.
+ */
+function Pedidos({ pedidos }: { pedidos: PedidoRecebido[] }) {
+  const router = useRouter();
+  const [respondendo, iniciar] = useTransition();
+  // Some da lista assim que respondido, antes mesmo do refresh chegar.
+  const [respondidos, setRespondidos] = useState<string[]>([]);
+
+  const visiveis = pedidos.filter((p) => !respondidos.includes(p.id));
+  if (visiveis.length === 0) return null;
+
+  const responder = (id: string, aceitar: boolean) => {
+    setRespondidos((prev) => [...prev, id]);
+    iniciar(async () => {
+      await (aceitar ? aceitarPedido(id) : recusarPedido(id));
+      router.refresh();
+    });
+  };
+
+  return (
+    <div className="mb-4">
+      <p className="mb-2 font-display text-[11px] uppercase tracking-wider text-ink">
+        Querem te adicionar · {visiveis.length}
+      </p>
+      <ul className="flex flex-col gap-1.5">
+        {visiveis.map((p) => (
+          <li
+            key={p.id}
+            className="shadow-hard-sm flex items-center gap-2 rounded-md border-2 border-mustard bg-card p-1.5"
+          >
+            <Avatar nome={p.nome} url={p.avatarUrl} bg={p.avatarBg} />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-xs font-bold">{p.nome}</span>
+              {p.username && (
+                <span className="block truncate text-[11px] text-ink-soft">@{p.username}</span>
+              )}
+            </span>
+            <button
+              type="button"
+              disabled={respondendo}
+              onClick={() => responder(p.id, true)}
+              className="shadow-hard-sm shrink-0 rounded-md border-2 border-ink bg-moss px-2.5 py-1.5 font-display text-[10px] uppercase tracking-wider text-paper active:translate-x-[1px] active:translate-y-[1px] active:shadow-none disabled:opacity-60"
+            >
+              Aceitar
+            </button>
+            <button
+              type="button"
+              disabled={respondendo}
+              aria-label={`Recusar pedido de ${p.nome}`}
+              onClick={() => responder(p.id, false)}
+              className="shadow-hard-sm shrink-0 rounded-md border-2 border-ink bg-paper px-2 py-1.5 text-[10px] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none disabled:opacity-60"
+            >
+              ✕
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function AmigosDialog({
   amigos,
   estantes,
+  pedidos,
   onClose,
 }: {
   amigos: Friend[];
   estantes: FriendShelf[];
+  pedidos: PedidoRecebido[];
   onClose: () => void;
 }) {
   const [busca, setBusca] = useState("");
@@ -578,6 +649,12 @@ function AmigosDialog({
   // ---- Lista de amigos -------------------------------------------------
   return (
     <DialogShell title={`Amigos (${amigos.length})`} onClose={onClose}>
+      {/* Sempre no topo, inclusive sem amigo nenhum: é a saída do estado
+          vazio, não um extra pra quem já tem gente. */}
+      <AdicionarAmigo />
+
+      {pedidos.length > 0 && <Pedidos pedidos={pedidos} />}
+
       {amigos.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-6 text-center">
           <AppImage
@@ -589,8 +666,8 @@ function AmigosDialog({
             className="w-28"
           />
           <p className="max-w-[240px] font-serif text-sm italic text-ink-soft">
-            Você ainda não tem amigos por aqui. Quando alguém te adicionar, a estante
-            dessa pessoa aparece na aba Estante.
+            Você ainda não tem amigos por aqui. Procure alguém pelo nome de usuário
+            ou e-mail aí em cima — a estante de quem aceitar aparece na aba Estante.
           </p>
         </div>
       ) : (

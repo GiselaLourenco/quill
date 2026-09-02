@@ -40,7 +40,8 @@ export default async function EstantePage({
 
   return (
     <div className="flex flex-1 flex-col bg-paper">
-      {/* Cabeçalho estilo Lovable: toggle Minha/Amigos + ações (diário, adicionar) */}
+      {/* Cabeçalho: toggle Minha/Amigos + diário. Adicionar livro virou botão
+          flutuante no canto inferior direito (BotaoAdicionarLivro). */}
       <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b-2 border-ink bg-paper px-4 py-3">
         <div
           role="tablist"
@@ -79,15 +80,6 @@ export default async function EstantePage({
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
                 <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-              </svg>
-            </Link>
-            <Link
-              href="/books/new"
-              aria-label="Adicionar livro"
-              className="flex h-10 w-10 items-center justify-center rounded-md border-2 border-ink bg-coral text-paper shadow-hard-sm"
-            >
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
-                <path d="M12 6v12M6 12h12" />
               </svg>
             </Link>
           </div>

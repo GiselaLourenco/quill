@@ -330,6 +330,12 @@ create policy "delete own checkin" on public.challenge_checkins for delete
 alter table public.friendships enable row level security;
 create policy "read own friendships" on public.friendships for select to authenticated
   using (user_id = auth.uid() or friend_id = auth.uid());
+-- Achar alguém pelo e-mail pra mandar pedido de amizade (migração
+-- buscar_id_por_email_para_amizade). `profiles` não guarda e-mail — ele vive
+-- em auth.users — daí SECURITY DEFINER. Só correspondência EXATA: com busca
+-- parcial daria pra varrer a base de e-mails.
+-- create function public.buscar_id_por_email(text) returns uuid ...
+
 create policy "create friend request" on public.friendships for insert to authenticated
   with check (user_id = auth.uid());
 create policy "update friendship" on public.friendships for update

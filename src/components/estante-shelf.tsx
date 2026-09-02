@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { AppImage } from "@/components/app-image";
 import { EmptyState } from "@/components/empty-state";
+import { BotaoAdicionarLivro } from "@/components/botao-adicionar-livro";
 import { BookCover } from "@/components/book-cover";
 import { StarRating } from "@/components/star-rating";
 import { setRating } from "@/app/actions/ratings";
@@ -89,7 +90,12 @@ export function EstanteShelf({ books }: { books: ShelfBook[] }) {
   }
 
   return (
-    <main className="flex flex-col gap-5 px-4 py-5 pb-8">
+    // `pb` extra: o botão flutuante fica sobre o fim da lista, e sem folga ele
+    // taparia a última fileira de capas.
+    <main className="flex flex-col gap-5 px-4 py-5 pb-24">
+      {/* Só com estante cheia. Vazia, o próprio estado vazio já tem o botão
+          grande de adicionar — dois botões pra mesma coisa competiriam. */}
+      <BotaoAdicionarLivro />
       {/* Hero */}
       <div className="relative overflow-hidden rounded-md border-2 border-ink bg-coral p-5 shadow-hard">
         <div className="relative z-10 max-w-[70%]">

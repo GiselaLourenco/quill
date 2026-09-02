@@ -6,7 +6,7 @@ import { logout, deleteAccount } from "@/app/actions/auth";
 import { toggleCompete } from "@/app/actions/groups";
 import { computeStreak, quillPhase, computeMaxSessionPages, type SessionRow } from "@/lib/gamification";
 import { evaluateAchievements, ACHIEVEMENT_ICON } from "@/lib/achievements";
-import { getFriends, getFriendsShelf } from "@/lib/friends";
+import { getFriends, getFriendsShelf, getPedidosRecebidos } from "@/lib/friends";
 import { PerfilClient, type BadgeView, type DesafioRanking } from "./perfil-client";
 
 const MESES_CURTOS = [
@@ -36,6 +36,7 @@ export default async function ProfilePage() {
     { data: memberships },
     friends,
     estantes,
+    pedidos,
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -72,6 +73,7 @@ export default async function ProfilePage() {
       .eq("user_id", userId),
     getFriends(supabase, userId),
     getFriendsShelf(supabase, userId),
+    getPedidosRecebidos(supabase, userId),
   ]);
 
   const totalFinished = finishedThisYear ?? 0;
@@ -142,6 +144,7 @@ export default async function ProfilePage() {
       totalHoras={totalHours}
       recordeStreak={recordeStreak}
       amigos={friends}
+      pedidos={pedidos}
       estantes={estantes}
       badges={badges}
       desafios={desafios}
