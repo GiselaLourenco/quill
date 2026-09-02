@@ -1,7 +1,7 @@
 "use server";
 
-import { revalidatePath, updateTag, unstable_cache } from "next/cache";
-import { createPublicClient, TAG_ARTES } from "@/lib/supabase/publico";
+import { revalidatePath, updateTag } from "next/cache";
+import { TAG_ARTES } from "@/lib/supabase/publico";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 import {
@@ -25,28 +25,18 @@ export async function ehAdmin(): Promise<boolean> {
   const { data: claims } = await supabase.auth.getClaims();
   const userId = claims?.claims?.sub;
   if (!userId) return false;
-  return ehAdminPorId(userId);
-}
 
-/**
- * `is_admin` de um usuário, cacheado.
- *
- * Roda no layout raiz, ou seja, em toda navegação — e a resposta praticamente
- * nunca muda. Cinco minutos: promover alguém a admin não precisa valer no
- * mesmo segundo, e o custo era uma ida ao banco por troca de aba.
- */
-const ehAdminPorId = unstable_cache(
-  async (userId: string) => {
-    const { data } = await createPublicClient()
-      .from("profiles")
-      .select("is_admin")
-      .eq("id", userId)
-      .maybeSingle();
-    return Boolean(data?.is_admin);
-  },
-  ["is-admin"],
-  { revalidate: 300 },
-);
+  // NÃO cachear esta leitura com client anônimo: `profiles` só é legível por
+  // `authenticated`, então a consulta volta vazia, `is_admin` vira false e o
+  // editor de artes some da tela. Aconteceu. Com a função na mesma região do
+  // banco a consulta custa poucos milissegundos — não vale o risco.
+  const { data } = await supabase
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", userId)
+    .maybeSingle();
+  return Boolean(data?.is_admin);
+}
 
 export async function salvarAjusteImagem(input: {
   path: string;
