@@ -1,6 +1,8 @@
 "use client";
 
 import Image from "next/image";
+import { ImportarAmazon } from "@/components/importar-amazon";
+import { useImagens } from "@/components/imagens-provider";
 import { BotaoAddLivroAmigo } from "@/components/botao-add-livro-amigo";
 import { CampoSenha } from "@/components/campo-senha";
 import { trocarSenha } from "@/app/actions/auth";
@@ -35,7 +37,7 @@ export type DesafioRanking = {
   competes: boolean;
 };
 
-type DialogId = "amigos" | "metas" | "badges" | "pilulas" | "ranking" | "senha" | "excluir" | "foto" | null;
+type DialogId = "amigos" | "metas" | "badges" | "pilulas" | "ranking" | "senha" | "excluir" | "foto" | "importar" | null;
 
 type Props = {
   /** Rótulos das pílulas que a pessoa escolheu, na ordem em que aparecem. */
@@ -97,6 +99,7 @@ export function PerfilClient({
   toggleCompeteAction,
 }: Props) {
   const [aberto, setAberto] = useState<DialogId>(null);
+  const { admin } = useImagens();
   // `avatarPorSrc` responde "houve escolha?" — é o que o rascunho do editor
   // precisa saber. `avatarDeExibicao` responde "o que desenhar?", e aí o
   // padrão entra pra quem nunca escolheu.
@@ -305,6 +308,24 @@ export function PerfilClient({
             </span>
             <span className="text-lg">›</span>
           </button>
+          {admin && (
+            <>
+              <div className="border-b border-dashed border-ink/30" />
+              <button
+                type="button"
+                onClick={() => setAberto("importar")}
+                className="flex w-full items-center justify-between text-left"
+              >
+                <span>
+                  <span className="block text-sm font-bold">Importar da Amazon</span>
+                  <span className="block text-[11px] text-ink-soft">
+                    o CSV da sua biblioteca Kindle · só admin por enquanto
+                  </span>
+                </span>
+                <span className="text-lg">›</span>
+              </button>
+            </>
+          )}
           <div className="border-b border-dashed border-ink/30" />
           <button
             type="button"
@@ -400,6 +421,11 @@ export function PerfilClient({
                 onSalvar={updateAvatarAction}
                 onClose={() => setAberto(null)}
               />
+            )}
+            {aberto === "importar" && (
+              <DialogShell title="Importar da Amazon" onClose={() => setAberto(null)}>
+                <ImportarAmazon />
+              </DialogShell>
             )}
             {aberto === "pilulas" && (
               <PilulasDialog pilulas={pilulas} onClose={() => setAberto(null)} />

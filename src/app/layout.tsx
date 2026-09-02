@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Archivo_Black, Fraunces, Inter } from "next/font/google";
 import "./globals.css";
 import {
@@ -25,6 +25,19 @@ const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
 });
+
+/**
+ * `viewport-fit: cover` é o que faz `env(safe-area-inset-*)` devolver valor.
+ * Sem ele a função resolve zero, e o `pb-[env(...)]` da tab bar não empurrava
+ * nada — a barra terminava debaixo da faixa de gestos do aparelho, com os
+ * rótulos cortados até um scroll forçar o navegador a redesenhar.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#f5ecd7",
+};
 
 export async function generateMetadata(): Promise<Metadata> {
   // O ícone é servido por rota (a arte vem do banco). O `?v=` muda quando o
