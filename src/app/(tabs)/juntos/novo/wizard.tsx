@@ -47,6 +47,35 @@ function duracaoDias(d: Duracao, valor: number, unidade: UnidadeDuracao): number
   return 365;
 }
 
+/** Data local em YYYY-MM-DD. `toISOString` usaria UTC e viraria o dia à noite. */
+function iso(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Meia-noite de hoje — para comparar datas sem a hora atrapalhar. */
+function hojeZerado(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/**
+ * Dia/mês/ano digitados → Date, ou null se a data não existe.
+ *
+ * Checa os componentes de volta porque o `Date` "conserta" sozinho: 31/02 vira
+ * 03/03 em silêncio, e a pessoa acharia que marcou fevereiro.
+ */
+function dataDe(dia: number, mes: number, ano: number): Date | null {
+  if (!dia || !mes || !ano || ano < 1000) return null;
+  const d = new Date(ano, mes - 1, dia);
+  d.setHours(0, 0, 0, 0);
+  if (d.getDate() !== dia || d.getMonth() !== mes - 1 || d.getFullYear() !== ano) return null;
+  return d;
+}
+
+/** Um ano à frente é o teto: sem limite, errar o ano cria desafio para 2043. */
+const DIAS_MAXIMO_ADIANTE = 365;
+
 function gerarCodigo() {
   const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
   let out = "";
@@ -68,8 +97,25 @@ export default function NovoDesafioWizard({ amigos }: { amigos: Amigo[] }) {
   const [copiado, setCopiado] = useState(false);
   const [convidados, setConvidados] = useState<Set<string>>(new Set());
   const [participarRanking, setParticiparRanking] = useState(true);
+  // Data de início como três campos de texto: é o que a pessoa digita, e
+  // guardar como número atrapalharia apagar para redigitar.
+  const inicial = hojeZerado();
+  const [dia, setDia] = useState(String(inicial.getDate()).padStart(2, "0"));
+  const [mes, setMes] = useState(String(inicial.getMonth() + 1).padStart(2, "0"));
+  const [ano, setAno] = useState(String(inicial.getFullYear()));
 
-  const podeAvancar = passo === 1 ? nome.trim().length >= 2 : true;
+  const inicioData = dataDe(Number(dia), Number(mes), Number(ano));
+  const limite = hojeZerado();
+  limite.setDate(limite.getDate() + DIAS_MAXIMO_ADIANTE);
+  const erroData = !inicioData
+    ? "Essa data não existe."
+    : inicioData < hojeZerado()
+    ? "Escolha hoje ou uma data à frente."
+    : inicioData > limite
+    ? "No máximo um ano à frente."
+    : null;
+
+  const podeAvancar = passo === 1 ? nome.trim().length >= 2 && !erroData : true;
 
   const passoInfo = useMemo(() => {
     if (passo === 1) return { titulo: "Passo 01 de 03", sub: "Nome e duração do desafio" };
@@ -94,10 +140,13 @@ export default function NovoDesafioWizard({ amigos }: { amigos: Amigo[] }) {
     });
   };
 
-  const hoje = new Date().toISOString().slice(0, 10);
-  const fim = new Date();
+  // A duração conta a partir da data escolhida, não de hoje.
+  const inicio = inicioData ?? hojeZerado();
+  const inicioStr = iso(inicio);
+  const fim = new Date(inicio);
   fim.setDate(fim.getDate() + duracaoDias(duracao, customValor, customUnidade));
-  const fimStr = fim.toISOString().slice(0, 10);
+  const fimStr = iso(fim);
+  const diasAteComecar = Math.round((+inicio - +hojeZerado()) / 86_400_000);
 
   const proximo = () => {
     if (!podeAvancar) return;
@@ -106,7 +155,7 @@ export default function NovoDesafioWizard({ amigos }: { amigos: Amigo[] }) {
       const form = formRef.current;
       (form.elements.namedItem("name") as HTMLInputElement).value = nome.trim();
       (form.elements.namedItem("scoring_metric") as HTMLInputElement).value = metrica;
-      (form.elements.namedItem("starts_at") as HTMLInputElement).value = hoje;
+      (form.elements.namedItem("starts_at") as HTMLInputElement).value = inicioStr;
       (form.elements.namedItem("ends_at") as HTMLInputElement).value = fimStr;
       // O código exibido no passo 3 é o que a pessoa copia e compartilha —
       // então é ele que precisa ser gravado. Antes o banco gerava outro por
@@ -167,6 +216,22 @@ export default function NovoDesafioWizard({ amigos }: { amigos: Amigo[] }) {
             onCustomValor={setCustomValor}
             customUnidade={customUnidade}
             onCustomUnidade={setCustomUnidade}
+            dia={dia}
+            mes={mes}
+            ano={ano}
+            onDia={setDia}
+            onMes={setMes}
+            onAno={setAno}
+            onHoje={() => {
+              const h = hojeZerado();
+              setDia(String(h.getDate()).padStart(2, "0"));
+              setMes(String(h.getMonth() + 1).padStart(2, "0"));
+              setAno(String(h.getFullYear()));
+            }}
+            erroData={erroData}
+            diasAteComecar={diasAteComecar}
+            inicio={inicio}
+            fim={fim}
           />
         )}
         {passo === 2 && <Passo2 metrica={metrica} onMetrica={setMetrica} />}
@@ -187,8 +252,46 @@ export default function NovoDesafioWizard({ amigos }: { amigos: Amigo[] }) {
   );
 }
 
+function CampoData({
+  id, rotulo, valor, onValor, tamanho, erro,
+}: {
+  id: string;
+  rotulo: string;
+  valor: string;
+  onValor: (v: string) => void;
+  tamanho: number;
+  erro: boolean;
+}) {
+  return (
+    <label
+      htmlFor={id}
+      className={`shadow-hard-sm flex cursor-text flex-col items-center rounded-md border-2 bg-card px-1 py-1.5 ${
+        erro ? "border-coral" : "border-ink"
+      }`}
+    >
+      <input
+        id={id}
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        value={valor}
+        maxLength={tamanho}
+        onChange={(e) => onValor(e.target.value.replace(/\D/g, "").slice(0, tamanho))}
+        // Preenche com zero ao sair: quem digita "5" quer dia 05, e sem isto o
+        // campo fica desalinhado dos vizinhos.
+        onBlur={() => onValor(valor ? valor.padStart(tamanho === 4 ? 4 : 2, "0") : valor)}
+        className="w-full bg-transparent text-center font-serif text-2xl font-bold text-ink focus:outline-none"
+      />
+      <span className="font-display text-[8px] uppercase tracking-widest text-ink-soft">
+        {rotulo}
+      </span>
+    </label>
+  );
+}
+
 function Passo1({
   nome, onNome, duracao, onDuracao, customValor, onCustomValor, customUnidade, onCustomUnidade,
+  dia, mes, ano, onDia, onMes, onAno, onHoje, erroData, diasAteComecar, inicio, fim,
 }: {
   nome: string;
   onNome: (v: string) => void;
@@ -198,7 +301,21 @@ function Passo1({
   onCustomValor: (v: number) => void;
   customUnidade: UnidadeDuracao;
   onCustomUnidade: (v: UnidadeDuracao) => void;
+  dia: string;
+  mes: string;
+  ano: string;
+  onDia: (v: string) => void;
+  onMes: (v: string) => void;
+  onAno: (v: string) => void;
+  onHoje: () => void;
+  erroData: string | null;
+  diasAteComecar: number;
+  inicio: Date;
+  fim: Date;
 }) {
+  const ddmm = (d: Date) =>
+    `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+  const comecaHoje = diasAteComecar === 0 && !erroData;
   return (
     <>
       <div className="space-y-2">
@@ -206,6 +323,39 @@ function Passo1({
         <input value={nome} onChange={(e) => onNome(e.target.value.slice(0, 60))} placeholder="Ex: Setembro clássico" maxLength={60} className="w-full border-2 border-ink bg-paper px-3 py-3 font-serif text-lg italic text-ink shadow-hard-sm placeholder:text-ink/30 focus:outline-none focus:shadow-hard" />
         <p className="text-right text-[10px] text-ink-soft">{nome.length}/60</p>
       </div>
+      {/* Começar em — antes da duração, porque é dela que a duração conta. */}
+      <div className="space-y-2">
+        <label className="block font-display text-xs uppercase tracking-widest text-ink">
+          Começar em
+        </label>
+        <div className="grid grid-cols-[1fr_1fr_1.25fr] gap-2">
+          <CampoData id="inicio-dia" rotulo="dia" valor={dia} onValor={onDia} tamanho={2} erro={!!erroData} />
+          <CampoData id="inicio-mes" rotulo="mês" valor={mes} onValor={onMes} tamanho={2} erro={!!erroData} />
+          <CampoData id="inicio-ano" rotulo="ano" valor={ano} onValor={onAno} tamanho={4} erro={!!erroData} />
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onHoje}
+            aria-pressed={comecaHoje}
+            className={`rounded-full border-2 border-ink px-3 py-1 font-display text-[9px] uppercase tracking-widest ${
+              comecaHoje ? "bg-mustard text-ink" : "bg-paper text-ink-soft"
+            }`}
+          >
+            hoje
+          </button>
+          {erroData ? (
+            <span className="font-serif text-xs italic text-coral">{erroData}</span>
+          ) : (
+            <span className="font-serif text-xs italic text-ink-soft">
+              {comecaHoje
+                ? "começa assim que criar"
+                : `começa em ${diasAteComecar} ${diasAteComecar === 1 ? "dia" : "dias"}`}
+            </span>
+          )}
+        </div>
+      </div>
+
       <div className="space-y-3">
         <label className="block font-display text-xs uppercase tracking-widest text-ink">Duração</label>
         <div className="grid grid-cols-3 gap-3">
@@ -279,6 +429,17 @@ function Passo1({
         </div>
 
         <p className="text-[11px] italic text-ink-soft">Mín. 1 semana · máx. 1 ano</p>
+
+        {/* O intervalo fechado. Sem ele, dá pra escolher data e duração e só
+            descobrir quando o desafio termina depois de criado. */}
+        {!erroData && (
+          <p className="border-t-2 border-dashed border-ink/25 pt-2 font-serif text-xs italic text-ink-soft">
+            de <strong className="not-italic text-ink">{ddmm(inicio)}</strong> até{" "}
+            <strong className="not-italic text-ink">
+              {ddmm(fim)}/{fim.getFullYear()}
+            </strong>
+          </p>
+        )}
       </div>
     </>
   );

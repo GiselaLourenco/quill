@@ -41,6 +41,11 @@ export default async function DesafioDetalhePage({
   // para novos check-ins.
   const fim = group.ends_at as string | null;
   const encerrado = Boolean(fim && fim < new Date().toISOString().slice(0, 10));
+  // Desafio marcado para começar depois: dá pra ver e convidar, mas check-in
+  // antes da largada bagunçaria placar e sequência.
+  const naoComecou = Boolean(
+    group.starts_at && (group.starts_at as string) > new Date().toISOString().slice(0, 10),
+  );
 
   // Check-ins + membros
   const { data: checkins } = await supabase
@@ -204,6 +209,8 @@ export default async function DesafioDetalhePage({
         unit,
         diasRestantes: Math.max(0, diasRestantes),
         encerrado,
+        naoComecou,
+        comecaEm: (group.starts_at as string | null) ?? null,
         progresso,
         minhaPosicao,
         codigoConvite,

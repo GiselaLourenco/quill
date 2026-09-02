@@ -17,6 +17,8 @@ type Group = {
   id: string; nome: string; metric: string; unit: string;
   diasRestantes: number; progresso: number; minhaPosicao: number; codigoConvite: string;
   encerrado: boolean;
+  naoComecou: boolean;
+  comecaEm: string | null;
 };
 
 /** Foto de quem está no desafio — a mesma escolhida no perfil. */
@@ -240,6 +242,17 @@ export default function DesafioDetalheClient({
               dá pra rever tudo, mas não dá mais pra fazer check-in
             </p>
           </div>
+        ) : group.naoComecou ? (
+          <div className="pointer-events-auto w-full border-2 border-ink bg-paper py-3.5 text-center shadow-hard">
+            <p className="font-display text-sm uppercase tracking-widest text-ink-soft">
+              Ainda não começou
+            </p>
+            <p className="mt-0.5 font-serif text-xs italic text-ink-soft">
+              {group.comecaEm
+                ? `o check-in abre em ${group.comecaEm.slice(8, 10)}/${group.comecaEm.slice(5, 7)} — já dá pra convidar`
+                : "já dá pra convidar quem vai participar"}
+            </p>
+          </div>
         ) : (
           <button
             onClick={() => setCheckinAberto(true)}
@@ -257,7 +270,7 @@ export default function DesafioDetalheClient({
         )}
       </div>
 
-      {checkinAberto && !group.encerrado && (
+      {checkinAberto && !group.encerrado && !group.naoComecou && (
         <CheckinSheet
           groupId={group.id}
           livros={livros}
