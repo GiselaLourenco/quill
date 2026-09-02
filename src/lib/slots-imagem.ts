@@ -41,7 +41,9 @@ export const SLOTS_FORA_DO_APP = [
   {
     slot: "app.favicon",
     rotulo: ROTULOS_SLOT["app.favicon"],
-    padrao: "/img/app/icone.png",
+    // Miniatura do /admin: tem que ser a mesma arte que a rota do ícone usa
+    // por padrão, senão o admin vê um desenho e o app mostra outro.
+    padrao: "/img/app/icone.svg",
     enquadra: false,
   },
   {
