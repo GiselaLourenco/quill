@@ -61,31 +61,12 @@ export function BuscaLivro({ termo, escolhido, onEscolher, onLimpar, onDispensar
     };
   }, [limpo, ativo]);
 
-  if (escolhido) {
-    return (
-      <div className="flex flex-col gap-1.5">
-        <p className="flex items-start gap-2 rounded-md border-2 border-moss bg-moss/15 px-2.5 py-2 text-xs leading-snug text-moss-dark">
-          <span aria-hidden>✓</span>
-          <span>
-            Autor, páginas e capa vieram da Open Library — pode editar tudo. O
-            título é o que você escreveu.
-          </span>
-        </p>
-        <button
-          type="button"
-          onClick={onLimpar}
-          className="self-start text-xs text-ink/60 underline underline-offset-2 hover:text-coral"
-        >
-          não é esse livro? buscar de novo
-        </button>
-      </div>
-    );
-  }
+  if (!ativo && !escolhido) return null;
 
-  if (!ativo) return null;
-
-  // Resposta de um termo anterior não vale pro que está escrito agora.
-  const atual = resposta?.termo === limpo ? resposta : null;
+  // Escolhido, a lista continua na tela com o marcado aceso — é assim que dá
+  // pra trocar de ideia sem recomeçar a busca. Sem escolha, resposta de um
+  // termo anterior não vale pro que está escrito agora.
+  const atual = escolhido ? resposta : resposta?.termo === limpo ? resposta : null;
 
   if (!atual) {
     return (
@@ -122,8 +103,17 @@ export function BuscaLivro({ termo, escolhido, onEscolher, onLimpar, onDispensar
           <li key={livro.id}>
             <button
               type="button"
-              onClick={() => onEscolher(livro)}
-              className="flex w-full items-center gap-2 rounded-md border-2 border-ink bg-white p-1.5 text-left transition-all hover:shadow-hard-sm active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+              // Tocar no que já está marcado desmarca: volta ao preenchimento
+              // manual. Um de cada vez — marcar outro troca a escolha.
+              onClick={() =>
+                escolhido?.id === livro.id ? onLimpar() : onEscolher(livro)
+              }
+              aria-pressed={escolhido?.id === livro.id}
+              className={`flex w-full items-center gap-2 rounded-md border-2 bg-white p-1.5 text-left transition-all active:translate-x-[1px] active:translate-y-[1px] active:shadow-none ${
+                escolhido?.id === livro.id
+                  ? "border-moss shadow-hard-sm"
+                  : "border-ink hover:shadow-hard-sm"
+              }`}
             >
               {livro.capaThumb ? (
                 <Image
@@ -152,25 +142,47 @@ export function BuscaLivro({ termo, escolhido, onEscolher, onLimpar, onDispensar
                   {livro.ano ? ` · ${livro.ano}` : ""}
                 </span>
               </span>
+              {/* O check diz qual livro está preenchendo o formulário. Vazio em
+                  todos = preenchimento manual. */}
+              <span
+                aria-hidden
+                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold ${
+                  escolhido?.id === livro.id
+                    ? "border-moss bg-moss text-paper"
+                    : "border-ink/30 text-transparent"
+                }`}
+              >
+                ✓
+              </span>
             </button>
           </li>
         ))}
       </ul>
-      {/* A Open Library casa por palavra solta, então uma lista sem nada a ver
-          é resultado normal — e antes ela ficava plantada na tela enquanto a
-          pessoa preenchia o resto do formulário. */}
-      <div className="flex items-center justify-between gap-2">
-        <p className="font-serif text-xs italic text-ink/60">
-          toque pra preencher, ou siga digitando
+      {escolhido ? (
+        <p className="flex items-start gap-2 rounded-md border-2 border-moss bg-moss/15 px-2.5 py-2 text-xs leading-snug text-moss-dark">
+          <span aria-hidden>✓</span>
+          <span>
+            Autor, páginas e capa vieram deste livro — pode editar tudo. O
+            título é o que você escreveu. Toque no check pra desmarcar.
+          </span>
         </p>
-        <button
-          type="button"
-          onClick={onDispensar}
-          className="shrink-0 text-xs font-semibold text-ink/60 underline underline-offset-2 hover:text-coral"
-        >
-          nenhum desses
-        </button>
-      </div>
+      ) : (
+        /* A Open Library casa por palavra solta, então uma lista sem nada a ver
+           é resultado normal — e antes ela ficava plantada na tela enquanto a
+           pessoa preenchia o resto do formulário. */
+        <div className="flex items-center justify-between gap-2">
+          <p className="font-serif text-xs italic text-ink/60">
+            marque um pra preencher, ou siga digitando
+          </p>
+          <button
+            type="button"
+            onClick={onDispensar}
+            className="shrink-0 text-xs font-semibold text-ink/60 underline underline-offset-2 hover:text-coral"
+          >
+            nenhum desses
+          </button>
+        </div>
+      )}
     </div>
   );
 }

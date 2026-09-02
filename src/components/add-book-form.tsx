@@ -63,10 +63,19 @@ export function AddBookForm({ serverError }: { serverError?: string }) {
     if (escolhido && !mesmoTitulo(valor, escolhido.titulo)) setEscolhido(null);
   }
 
+  // Desmarcar devolve o formulário ao preenchimento manual: o que veio do livro
+  // sai, o que você digitou fica. Comparar antes de limpar é o que faz essa
+  // diferença — apagar tudo levaria junto uma correção sua.
   function voltarABuscar() {
+    if (escolhido) {
+      if (escolhido.autor && creator === escolhido.autor) setCreator("");
+      if (escolhido.paginas && paginas === String(escolhido.paginas)) setPaginas("");
+      if (escolhido.capaGrande && coverUrl === escolhido.capaGrande) {
+        setCoverUrl(null);
+        setCoverKind("illustrated");
+      }
+    }
     setEscolhido(null);
-    setCoverUrl(null);
-    setCoverKind("illustrated");
   }
 
   return (
