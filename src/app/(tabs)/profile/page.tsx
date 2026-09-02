@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getNotificacoes } from "@/lib/notificacoes";
 import { pillsEscolhidas, rotuloDaPill } from "@/lib/pills";
 import { requireUserId } from "@/lib/supabase/auth";
 import { updateAvatar } from "@/app/actions/profile";
@@ -37,6 +38,7 @@ export default async function ProfilePage() {
     friends,
     estantes,
     pedidos,
+    notificacoes,
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -74,6 +76,7 @@ export default async function ProfilePage() {
     getFriends(supabase, userId),
     getFriendsShelf(supabase, userId),
     getPedidosRecebidos(supabase, userId),
+    getNotificacoes(supabase, userId),
   ]);
 
   const totalFinished = finishedThisYear ?? 0;
@@ -142,6 +145,7 @@ export default async function ProfilePage() {
       recordeStreak={recordeStreak}
       amigos={friends}
       pedidos={pedidos}
+      notificacoes={notificacoes.length}
       estantes={estantes}
       badges={badges}
       desafios={desafios}

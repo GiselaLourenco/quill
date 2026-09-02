@@ -44,6 +44,8 @@ type Props = {
   pilulas: string[];
   /** Quem pediu pra te adicionar e ainda espera resposta. */
   pedidos: PedidoRecebido[];
+  /** Quantas notificações pendentes — o número do card. */
+  notificacoes: number;
   displayName: string | null;
   username: string | null;
   avatarUrl: string | null;
@@ -76,6 +78,7 @@ type Props = {
 export function PerfilClient({
   pilulas,
   pedidos,
+  notificacoes,
   displayName,
   username,
   avatarUrl,
@@ -188,6 +191,21 @@ export function PerfilClient({
           <span className="text-lg">›</span>
         </span>
       </button>
+
+      {/* Notificações — mesmo desenho do card de Amigos, logo abaixo dele:
+          os dois são "gente falando com você". */}
+      <Link
+        href="/notificacoes"
+        className="shadow-hard mt-3 flex w-full items-center justify-between rounded-md border-2 border-ink bg-card p-4 transition-all active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+      >
+        <span className="text-sm font-bold uppercase tracking-wide">Notificações</span>
+        <span className="flex items-center gap-2">
+          <span className={`font-display text-lg ${notificacoes > 0 ? "text-coral" : ""}`}>
+            {notificacoes}
+          </span>
+          <span className="text-lg">›</span>
+        </span>
+      </Link>
 
       {/* Meta do ano + fase do Quill */}
       <Link
