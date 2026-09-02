@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { BotaoAddLivroAmigo } from "@/components/botao-add-livro-amigo";
 import { CampoSenha } from "@/components/campo-senha";
 import { trocarSenha } from "@/app/actions/auth";
 import { AdicionarAmigo, Avatar } from "@/components/adicionar-amigo";
@@ -653,6 +654,11 @@ function AmigosDialog({
                       {l.progressLabel ? ` · ${l.progressLabel}` : ""}
                       {l.stars ? ` · ${"★".repeat(l.stars)}` : ""}
                     </p>
+                    {/* O mesmo botão da aba Amigos: os livros do amigo
+                        aparecem aqui também, e aqui o adicionar não existia. */}
+                    <div className="mt-2">
+                      <BotaoAddLivroAmigo itemId={l.id} />
+                    </div>
                   </div>
                 </div>
                 {/* Só comentários públicos chegam até aqui (getFriendsShelf filtra) */}

@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import { BookThumb } from "@/components/book-thumb";
-import { addFriendBookToShelf } from "@/app/actions/media-items";
+import { BotaoAddLivroAmigo } from "@/components/botao-add-livro-amigo";
 import type { FriendShelf } from "@/lib/friends";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -110,23 +110,6 @@ function Estante({ shelf, onAbrir }: { shelf: FriendShelf; onAbrir?: () => void 
 }
 
 function LivroDoAmigo({ item }: { item: FriendShelf["items"][number] }) {
-  const [estado, setEstado] = useState<"idle" | "feito" | "ja-tinha">("idle");
-  const [erro, setErro] = useState<string | null>(null);
-  const [pendente, iniciar] = useTransition();
-
-  function adicionar() {
-    setErro(null);
-    iniciar(async () => {
-      const r = await addFriendBookToShelf({ sourceItemId: item.id });
-      // "já está na sua estante" vem com itemId: é aviso, não falha.
-      if (r.error && !r.itemId) {
-        setErro(r.error);
-        return;
-      }
-      setEstado(r.error ? "ja-tinha" : "feito");
-    });
-  }
-
   return (
     <div className="rounded-md border-2 border-cover-border bg-white p-2.5">
       <div className="flex gap-3">
@@ -141,23 +124,9 @@ function LivroDoAmigo({ item }: { item: FriendShelf["items"][number] }) {
               {item.progressLabel ? ` · ${item.progressLabel}` : ""}
             </span>
           </Link>
-
-          {estado === "idle" ? (
-            <button
-              type="button"
-              onClick={adicionar}
-              disabled={pendente}
-              className="shadow-hard-sm mt-2 rounded-md border-2 border-ink bg-coral px-2.5 py-1 font-display text-[10px] uppercase tracking-wider text-paper active:translate-x-[1px] active:translate-y-[1px] active:shadow-none disabled:opacity-60"
-            >
-              {pendente ? "Adicionando…" : "+ minha estante"}
-            </button>
-          ) : (
-            <p className="mt-2 font-display text-[10px] uppercase tracking-wider text-moss-dark">
-              {estado === "feito" ? "✓ na sua estante" : "já estava na sua estante"}
-            </p>
-          )}
-
-          {erro && <p className="mt-1 text-[11px] font-medium text-coral">{erro}</p>}
+          <div className="mt-2">
+            <BotaoAddLivroAmigo itemId={item.id} />
+          </div>
         </div>
       </div>
     </div>
