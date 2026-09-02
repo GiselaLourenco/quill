@@ -68,6 +68,7 @@ export default function HomeClient({
   semanas,
   meses,
   metas,
+  notificacoes,
   desafios,
   pilulas,
 }: {
@@ -78,6 +79,8 @@ export default function HomeClient({
   semanas: SemanaDados[];
   meses: MesCalendario[];
   metas: Meta[];
+  /** Quantas notificações pendentes — vira o contador no avatar. */
+  notificacoes: number;
   desafios: Desafio[];
   pilulas: Pilula[];
 }) {
@@ -104,25 +107,15 @@ export default function HomeClient({
             {dataStr}
           </p>
         </div>
-        {/* Ícone de perfil — espelha a foto do perfil, que sempre existe */}
-        <Link href="/profile" className="shrink-0" aria-label="Ir para o perfil">
-          <div
-            className="shadow-hard-sm relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-2 border-ink bg-coral transition-transform hover:-translate-x-0.5 hover:-translate-y-0.5 active:translate-x-0 active:translate-y-0"
-            style={{ backgroundColor: avatarBg || AVATAR_FUNDO_PADRAO }}
-          >
-            {/* Foto de perfil não passa por AppImage: quem ajusta é a própria
-                pessoa, no editor de perfil — não o admin. */}
-            <Image
-              src={avatarPerfil.src}
-              alt={avatarPerfil.nome}
-              width={64}
-              height={64}
-              className="h-full w-full object-contain"
-              style={{ transform: `scale(${avatarZoom / 100})` }}
-              draggable={false}
-            />
-          </div>
-        </Link>
+        {/* O avatar abre um menu em vez de ir direto ao perfil: com as
+            notificações, passaram a existir dois destinos a partir dele. */}
+        <AvatarMenu
+          src={avatarPerfil.src}
+          nome={avatarPerfil.nome}
+          bg={avatarBg}
+          zoom={avatarZoom}
+          notificacoes={notificacoes}
+        />
       </header>
 
       {/* Metas */}
@@ -139,6 +132,89 @@ export default function HomeClient({
 
       {/* Compartilhar */}
       <CompartilharBtn />
+    </div>
+  );
+}
+
+function AvatarMenu({
+  src,
+  nome,
+  bg,
+  zoom,
+  notificacoes,
+}: {
+  src: string;
+  nome: string;
+  bg: string;
+  zoom: number;
+  notificacoes: number;
+}) {
+  const [aberto, setAberto] = useState(false);
+
+  return (
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setAberto((v) => !v)}
+        aria-label="Menu do perfil"
+        aria-expanded={aberto}
+        className="block"
+      >
+        <div
+          className="shadow-hard-sm relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-2 border-ink transition-transform active:translate-x-0.5 active:translate-y-0.5"
+          style={{ backgroundColor: bg || AVATAR_FUNDO_PADRAO }}
+        >
+          {/* Foto de perfil não passa por AppImage: quem ajusta é a própria
+              pessoa, no editor de perfil — não o admin. */}
+          <Image
+            src={src}
+            alt={nome}
+            width={64}
+            height={64}
+            className="h-full w-full object-contain"
+            style={{ transform: `scale(${zoom / 100})` }}
+            draggable={false}
+          />
+        </div>
+        {notificacoes > 0 && (
+          <span className="absolute -right-1 -top-1 rounded-md border-2 border-ink bg-coral px-1.5 font-display text-[10px] leading-4 text-paper">
+            {notificacoes}
+          </span>
+        )}
+      </button>
+
+      {aberto && (
+        <>
+          {/* Camada de fechar: toque fora sai do menu sem clicar em nada. */}
+          <button
+            type="button"
+            aria-label="Fechar menu"
+            onClick={() => setAberto(false)}
+            className="fixed inset-0 z-30 cursor-default"
+          />
+          <div className="shadow-hard absolute right-0 top-[4.5rem] z-40 w-48 overflow-hidden rounded-md border-2 border-ink bg-card">
+            <Link
+              href="/profile"
+              onClick={() => setAberto(false)}
+              className="block px-3 py-2.5 font-display text-[11px] uppercase tracking-wider text-ink"
+            >
+              Perfil
+            </Link>
+            <Link
+              href="/notificacoes"
+              onClick={() => setAberto(false)}
+              className="flex items-center gap-2 border-t-2 border-ink px-3 py-2.5 font-display text-[11px] uppercase tracking-wider text-ink"
+            >
+              Notificações
+              {notificacoes > 0 && (
+                <span className="ml-auto rounded-md border-2 border-ink bg-coral px-1.5 text-[10px] leading-4 text-paper">
+                  {notificacoes}
+                </span>
+              )}
+            </Link>
+          </div>
+        </>
+      )}
     </div>
   );
 }

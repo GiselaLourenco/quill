@@ -8,6 +8,7 @@ import {
   type SessionRow,
 } from "@/lib/gamification";
 import { pillsEscolhidas, pillDisplay, type PillStats } from "@/lib/pills";
+import { getNotificacoes } from "@/lib/notificacoes";
 import { nomeExibicao } from "@/lib/nome-exibicao";
 import { AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
 import HomeClient, { type Meta, type SemanaDados, type MesCalendario } from "./home-client";
@@ -270,7 +271,10 @@ export default async function HomePage() {
     pillDisplay(chave, stats),
   );
 
-  const desafiosAtivos = await getActiveChallenges(supabase, userId);
+  const [desafiosAtivos, notificacoes] = await Promise.all([
+    getActiveChallenges(supabase, userId),
+    getNotificacoes(supabase, userId),
+  ]);
 
   return (
     <HomeClient
@@ -281,6 +285,7 @@ export default async function HomePage() {
       semanas={semanas}
       meses={meses}
       metas={metas}
+      notificacoes={notificacoes.length}
       desafios={desafiosAtivos.map((d, i) => ({
         id: d.id,
         nome: d.name,
