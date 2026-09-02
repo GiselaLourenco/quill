@@ -38,22 +38,22 @@ export function LoginClient({ modoInicial }: { modoInicial: Modo }) {
 
   return (
     <div className="min-h-screen bg-paper">
-      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col px-6 pb-10 pt-14">
+      <div className="mx-auto flex min-h-screen w-full max-w-[390px] flex-col px-6 pb-6 pt-8">
 
         {/* Mascote + wordmark */}
-        <header className="flex flex-col items-center gap-3 text-center">
+        <header className="flex flex-col items-center gap-2 text-center">
           <AppImage
             slot="login.mascote"
             src="/img/mascot/quill-confiante.webp"
             alt=""
             aria-hidden
-            width={128}
-            height={128}
+            width={96}
+            height={96}
             className="select-none"
             draggable={false}
             priority
           />
-          <h1 className="font-display text-6xl leading-none tracking-tight text-ink">
+          <h1 className="font-display text-5xl leading-none tracking-tight text-ink">
             Quill
           </h1>
           {tagline && (
@@ -63,7 +63,7 @@ export function LoginClient({ modoInicial }: { modoInicial: Modo }) {
 
         {/* ── Login ── */}
         {modo === "login" && (
-          <form action={loginAction} className="mt-10 flex flex-col gap-4">
+          <form action={loginAction} className="mt-7 flex flex-col gap-4">
             <Field id="email" label="E-mail ou nome de usuário" type="text" name="email" autoComplete="username" placeholder="voce@email.com ou seuusuario" />
             <CampoSenha id="password" label="Senha" name="password" autoComplete="current-password" />
 
@@ -158,7 +158,7 @@ export function LoginClient({ modoInicial }: { modoInicial: Modo }) {
 
         {/* Era só um rótulo. Vira a porta da história — que fica no login de
             propósito: quem ainda não tem conta pode conhecer o Quill antes. */}
-        <div className="mt-auto pt-10 text-center">
+        <div className="mt-auto pt-6 text-center">
           <Link
             href="/lore"
             className="text-[13px] font-semibold text-ink underline underline-offset-4 hover:text-coral"
