@@ -5,7 +5,13 @@ import { createSession, publishSession, saveSessionMemory } from "@/app/actions/
 
 export type LivroLendo = { id: string; titulo: string };
 
-const PRESETS = [15, 30, 60];
+// Atalhos por unidade. Em horas os passos são inteiros: quem pensa "li duas
+// horas" não quer marcar 120.
+const PRESETS_MIN = [15, 30, 60];
+const PRESETS_H = [1, 2, 3];
+const MAX_MINUTOS = 600;
+
+type Unidade = "min" | "h";
 
 // Sheet de check-in do desafio: grava uma sessão de leitura de verdade e
 // publica o check-in no grupo. O comentário vira nota do check-in e, quando
@@ -22,7 +28,10 @@ export function CheckinSheet({
   onFeito: () => void;
 }) {
   const [livroId, setLivroId] = useState<string>(livros[0]?.id ?? "manual");
+  // `minutos` continua sendo a verdade — é o que vira `durationSeconds`. A
+  // unidade só muda como o número é mostrado e digitado.
   const [minutos, setMinutos] = useState(30);
+  const [unidade, setUnidade] = useState<Unidade>("min");
   const [paginas, setPaginas] = useState("");
   const [capitulos, setCapitulos] = useState("");
   const [comentario, setComentario] = useState("");
@@ -30,6 +39,16 @@ export function CheckinSheet({
   const [salvo, setSalvo] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, startSave] = useTransition();
+
+  const emHoras = unidade === "h";
+  // Uma casa decimal: "1,5 h" é uma forma normal de contar leitura; mais que
+  // isso vira precisão falsa.
+  const valorExibido = emHoras ? Math.round((minutos / 60) * 10) / 10 : minutos;
+
+  function aoMudarValor(bruto: number) {
+    const emMinutos = emHoras ? bruto * 60 : bruto;
+    setMinutos(Math.max(0, Math.min(MAX_MINUTOS, Math.round(emMinutos))));
+  }
 
   const semLivro = livroId === "manual";
   const podeSalvar = minutos > 0 && !salvando;
@@ -150,32 +169,52 @@ export function CheckinSheet({
               >
                 Tempo lido
               </label>
-              <div className="shadow-hard-sm flex items-center gap-3 rounded-md border-2 border-ink bg-card p-3">
-                <input
-                  id="checkin-minutos"
-                  type="number"
-                  min={1}
-                  max={600}
-                  value={minutos}
-                  onChange={(e) =>
-                    setMinutos(Math.max(0, Math.min(600, Number(e.target.value) || 0)))
-                  }
-                  className="w-24 border-b-2 border-ink bg-transparent text-center font-display text-3xl text-ink outline-none"
-                />
-                <span className="font-display text-[10px] uppercase tracking-widest text-ink-soft">
-                  min
-                </span>
-                <div className="ml-auto flex gap-2">
-                  {PRESETS.map((p) => (
+              {/* Número e unidade em cima, atalhos embaixo: com o seletor de
+                  unidade na mesma linha, os três presets não cabiam num
+                  celular de 390px. */}
+              <div className="shadow-hard-sm rounded-md border-2 border-ink bg-card p-3">
+                <div className="flex items-center gap-3">
+                  <input
+                    id="checkin-minutos"
+                    type="number"
+                    min={0}
+                    max={emHoras ? MAX_MINUTOS / 60 : MAX_MINUTOS}
+                    step={emHoras ? 0.5 : 1}
+                    value={valorExibido}
+                    onChange={(e) => aoMudarValor(Number(e.target.value) || 0)}
+                    className="w-24 border-b-2 border-ink bg-transparent text-center font-display text-3xl text-ink outline-none"
+                  />
+                  <div
+                    className="flex overflow-hidden rounded-md border-2 border-ink"
+                    role="group"
+                    aria-label="Unidade do tempo lido"
+                  >
+                    {(["min", "h"] as Unidade[]).map((u) => (
+                      <button
+                        key={u}
+                        type="button"
+                        onClick={() => setUnidade(u)}
+                        aria-pressed={unidade === u}
+                        className={`px-3 py-1.5 font-display text-[10px] uppercase tracking-widest ${
+                          unidade === u ? "bg-ink text-paper" : "bg-paper text-ink-soft"
+                        }`}
+                      >
+                        {u}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-3 flex gap-2">
+                  {(emHoras ? PRESETS_H : PRESETS_MIN).map((p) => (
                     <button
                       key={p}
                       type="button"
-                      onClick={() => setMinutos(p)}
-                      className={`border-2 border-ink px-2 py-1 font-display text-[10px] uppercase tracking-widest ${
-                        minutos === p ? "bg-mustard text-ink" : "bg-paper text-ink"
+                      onClick={() => aoMudarValor(p)}
+                      className={`flex-1 border-2 border-ink px-2 py-1.5 font-display text-[10px] uppercase tracking-widest ${
+                        valorExibido === p ? "bg-mustard text-ink" : "bg-paper text-ink"
                       }`}
                     >
-                      {p}
+                      {p} {unidade}
                     </button>
                   ))}
                 </div>
