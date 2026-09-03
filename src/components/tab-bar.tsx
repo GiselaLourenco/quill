@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Portal } from "@/components/portal";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -65,10 +66,14 @@ export function TabBar() {
   const pathname = usePathname();
 
   return (
-    // `fixed` e não item de flex: presa ao viewport, ela para de subir e descer
-    // junto com a barra de endereço do navegador no celular. z-20 fica acima do
-    // conteúdo (cabeçalhos sticky são z-10) e abaixo das folhas (z-30 pra cima),
-    // que precisam cobri-la.
+    // Portal pro body porque `fixed` não é garantia: basta um ancestral com
+    // `transform`, `filter` ou `contain` pra ele virar relativo àquele elemento
+    // e a barra passar a rolar com a página — foi o que acontecia no perfil.
+    // No body não há ancestral que possa fazer isso.
+    //
+    // z-20 fica acima do conteúdo (cabeçalhos sticky são z-10) e abaixo das
+    // folhas (z-30 pra cima), que precisam cobri-la.
+    <Portal>
     <nav
       aria-label="Navegação principal"
       className="fixed inset-x-0 bottom-0 z-20 border-t-2 border-ink bg-paper pb-[max(env(safe-area-inset-bottom),0.5rem)]"
@@ -99,5 +104,6 @@ export function TabBar() {
         })}
       </ul>
     </nav>
+    </Portal>
   );
 }

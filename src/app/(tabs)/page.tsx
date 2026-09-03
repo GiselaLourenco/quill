@@ -285,7 +285,7 @@ export default async function HomePage() {
       semanas={semanas}
       meses={meses}
       metas={metas}
-      notificacoes={notificacoes.length}
+      notificacoes={notificacoes.novas}
       desafios={desafiosAtivos.map((d, i) => ({
         id: d.id,
         nome: d.name,

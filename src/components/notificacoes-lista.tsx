@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/adicionar-amigo";
 import { aceitarPedido, recusarPedido } from "@/app/actions/friends";
 import { addFriendBookToShelf } from "@/app/actions/media-items";
+import { limparNotificacoes } from "@/app/actions/notificacoes";
 import type { Notificacao, TipoNotificacao } from "@/lib/notificacoes";
 
 const FILTROS: { id: "todas" | TipoNotificacao; label: string }[] = [
@@ -23,15 +24,41 @@ const FILTROS: { id: "todas" | TipoNotificacao; label: string }[] = [
  * sem responder não muda nada, e é isso que a tela comunica ao não oferecer o
  * botão.
  */
+/** Quantas entram por vez. Dez cabe numa tela sem virar rolagem infinita. */
+const PAGINA = 10;
+
 export function NotificacoesLista({ inicial }: { inicial: Notificacao[] }) {
+  const router = useRouter();
   const [filtro, setFiltro] = useState<"todas" | TipoNotificacao>("todas");
   // Some da tela assim que respondido, antes do refresh do servidor chegar.
   const [resolvidos, setResolvidos] = useState<Record<string, string>>({});
+  const [quantas, setQuantas] = useState(PAGINA);
+  const [carregando, setCarregando] = useState(false);
+  const [limpando, iniciarLimpeza] = useTransition();
 
-  const visiveis = useMemo(
+  const daLista = useMemo(
     () => (filtro === "todas" ? inicial : inicial.filter((n) => n.tipo === filtro)),
     [inicial, filtro],
   );
+  const visiveis = daLista.slice(0, quantas);
+  const faltam = daLista.length - visiveis.length;
+
+  function carregarMais() {
+    setCarregando(true);
+    // A lista já está na memória; a espera existe só pra o "carregando" ser
+    // visível — sem ela o botão pisca e parece que nada aconteceu.
+    setTimeout(() => {
+      setQuantas((q) => q + PAGINA);
+      setCarregando(false);
+    }, 350);
+  }
+
+  function trocarFiltro(id: "todas" | TipoNotificacao) {
+    setFiltro(id);
+    // Filtro novo recomeça do topo: manter a contagem faria a lista abrir no
+    // meio, já expandida, sem a pessoa ter pedido.
+    setQuantas(PAGINA);
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -44,7 +71,7 @@ export function NotificacoesLista({ inicial }: { inicial: Notificacao[] }) {
             <button
               key={f.id}
               type="button"
-              onClick={() => setFiltro(f.id)}
+              onClick={() => trocarFiltro(f.id)}
               aria-pressed={ativo}
               className={`rounded-md border-2 border-ink px-3 py-1.5 font-display text-[10px] uppercase tracking-wider ${
                 ativo ? "shadow-hard-sm bg-navy text-paper" : "bg-paper text-ink"
@@ -74,6 +101,35 @@ export function NotificacoesLista({ inicial }: { inicial: Notificacao[] }) {
               onResolver={(texto) => setResolvidos((p) => ({ ...p, [n.id]: texto }))}
             />
           ))}
+
+          {faltam > 0 && (
+            <button
+              type="button"
+              onClick={carregarMais}
+              disabled={carregando}
+              className="shadow-hard-sm rounded-md border-2 border-ink bg-card py-2.5 font-display text-[10px] uppercase tracking-widest text-ink active:translate-x-[1px] active:translate-y-[1px] active:shadow-none disabled:opacity-60"
+            >
+              {carregando ? "carregando…" : `ver mais ${Math.min(faltam, PAGINA)}`}
+            </button>
+          )}
+
+          {/* Limpar só em "Todas": é a ação de "vi tudo", e limpar de dentro de
+              um filtro sugeriria que só aquele tipo seria zerado. */}
+          {filtro === "todas" && (
+            <button
+              type="button"
+              disabled={limpando}
+              onClick={() =>
+                iniciarLimpeza(async () => {
+                  await limparNotificacoes();
+                  router.refresh();
+                })
+              }
+              className="mt-2 self-center text-xs font-semibold text-ink-soft underline underline-offset-2 hover:text-coral disabled:opacity-60"
+            >
+              {limpando ? "limpando…" : "Limpar notificações"}
+            </button>
+          )}
         </div>
       )}
     </div>

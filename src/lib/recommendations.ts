@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type ReceivedRec = {
+  /** Quando chegou — as notificações ordenam e contam por isto. */
+  criadoEm: string;
   id: string;
   title: string;
   message: string | null;
@@ -33,6 +35,7 @@ export async function getReceivedRecommendations(
 
   return recs.map((r) => ({
     id: r.id as string,
+    criadoEm: (r.created_at as string) ?? new Date(0).toISOString(),
     title: (r.title as string) ?? "livro",
     message: (r.message as string) ?? null,
     itemRef: (r.item_ref as string) ?? null,

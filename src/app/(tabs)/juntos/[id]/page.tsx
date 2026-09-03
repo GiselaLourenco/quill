@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getFriends } from "@/lib/friends";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 import { computeScores, daysRemaining, periodProgress, type ScoringMetric, SCORING_METRIC_UNIT } from "@/lib/challenges";
@@ -55,6 +56,14 @@ export default async function DesafioDetalhePage({
     .order("created_at", { ascending: false });
 
   const memberIds = Array.from(new Set((checkins ?? []).map((c) => c.user_id as string)));
+
+  // Quem já está no desafio sai da lista de convidáveis — e é `group_members`
+  // que manda, não quem fez check-in: entrou e ainda não leu continua dentro.
+  const [amigos, { data: jaMembros }] = await Promise.all([
+    getFriends(supabase, userId),
+    supabase.from("group_members").select("user_id").eq("group_id", id),
+  ]);
+  const idsNoDesafio = new Set((jaMembros ?? []).map((m) => m.user_id as string));
 
   const { data: profiles } = memberIds.length
     ? await supabase
@@ -202,6 +211,13 @@ export default async function DesafioDetalhePage({
 
   return (
     <DesafioDetalheClient
+      amigosConvidaveis={amigos.map((a) => ({
+        id: a.id,
+        nome: a.name,
+        avatarUrl: perfilPorId.get(a.id)?.avatarUrl ?? null,
+        avatarBg: perfilPorId.get(a.id)?.avatarBg ?? AVATAR_FUNDO_PADRAO,
+        jaEstaNoDesafio: idsNoDesafio.has(a.id),
+      }))}
       group={{
         id: group.id as string,
         nome: group.name as string,

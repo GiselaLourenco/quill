@@ -108,3 +108,33 @@ export async function leaveChallenge(groupId: string) {
   revalidatePath("/");
   redirect("/juntos");
 }
+
+/**
+ * Puxa um amigo pra um desafio que já existe.
+ *
+ * A RLS garante o resto: a política "add friend to my group" exige que quem
+ * chama já esteja no grupo e que a pessoa adicionada já seja amiga dela. Aqui
+ * a checagem existe só pra devolver mensagem em vez de uma escrita
+ * silenciosamente recusada.
+ */
+export async function adicionarAmigoAoDesafio(input: {
+  groupId: string;
+  friendId: string;
+}): Promise<{ error: string | null }> {
+  await requireUserId();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("group_members")
+    .insert({ group_id: input.groupId, user_id: input.friendId });
+
+  if (error) {
+    // Chave duplicada: já está no desafio. Não é falha, é o estado desejado.
+    if (error.code === "23505") return { error: null };
+    console.error("[adicionarAmigoAoDesafio]", error.code, error.message);
+    return { error: "Não foi possível adicionar." };
+  }
+
+  revalidatePath(`/juntos/${input.groupId}`);
+  return { error: null };
+}

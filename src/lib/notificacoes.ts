@@ -48,33 +48,46 @@ function quandoRelativo(iso: string): { texto: string; ms: number } {
  * ela. Aceitar o pedido tira o item da lista porque a amizade deixou de estar
  * pendente — não porque alguém marcou um booleano.
  */
+export type Notificacoes = {
+  itens: Notificacao[];
+  /** Quantas são mais novas que a última limpeza — é o número dos contadores. */
+  novas: number;
+};
+
 export async function getNotificacoes(
   supabase: SupabaseClient,
   userId: string,
-): Promise<Notificacao[]> {
+): Promise<Notificacoes> {
   const hoje = new Date().toISOString().slice(0, 10);
   const daquiA7 = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
 
-  const [pedidos, recs, { data: membros }] = await Promise.all([
+  const [pedidos, recs, { data: membros }, { data: perfil }] = await Promise.all([
     getPedidosRecebidos(supabase, userId),
     getReceivedRecommendations(supabase, userId),
     supabase
       .from("group_members")
       .select("groups!inner(id, name, starts_at, format)")
       .eq("user_id", userId),
+    supabase
+      .from("profiles")
+      .select("notificacoes_limpas_em")
+      .eq("id", userId)
+      .maybeSingle(),
   ]);
+
+  const limpasEm = perfil?.notificacoes_limpas_em
+    ? Date.parse(perfil.notificacoes_limpas_em as string)
+    : 0;
 
   const notas: Notificacao[] = [];
 
   for (const p of pedidos) {
+    const { texto, ms } = quandoRelativo(p.criadoEm);
     notas.push({
       id: `amizade-${p.id}`,
       tipo: "amizade",
-      // `friendships` não guarda quando o pedido chegou de forma acessível
-      // aqui; o texto some e a ordenação joga esses pro topo, que é onde uma
-      // resposta pendente deve mesmo estar.
-      quando: "aguardando resposta",
-      emMs: Number.MAX_SAFE_INTEGER,
+      quando: texto,
+      emMs: ms,
       autor: p.nome,
       autorId: p.id,
       avatarUrl: p.avatarUrl,
@@ -83,7 +96,7 @@ export async function getNotificacoes(
   }
 
   for (const r of recs) {
-    const { texto, ms } = quandoRelativo(new Date().toISOString());
+    const { texto, ms } = quandoRelativo(r.criadoEm);
     notas.push({
       id: `indicacao-${r.id}`,
       tipo: "indicacao",
@@ -115,5 +128,9 @@ export async function getNotificacoes(
     });
   }
 
-  return notas.sort((a, b) => b.emMs - a.emMs);
+  const itens = notas.sort((a, b) => b.emMs - a.emMs);
+  // Limpar não apaga nada: o pedido de amizade continua pendente e segue
+  // visível nos filtros por tipo. O que a limpeza faz é parar de contar como
+  // novidade — por isso "novas" é o único número que ela mexe.
+  return { itens, novas: itens.filter((n) => n.emMs > limpasEm).length };
 }

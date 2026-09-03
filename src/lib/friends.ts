@@ -177,6 +177,8 @@ export async function getFriendsShelf(
 
 export type PedidoRecebido = {
   id: string;
+  /** Quando o pedido chegou — as notificações ordenam e contam por isto. */
+  criadoEm: string;
   nome: string;
   username: string | null;
   avatarUrl: string | null;
@@ -190,11 +192,14 @@ export async function getPedidosRecebidos(
 ): Promise<PedidoRecebido[]> {
   const { data: pedidos } = await supabase
     .from("friendships")
-    .select("user_id")
+    .select("user_id, created_at")
     .eq("friend_id", userId)
     .eq("status", "pending");
 
   const ids = (pedidos ?? []).map((p) => p.user_id as string);
+  const criadoPorId = new Map(
+    (pedidos ?? []).map((p) => [p.user_id as string, p.created_at as string]),
+  );
   if (ids.length === 0) return [];
 
   const { data: perfis } = await supabase
@@ -204,6 +209,7 @@ export async function getPedidosRecebidos(
 
   return (perfis ?? []).map((p) => ({
     id: p.id as string,
+    criadoEm: criadoPorId.get(p.id as string) ?? new Date(0).toISOString(),
     nome: nomeExibicao(p.display_name as string | null, p.username as string | null),
     username: (p.username as string | null) ?? null,
     avatarUrl: (p.avatar_url as string | null) ?? null,

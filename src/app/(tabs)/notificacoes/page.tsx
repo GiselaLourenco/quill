@@ -7,7 +7,7 @@ import { NotificacoesLista } from "@/components/notificacoes-lista";
 export default async function NotificacoesPage() {
   const userId = await requireUserId();
   const supabase = await createClient();
-  const notificacoes = await getNotificacoes(supabase, userId);
+  const { itens, novas } = await getNotificacoes(supabase, userId);
 
   return (
     <div className="flex flex-1 flex-col bg-paper px-5 pb-8 pt-6">
@@ -22,14 +22,14 @@ export default async function NotificacoesPage() {
         <h1 className="font-display text-2xl uppercase leading-none tracking-tight text-ink">
           Notificações
         </h1>
-        {notificacoes.length > 0 && (
+        {novas > 0 && (
           <span className="shadow-hard-sm ml-auto rounded-md border-2 border-ink bg-mustard px-2 py-1 font-display text-[10px] uppercase text-ink">
-            {notificacoes.length}
+            {novas}
           </span>
         )}
       </header>
 
-      <NotificacoesLista inicial={notificacoes} />
+      <NotificacoesLista inicial={itens} />
     </div>
   );
 }

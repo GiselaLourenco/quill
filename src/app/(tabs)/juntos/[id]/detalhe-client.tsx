@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { ConvidarAmigoDesafio, type AmigoConvidavel } from "@/components/convidar-amigo-desafio";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -45,8 +46,9 @@ function AvatarMembro({
 }
 
 export default function DesafioDetalheClient({
-  group, semana, ranking, atividade, livros,
+  group, semana, ranking, atividade, livros, amigosConvidaveis,
 }: {
+  amigosConvidaveis: AmigoConvidavel[];
   group: Group;
   semana: SemanaItem[];
   ranking: RankingItem[];
@@ -229,6 +231,10 @@ export default function DesafioDetalheClient({
             {copiado ? "Copiado" : "Copiar"}
           </button>
         </div>
+
+        {/* O código serve pra quem está fora da sua lista; pra quem já é amigo
+            aqui, chamar direto poupa sair do app e voltar. */}
+        <ConvidarAmigoDesafio groupId={group.id} amigos={amigosConvidaveis} />
       </section>
 
       {/* CTA fixo */}

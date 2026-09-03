@@ -145,7 +145,7 @@ export default async function ProfilePage() {
       recordeStreak={recordeStreak}
       amigos={friends}
       pedidos={pedidos}
-      notificacoes={notificacoes.length}
+      notificacoes={notificacoes.novas}
       estantes={estantes}
       badges={badges}
       desafios={desafios}
