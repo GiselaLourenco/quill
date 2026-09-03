@@ -36,8 +36,14 @@ export function NotificacoesLista({ inicial }: { inicial: Notificacao[] }) {
   const [carregando, setCarregando] = useState(false);
   const [limpando, iniciarLimpeza] = useTransition();
 
+  // "Todas" é a caixa de entrada: só o que chegou desde a última limpeza.
+  // Os filtros por tipo são o arquivo — mostram tudo que ainda está pendente,
+  // limpo ou não. É assim que a limpeza esvazia a tela sem perder nada.
   const daLista = useMemo(
-    () => (filtro === "todas" ? inicial : inicial.filter((n) => n.tipo === filtro)),
+    () =>
+      filtro === "todas"
+        ? inicial.filter((n) => n.nova)
+        : inicial.filter((n) => n.tipo === filtro),
     [inicial, filtro],
   );
   const visiveis = daLista.slice(0, quantas);
@@ -66,7 +72,9 @@ export function NotificacoesLista({ inicial }: { inicial: Notificacao[] }) {
         {FILTROS.map((f) => {
           const ativo = filtro === f.id;
           const quantos =
-            f.id === "todas" ? inicial.length : inicial.filter((n) => n.tipo === f.id).length;
+            f.id === "todas"
+              ? inicial.filter((n) => n.nova).length
+              : inicial.filter((n) => n.tipo === f.id).length;
           return (
             <button
               key={f.id}
@@ -86,9 +94,12 @@ export function NotificacoesLista({ inicial }: { inicial: Notificacao[] }) {
       {visiveis.length === 0 ? (
         <div className="shadow-hard flex flex-col items-center gap-2 rounded-md border-2 border-ink bg-paper px-5 py-10 text-center">
           <p className="font-display text-base uppercase text-ink">Nada por aqui</p>
-          <p className="max-w-[240px] font-serif text-sm text-ink-soft">
-            Quando alguém te chamar pra ler junto, indicar um livro ou pedir amizade, aparece
-            nesta tela.
+          <p className="max-w-[250px] font-serif text-sm text-ink-soft">
+            {/* Depois de limpar, o que estava aqui não sumiu — mudou de lugar.
+                Dizer isso evita a impressão de que a limpeza apagou pedidos. */}
+            {filtro === "todas" && inicial.length > 0
+              ? "Tudo limpo. O que ainda está pendente continua nos filtros acima, por categoria."
+              : "Quando alguém te chamar pra ler junto, indicar um livro ou pedir amizade, aparece nesta tela."}
           </p>
         </div>
       ) : (

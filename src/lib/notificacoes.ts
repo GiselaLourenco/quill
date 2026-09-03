@@ -10,6 +10,8 @@ export type Notificacao = {
   quando: string;
   /** Ordenação — a tela só mostra o texto relativo. */
   emMs: number;
+  /** Mais nova que a última limpeza. "Todas" mostra só estas. */
+  nova: boolean;
   autor?: string;
   autorId?: string;
   avatarUrl?: string | null;
@@ -79,7 +81,8 @@ export async function getNotificacoes(
     ? Date.parse(perfil.notificacoes_limpas_em as string)
     : 0;
 
-  const notas: Notificacao[] = [];
+  // Sem `nova` ainda: ela é decidida no fim, comparando com a última limpeza.
+  const notas: Omit<Notificacao, "nova">[] = [];
 
   for (const p of pedidos) {
     const { texto, ms } = quandoRelativo(p.criadoEm);
@@ -128,9 +131,12 @@ export async function getNotificacoes(
     });
   }
 
-  const itens = notas.sort((a, b) => b.emMs - a.emMs);
   // Limpar não apaga nada: o pedido de amizade continua pendente e segue
-  // visível nos filtros por tipo. O que a limpeza faz é parar de contar como
-  // novidade — por isso "novas" é o único número que ela mexe.
-  return { itens, novas: itens.filter((n) => n.emMs > limpasEm).length };
+  // visível nos filtros por tipo. O que ela faz é tirar da aba "Todas", que
+  // passa a ser "o que chegou desde a última vez que você olhou".
+  const itens = notas
+    .map((n) => ({ ...n, nova: n.emMs > limpasEm }))
+    .sort((a, b) => b.emMs - a.emMs);
+
+  return { itens, novas: itens.filter((n) => n.nova).length };
 }
