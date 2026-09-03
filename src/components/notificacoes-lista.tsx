@@ -27,6 +27,36 @@ const FILTROS: { id: "todas" | TipoNotificacao; label: string }[] = [
 /** Quantas entram por vez. Dez cabe numa tela sem virar rolagem infinita. */
 const PAGINA = 10;
 
+/**
+ * Texto de tela vazia por filtro.
+ *
+ * Cada aba está vazia por um motivo diferente, e o genérico não dizia nenhum
+ * deles: quem abre Amizades sem pedidos precisa saber COMO alguém te acha;
+ * quem abre Desafios precisa saber que os que já começaram estão noutro lugar.
+ */
+const VAZIO: Record<"todas" | TipoNotificacao, { titulo: string; texto: string }> = {
+  todas: {
+    titulo: "Nada de novo",
+    texto:
+      "Quando alguém te chamar pra ler junto, indicar um livro ou pedir amizade, aparece aqui.",
+  },
+  amizade: {
+    titulo: "Nenhum pedido",
+    texto:
+      "Ninguém pediu pra te adicionar. Quem quiser te achar procura pelo seu nome de usuário ou e-mail, em Perfil → Amigos.",
+  },
+  desafio: {
+    titulo: "Nenhum começando",
+    texto:
+      "Só aparece aqui desafio prestes a começar, até uma semana antes. Os que já estão rolando ficam na aba Juntos.",
+  },
+  indicacao: {
+    titulo: "Nenhuma indicação",
+    texto:
+      "Livro indicado por amigo cai aqui. Você também pode indicar: é o botão na aba Amigos da estante.",
+  },
+};
+
 export function NotificacoesLista({ inicial }: { inicial: Notificacao[] }) {
   const router = useRouter();
   const [filtro, setFiltro] = useState<"todas" | TipoNotificacao>("todas");
@@ -47,6 +77,9 @@ export function NotificacoesLista({ inicial }: { inicial: Notificacao[] }) {
     [inicial, filtro],
   );
   const visiveis = daLista.slice(0, quantas);
+  // "Todas" vazia por ter sido limpa é diferente de vazia por nunca ter tido
+  // nada — e a diferença muda o que a tela precisa explicar.
+  const limpou = filtro === "todas" && inicial.length > 0;
   const faltam = daLista.length - visiveis.length;
 
   function carregarMais() {
@@ -93,13 +126,15 @@ export function NotificacoesLista({ inicial }: { inicial: Notificacao[] }) {
 
       {visiveis.length === 0 ? (
         <div className="shadow-hard flex flex-col items-center gap-2 rounded-md border-2 border-ink bg-paper px-5 py-10 text-center">
-          <p className="font-display text-base uppercase text-ink">Nada por aqui</p>
+          {/* Depois de limpar, o que estava aqui não sumiu — mudou de lugar.
+              Dizer isso evita a impressão de que a limpeza apagou pedidos. */}
+          <p className="font-display text-base uppercase text-ink">
+            {limpou ? "Tudo limpo" : VAZIO[filtro].titulo}
+          </p>
           <p className="max-w-[250px] font-serif text-sm text-ink-soft">
-            {/* Depois de limpar, o que estava aqui não sumiu — mudou de lugar.
-                Dizer isso evita a impressão de que a limpeza apagou pedidos. */}
-            {filtro === "todas" && inicial.length > 0
-              ? "Tudo limpo. O que ainda está pendente continua nos filtros acima, por categoria."
-              : "Quando alguém te chamar pra ler junto, indicar um livro ou pedir amizade, aparece nesta tela."}
+            {limpou
+              ? "O que ainda está pendente continua nos filtros acima, por categoria."
+              : VAZIO[filtro].texto}
           </p>
         </div>
       ) : (
