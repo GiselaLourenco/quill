@@ -1,3 +1,5 @@
+import { localDateKey, todayLocalDateKey, localHour, addDaysToKey } from "@/lib/date-br";
+
 export type SessionRow = {
   started_at: string;
   duration_seconds: number | null;
@@ -11,8 +13,11 @@ export type SessionRow = {
 
 const POSITIVE_TAGS = ["flowed", "no_distractions"];
 
+// Dia (fuso do Brasil, não UTC cru) de um started_at — uma sessão feita às
+// 23h local pode já ser o dia seguinte em UTC, e não pode "sumir" do dia
+// certo por causa disso.
 function dateKey(iso: string): string {
-  return iso.slice(0, 10);
+  return localDateKey(iso);
 }
 
 // Segunda-feira da semana daquela data, como chave YYYY-MM-DD.
@@ -50,8 +55,8 @@ export function computeStreak(sessions: Pick<SessionRow, "started_at">[]): {
     record = Math.max(record, run);
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+  const today = todayLocalDateKey();
+  const yesterday = addDaysToKey(today, -1);
   let anchor: string | null = null;
   if (daySet.has(today)) anchor = today;
   else if (daySet.has(yesterday)) anchor = yesterday;
@@ -271,7 +276,7 @@ export function goalProgress(
     current = ctx.currentStreak;
     label = `${goal.target_value} dias seguidos`;
   } else if (goal.type === "pages_in_period") {
-    const start = goal.period_start ?? new Date().toISOString().slice(0, 10);
+    const start = goal.period_start ?? todayLocalDateKey();
     const end = goal.period_end ?? start;
     current = pagesReadInRange(ctx.sessions, start, end);
     label = `${goal.target_value} páginas até ${end.slice(8, 10)}/${end.slice(5, 7)}`;
@@ -279,7 +284,7 @@ export function goalProgress(
 
   const remaining = goal.target_value - current;
   if (remaining > 0 && goal.period_end) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayLocalDateKey();
     const remainingDays = Math.max(
       1,
       Math.round(
@@ -336,13 +341,13 @@ const TIME_BUCKETS = [
   { label: "noite", from: 18, to: 23 },
 ];
 
-// Assume o fuso horário de quem roda o servidor — sem timezone do usuário
+// Fuso fixo do Brasil (TIMEZONE em date-br.ts) — sem timezone por usuário
 // salvo em lugar nenhum ainda, então é uma aproximação por enquanto.
 export function computeBestTimeOfDay(sessions: SessionRow[]): string | null {
   if (sessions.length === 0) return null;
   const totals = TIME_BUCKETS.map(() => 0);
   for (const s of sessions) {
-    const hour = new Date(s.started_at).getHours();
+    const hour = localHour(s.started_at);
     const idx = TIME_BUCKETS.findIndex((b) => hour >= b.from && hour <= b.to);
     if (idx >= 0) totals[idx] += s.duration_seconds ?? 0;
   }

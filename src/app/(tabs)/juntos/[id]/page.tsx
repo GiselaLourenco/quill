@@ -6,6 +6,7 @@ import { computeScores, daysRemaining, periodProgress, type ScoringMetric, SCORI
 import DesafioDetalheClient from "./detalhe-client";
 import { nomeExibicao } from "@/lib/nome-exibicao";
 import { AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
+import { localDateKey, todayLocalDateKey, addDaysToKey } from "@/lib/date-br";
 
 export default async function DesafioDetalhePage({
   params,
@@ -41,11 +42,11 @@ export default async function DesafioDetalhePage({
   // Desafio encerrado continua visível (histórico, ranking, feed), mas fechado
   // para novos check-ins.
   const fim = group.ends_at as string | null;
-  const encerrado = Boolean(fim && fim < new Date().toISOString().slice(0, 10));
+  const encerrado = Boolean(fim && fim < todayLocalDateKey());
   // Desafio marcado para começar depois: dá pra ver e convidar, mas check-in
   // antes da largada bagunçaria placar e sequência.
   const naoComecou = Boolean(
-    group.starts_at && (group.starts_at as string) > new Date().toISOString().slice(0, 10),
+    group.starts_at && (group.starts_at as string) > todayLocalDateKey(),
   );
 
   // Check-ins + membros
@@ -124,31 +125,28 @@ export default async function DesafioDetalhePage({
 
   const minhaPosicao = ranking.find((r) => r.ehVoce)?.posicao ?? 0;
 
-  // Check-ins da semana atual (do usuário)
-  const hoje = new Date();
-  const diaSemana = hoje.getDay(); // 0=Dom
-  const inicioSemana = new Date(hoje);
-  inicioSemana.setDate(hoje.getDate() - diaSemana);
+  // Check-ins da semana atual (do usuário) — dia calculado no fuso do
+  // Brasil: uma sessão feita à noite local não pode cair no dia seguinte só
+  // porque em UTC o relógio já virou.
+  const hojeKey = todayLocalDateKey();
+  const diaSemana = new Date(`${hojeKey}T12:00:00Z`).getUTCDay(); // 0=Dom
+  const inicioSemanaKey = addDaysToKey(hojeKey, -diaSemana);
 
-  const diasSemana = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(inicioSemana);
-    d.setDate(inicioSemana.getDate() + i);
-    return d.toISOString().slice(0, 10);
-  });
+  const diasSemana = Array.from({ length: 7 }, (_, i) => addDaysToKey(inicioSemanaKey, i));
 
   const checkinsDoUsuario = new Set(
     (checkins ?? [])
       .filter((c) => c.user_id === userId)
       .map((c) => {
         const s = (c.session as unknown) as { started_at: string } | null;
-        return s?.started_at?.slice(0, 10) ?? "";
+        return s?.started_at ? localDateKey(s.started_at) : "";
       })
       .filter(Boolean),
   );
 
   const DIAS_LABEL = ["D", "S", "T", "Q", "Q", "S", "S"];
   const semana = diasSemana.map((isoDate, i) => {
-    const isHoje = isoDate === hoje.toISOString().slice(0, 10);
+    const isHoje = isoDate === hojeKey;
     const feito = checkinsDoUsuario.has(isoDate);
     return {
       data: new Date(isoDate + "T12:00:00").getDate(),

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 import CompartilharClient, { type PeriodoStats, type LivroCartaz } from "./compartilhar-client";
+import { localDateKey, localHour, todayLocalDateKey } from "@/lib/date-br";
 
 const MESES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -23,10 +24,12 @@ type SessionRow = {
 
 /** Últimos N meses (mais antigo primeiro), como chaves "AAAA-MM". */
 function ultimosMeses(qtd: number): { id: string; ano: number; mes: number }[] {
-  const hoje = new Date();
+  const hojeKey = todayLocalDateKey();
+  const anoAtual = Number(hojeKey.slice(0, 4));
+  const mesAtual = Number(hojeKey.slice(5, 7)) - 1; // 0-based
   const out: { id: string; ano: number; mes: number }[] = [];
   for (let i = qtd - 1; i >= 0; i -= 1) {
-    const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+    const d = new Date(anoAtual, mesAtual - i, 1);
     out.push({ id: `${d.getFullYear()}-${pad(d.getMonth() + 1)}`, ano: d.getFullYear(), mes: d.getMonth() });
   }
   return out;
@@ -37,7 +40,7 @@ function horaDeOuro(sessions: SessionRow[]): string {
   if (sessions.length === 0) return "—";
   const contagem = new Map<number, number>();
   for (const s of sessions) {
-    const hora = new Date(s.started_at).getHours();
+    const hora = localHour(s.started_at);
     contagem.set(hora, (contagem.get(hora) ?? 0) + 1);
   }
   let melhor = 0;
@@ -77,7 +80,7 @@ export default async function CompartilharPage() {
   const rows = (sessions ?? []) as SessionRow[];
 
   const periodos: PeriodoStats[] = meses.map(({ id, ano, mes }) => {
-    const doMes = rows.filter((s) => s.started_at.slice(0, 7) === id);
+    const doMes = rows.filter((s) => localDateKey(s.started_at).slice(0, 7) === id);
     const segundos = doMes.reduce((soma, s) => soma + (s.duration_seconds ?? 0), 0);
     const paginas = doMes.reduce((soma, s) => {
       if (s.item_id && s.unit_start != null && s.unit_end != null) {
@@ -85,7 +88,7 @@ export default async function CompartilharPage() {
       }
       return soma;
     }, 0);
-    const diasLidos = new Set(doMes.map((s) => s.started_at.slice(0, 10))).size;
+    const diasLidos = new Set(doMes.map((s) => localDateKey(s.started_at))).size;
     const diasNoMes = new Date(ano, mes + 1, 0).getDate();
 
     return {

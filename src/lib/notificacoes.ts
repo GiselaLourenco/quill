@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getPedidosRecebidos } from "@/lib/friends";
 import { getReceivedRecommendations } from "@/lib/recommendations";
+import { todayLocalDateKey, addDaysToKey } from "@/lib/date-br";
 
 export type TipoNotificacao = "amizade" | "desafio" | "indicacao";
 
@@ -60,8 +61,8 @@ export async function getNotificacoes(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<Notificacoes> {
-  const hoje = new Date().toISOString().slice(0, 10);
-  const daquiA7 = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
+  const hoje = todayLocalDateKey();
+  const daquiA7 = addDaysToKey(hoje, 7);
 
   const [pedidos, recs, { data: membros }, { data: perfil }] = await Promise.all([
     getPedidosRecebidos(supabase, userId),

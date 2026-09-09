@@ -7,6 +7,7 @@ import { computeScores, daysRemaining, periodProgress } from "@/lib/challenges";
 import { BookThumb } from "@/components/book-thumb";
 import { EmptyState } from "@/components/empty-state";
 import { nomeExibicao } from "@/lib/nome-exibicao";
+import { todayLocalDateKey } from "@/lib/date-br";
 
 type GroupRow = {
   id: string;
@@ -38,7 +39,7 @@ function estadoDoDesafio(
   startsAt: string | null,
   fizCheckin: boolean,
 ): { texto: string; tom: string } {
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = todayLocalDateKey();
 
   if (startsAt && startsAt > hoje) {
     const dias = Math.max(
@@ -75,7 +76,7 @@ export default async function JuntosPage({
     .map((m) => m.groups as unknown as GroupRow & { format: string })
     .filter((g) => g && g.format === "challenge");
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalDateKey();
   const active = challenges.filter((g) => !g.ends_at || g.ends_at >= today);
   const ended = challenges.filter((g) => g.ends_at && g.ends_at < today);
 

@@ -1,3 +1,5 @@
+import { localDateKey } from "@/lib/date-br";
+
 export type SessionForStats = {
   started_at: string;
   duration_seconds: number | null;
@@ -19,7 +21,7 @@ export function computeReadingStats(sessions: SessionForStats[]): ReadingStats {
   );
 
   const days = new Set(
-    sessions.map((s) => s.started_at.slice(0, 10)), // YYYY-MM-DD
+    sessions.map((s) => localDateKey(s.started_at)), // YYYY-MM-DD, fuso do Brasil
   );
 
   const currentPage = sessions.reduce(
@@ -65,7 +67,7 @@ export function computeGlobalStats(
     (sum, s) => sum + (s.duration_seconds ?? 0),
     0,
   );
-  const days = new Set(sessions.map((s) => s.started_at.slice(0, 10)));
+  const days = new Set(sessions.map((s) => localDateKey(s.started_at)));
   return { totalSeconds, daysRead: days.size };
 }
 

@@ -9,6 +9,7 @@ import {
   dateRange,
   type SessionRow,
 } from "@/lib/gamification";
+import { todayLocalDateKey } from "@/lib/date-br";
 
 const MONTH_NAMES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -27,9 +28,9 @@ export default async function CalendarioPage({
   const userId = await requireUserId();
   const { y, m } = await searchParams;
 
-  const now = new Date();
-  const year = y ? Number(y) : now.getFullYear();
-  const month = m ? Number(m) : now.getMonth() + 1; // 1-12
+  const hoje = todayLocalDateKey();
+  const year = y ? Number(y) : Number(hoje.slice(0, 4));
+  const month = m ? Number(m) : Number(hoje.slice(5, 7)); // 1-12
 
   const firstDay = `${year}-${pad(month)}-01`;
   const lastDayDate = new Date(Date.UTC(year, month, 0));
@@ -57,7 +58,7 @@ export default async function CalendarioPage({
   }));
 
   const firstWeekday = new Date(`${firstDay}T00:00:00Z`).getUTCDay(); // 0 = domingo
-  const today = new Date().toISOString().slice(0, 10);
+  const today = hoje;
 
   return (
     <>

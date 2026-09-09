@@ -11,6 +11,7 @@ import { pillsEscolhidas, pillDisplay, type PillStats } from "@/lib/pills";
 import { getNotificacoes } from "@/lib/notificacoes";
 import { nomeExibicao } from "@/lib/nome-exibicao";
 import { AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
+import { localDateKey, todayLocalDateKey, localHour } from "@/lib/date-br";
 import HomeClient, { type Meta, type SemanaDados, type MesCalendario } from "./home-client";
 
 const DIA_LABEL = ["D", "S", "T", "Q", "Q", "S", "S"];
@@ -46,8 +47,11 @@ export default async function HomePage() {
   const userId = await requireUserId();
   const supabase = await createClient();
 
-  const agora = new Date();
-  const hoje = iso(agora);
+  // `agora` fica ancorado ao meio-dia do dia local (Brasil), não ao instante
+  // cru do servidor (Vercel roda em UTC) — sem isso, a virada de dia da grade
+  // de semana/mês acontece 3h cedo demais para quem lê à noite.
+  const hoje = todayLocalDateKey();
+  const agora = new Date(`${hoje}T12:00:00`);
   const anoAtual = agora.getFullYear();
 
   // Janela de busca: cobre o ano corrente E os meses/semanas navegáveis,
@@ -118,7 +122,7 @@ export default async function HomePage() {
       const chave = iso(dia);
       const min = Math.round(
         todas
-          .filter((s) => s.started_at?.slice(0, 10) === chave)
+          .filter((s) => s.started_at && localDateKey(s.started_at) === chave)
           .reduce((soma, s) => soma + (s.duration_seconds ?? 0), 0) / 60,
       );
       return { d: DIA_LABEL[dia.getDay()]!, min, hoje: chave === hoje };
@@ -132,12 +136,12 @@ export default async function HomePage() {
   for (let i = -MESES_ANTES; i <= MESES_DEPOIS; i += 1) {
     const ref = new Date(anoAtual, agora.getMonth() + i, 1);
     const prefixo = `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, "0")}`;
-    const doMes = todas.filter((s) => s.started_at?.startsWith(prefixo));
+    const doMes = todas.filter((s) => s.started_at && localDateKey(s.started_at).startsWith(prefixo));
 
     // Dia é "destaque" quando passou de 60 min lidos.
     const minutosPorDia = new Map<number, number>();
     for (const s of doMes) {
-      const dia = Number(s.started_at.slice(8, 10));
+      const dia = Number(localDateKey(s.started_at).slice(8, 10));
       minutosPorDia.set(dia, (minutosPorDia.get(dia) ?? 0) + (s.duration_seconds ?? 0) / 60);
     }
 
@@ -206,8 +210,8 @@ export default async function HomePage() {
   // Quais aparecem é escolha da pessoa em /personalizar; sem escolha, valem as
   // seis padrão. Todas as contas ficam prontas aqui — são baratas em cima das
   // sessões já carregadas, e assim trocar a seleção não exige tocar na home.
-  const doAno = todas.filter((s) => s.started_at?.startsWith(String(anoAtual)));
-  const diasComLeituraAno = new Set(doAno.map((s) => s.started_at.slice(0, 10)));
+  const doAno = todas.filter((s) => s.started_at && localDateKey(s.started_at).startsWith(String(anoAtual)));
+  const diasComLeituraAno = new Set(doAno.map((s) => localDateKey(s.started_at)));
 
   // Média de páginas por dia efetivamente lido (não por dia do calendário).
   const paginasAno = doAno.reduce((soma, s) => soma + paginasDa(s), 0);
@@ -238,7 +242,7 @@ export default async function HomePage() {
   // Horário de ouro: a hora do dia em que mais sessões começaram.
   const porHora = new Map<number, number>();
   for (const s of doAno) {
-    const h = new Date(s.started_at).getHours();
+    const h = localHour(s.started_at);
     porHora.set(h, (porHora.get(h) ?? 0) + 1);
   }
   let melhorHora: string | null = null;

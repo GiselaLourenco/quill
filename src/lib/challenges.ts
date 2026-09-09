@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { localDateKey, todayLocalDateKey } from "@/lib/date-br";
 
 export type ActiveChallenge = {
   id: string;
@@ -12,7 +13,7 @@ export async function getActiveChallenges(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<ActiveChallenge[]> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalDateKey();
   const { data: memberships } = await supabase
     .from("group_members")
     .select("groups!inner(id, name, format, starts_at, ends_at, scoring_metric)")
@@ -90,7 +91,7 @@ export function computeScores(
     const uid = c.user_id;
 
     if (metric === "active_days") {
-      const day = c.session.started_at.slice(0, 10);
+      const day = localDateKey(c.session.started_at);
       if (!daysByUser.has(uid)) daysByUser.set(uid, new Set());
       daysByUser.get(uid)!.add(day);
       continue;
@@ -123,7 +124,7 @@ export function computeScores(
 
 export function daysRemaining(endsAt: string | null): number | null {
   if (!endsAt) return null;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalDateKey();
   const diff = Math.ceil(
     (+new Date(`${endsAt}T00:00:00Z`) - +new Date(`${today}T00:00:00Z`)) / 86_400_000,
   );
@@ -135,7 +136,7 @@ export function periodProgress(
   endsAt: string | null,
 ): number {
   if (!startsAt || !endsAt) return 0;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalDateKey();
   const total = +new Date(`${endsAt}T00:00:00Z`) - +new Date(`${startsAt}T00:00:00Z`);
   if (total <= 0) return 100;
   const elapsed = +new Date(`${today}T00:00:00Z`) - +new Date(`${startsAt}T00:00:00Z`);

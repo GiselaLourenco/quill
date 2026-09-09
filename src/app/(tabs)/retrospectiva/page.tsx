@@ -9,6 +9,7 @@ import {
   type SessionRow,
 } from "@/lib/gamification";
 import { formatDuration } from "@/lib/reading-stats";
+import { localDateKey, todayLocalDateKey } from "@/lib/date-br";
 
 const MONTH_NAMES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -34,7 +35,7 @@ function monthRange(ref: string) {
 
 function summarize(sessions: SessionRow[], start: string, end: string) {
   const inRange = sessions.filter((s) => {
-    const key = s.started_at.slice(0, 10);
+    const key = localDateKey(s.started_at);
     return key >= start && key <= end;
   });
   const totalSeconds = inRange.reduce((sum, s) => sum + (s.duration_seconds ?? 0), 0);
@@ -44,7 +45,7 @@ function summarize(sessions: SessionRow[], start: string, end: string) {
     }
     return sum;
   }, 0);
-  const daysRead = new Set(inRange.map((s) => s.started_at.slice(0, 10))).size;
+  const daysRead = new Set(inRange.map((s) => localDateKey(s.started_at))).size;
   return { inRange, totalSeconds, pagesRead, daysRead };
 }
 
@@ -61,7 +62,7 @@ export default async function RetrospectivaPage({
   const userId = await requireUserId();
   const { period: periodParam, ref: refParam } = await searchParams;
   const period = periodParam === "week" ? "week" : "month";
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalDateKey();
   const ref = refParam ?? today;
 
   const { start, end, label } =
