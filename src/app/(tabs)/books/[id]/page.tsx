@@ -10,13 +10,16 @@ import { LivroAmigoCtas } from "@/components/livro-amigo-ctas";
 import { LivroKebab } from "@/components/livro-kebab";
 import { EmptyState } from "@/components/empty-state";
 import { CommentComposer } from "@/components/comment-composer";
+import { EditorPosicaoLinha, EditorPosicaoTile } from "@/components/editor-posicao";
 import { getFriends } from "@/lib/friends";
 import {
   computeReadingStats,
   formatDuration,
+  posicaoAtual,
   predictFinish,
 } from "@/lib/reading-stats";
 import { toSpotifyEmbedUrl } from "@/lib/spotify";
+import { todayLocalDateKey } from "@/lib/date-br";
 import { nomeExibicao } from "@/lib/nome-exibicao";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -62,7 +65,7 @@ export default async function BookPage({
   const { data: item } = await supabase
     .from("media_items")
     .select(
-      "id, user_id, title, creator, status, cover_kind, cover_url, cover_palette, spotify_url, total_units",
+      "id, user_id, title, creator, status, cover_kind, cover_url, cover_palette, spotify_url, total_units, total_chapters, started_at, finished_at",
     )
     .eq("id", id)
     .single();
@@ -79,7 +82,7 @@ export default async function BookPage({
     await Promise.all([
       supabase
         .from("sessions")
-        .select("started_at, duration_seconds, unit_end")
+        .select("started_at, duration_seconds, unit_end, chapter_end, created_at")
         .eq("item_id", id),
       supabase
         .from("comments")
@@ -97,6 +100,20 @@ export default async function BookPage({
 
   const stats = computeReadingStats(sessions ?? []);
   const prediction = predictFinish(stats, item.total_units);
+  // `computeReadingStats` só olha página (unit_end) — capítulo é só isso aqui.
+  const currentChapter = posicaoAtual(sessions ?? []).capitulos;
+  // Do primeiro "lendo" até o "terminei" (ou até hoje, se ainda estiver
+  // lendo) — mantém a data mesmo se passar por "abandonei" no meio.
+  const diasLidos = item.started_at
+    ? Math.max(
+        1,
+        Math.floor(
+          (new Date(`${item.finished_at ?? todayLocalDateKey()}T00:00:00`).getTime() -
+            new Date(`${item.started_at}T00:00:00`).getTime()) /
+            86_400_000,
+        ) + 1,
+      )
+    : null;
   const embedUrl = item.spotify_url ? toSpotifyEmbedUrl(item.spotify_url) : null;
 
   const statusStyle = STATUS_STYLE[item.status] ?? "bg-paper text-ink";
@@ -155,12 +172,22 @@ export default async function BookPage({
           <StatusEditor itemId={item.id} status={item.status} />
         </section>
 
-        {/* Stats */}
+        {/* Páginas é o dado que a maioria dos livros tem (capítulo é a
+            exceção) — ganha a linha inteira, com botão de salvar explícito.
+            Sem total cadastrado, o próprio editor pede o total (ver
+            editor-posicao.tsx). */}
+        <EditorPosicaoLinha itemId={item.id} atual={stats.currentPage} total={item.total_units} unidade="pages" />
+
+        {/* Os outros quatro números, 2×2 — Capítulos aqui dobra como editor
+            de posição (mesmo cálculo que alimenta a % da estante). */}
         <section className="grid grid-cols-2 gap-2">
           <StatBox label="Tempo total" value={formatDuration(stats.totalSeconds)} />
           <StatBox label="Pág. / dia" value={String(stats.pagesPerDay)} />
-          <StatBox label="Pág. / hora" value={String(stats.pagesPerHour)} />
-          <StatBox label="Dias lidos" value={String(stats.daysRead)} />
+          <EditorPosicaoTile itemId={item.id} atual={currentChapter} total={item.total_chapters} unidade="chapters" />
+          <StatBox
+            label="Dias lidos"
+            value={diasLidos != null ? String(diasLidos) : "—"}
+          />
         </section>
 
         {prediction && (
