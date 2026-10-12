@@ -8,6 +8,7 @@ import { getReceivedRecommendations } from "@/lib/recommendations";
 import { IndicarSheet, type LivroIndicavel } from "@/components/indicar-sheet";
 import { AmigosEstantes } from "@/components/amigos-estantes";
 import { EmptyState } from "@/components/empty-state";
+import { posicaoAtualPorItem } from "@/lib/reading-stats";
 
 
 
@@ -172,27 +173,65 @@ async function MyShelf({
   // A RLS deixa amigo ler meus livros (e vice-versa) — por isso a estante
   // PRECISA filtrar pelo dono aqui. Sem isso, os livros do amigo apareciam
   // misturados aos meus.
-  const [{ data: items }, { data: ratings }] = await Promise.all([
+  const [{ data: items }, { data: ratings }, { data: sessionRows }] = await Promise.all([
     supabase
       .from("media_items")
-      .select("id, title, creator, cover_kind, cover_url, cover_palette, status")
+      .select(
+        "id, title, creator, cover_kind, cover_url, cover_palette, status, total_units, total_chapters",
+      )
       .eq("user_id", userId)
-      .order("created_at", { ascending: false }),
+      // `id` como desempate: um insert em lote (import do Kindle) pode gravar
+      // várias linhas com o mesmíssimo `created_at`, e sem desempate a ordem
+      // delas fica arbitrária a cada consulta em vez de fixa.
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false }),
     supabase.from("ratings").select("item_id, stars").eq("user_id", userId),
+    // Só pra achar a posição mais avançada de cada livro (% de progresso na
+    // estante) — mesma lógica do "pág. atual" que a tela de Ler já calcula.
+    supabase
+      .from("sessions")
+      .select("item_id, unit_end, chapter_end, created_at")
+      .eq("user_id", userId)
+      .not("item_id", "is", null),
   ]);
 
   const starsByItem = new Map((ratings ?? []).map((r) => [r.item_id, r.stars]));
 
-  const books: ShelfBook[] = (items ?? []).map((item) => ({
-    id: item.id,
-    title: item.title,
-    creator: item.creator,
-    cover_kind: item.cover_kind,
-    cover_url: item.cover_url,
-    cover_palette: item.cover_palette,
-    status: item.status as DbStatus,
-    stars: starsByItem.get(item.id) ?? 0,
-  }));
+  const progressoPorItem = posicaoAtualPorItem(
+    (sessionRows ?? []).map((s) => ({
+      item_id: s.item_id as string,
+      unit_end: s.unit_end as number | null,
+      chapter_end: s.chapter_end as number | null,
+      created_at: s.created_at as string,
+    })),
+  );
+
+  const books: ShelfBook[] = (items ?? []).map((item) => {
+    const progresso = progressoPorItem.get(item.id);
+    // Páginas tem prioridade sobre capítulos (mesma regra do check-in de
+    // desafio) — só entra se o livro tiver o total cadastrado e já houver
+    // alguma posição registrada.
+    let percentLido: number | null = null;
+    if (progresso) {
+      if (item.total_units && progresso.paginas > 0) {
+        percentLido = Math.min(100, Math.round((progresso.paginas / item.total_units) * 100));
+      } else if (item.total_chapters && progresso.capitulos > 0) {
+        percentLido = Math.min(100, Math.round((progresso.capitulos / item.total_chapters) * 100));
+      }
+    }
+    return {
+      id: item.id,
+      title: item.title,
+      creator: item.creator,
+      cover_kind: item.cover_kind,
+      cover_url: item.cover_url,
+      cover_palette: item.cover_palette,
+      status: item.status as DbStatus,
+      stars: starsByItem.get(item.id) ?? 0,
+      total_units: item.total_units,
+      percent_lido: percentLido,
+    };
+  });
 
   return <EstanteShelf books={books} />;
 }

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { nomeExibicao } from "@/lib/nome-exibicao";
+import { posicaoAtualPorItem } from "@/lib/reading-stats";
 
 export type Friend = { id: string; name: string };
 
@@ -45,6 +46,8 @@ export type FriendItem = {
   status: string;
   stars: number | null;
   progressLabel: string | null;
+  percent_lido: number | null; // posição atual ÷ total (páginas ou capítulos) — mesmo cálculo da estante
+  total_units: number | null; // páginas — pro somatório de "Páginas" quando a estante dele é exibida com EstanteShelf
   lastComment: { content: string; chapterRef: number | null } | null;
 };
 
@@ -82,7 +85,7 @@ export async function getFriendsShelf(
     supabase
       .from("media_items")
       .select(
-        "id, user_id, title, creator, cover_kind, cover_url, cover_palette, status, created_at",
+        "id, user_id, title, creator, cover_kind, cover_url, cover_palette, status, created_at, total_units, total_chapters",
       )
       .in("user_id", friendIds)
       .order("created_at", { ascending: false }),
@@ -110,7 +113,7 @@ export async function getFriendsShelf(
             .order("created_at", { ascending: false }),
           supabase
             .from("sessions")
-            .select("item_id, unit_end, chapter_end")
+            .select("item_id, unit_end, chapter_end, created_at")
             .in("item_id", itemIds),
         ])
       : [{ data: [] }, { data: [] }, { data: [] }];
@@ -131,13 +134,20 @@ export async function getFriendsShelf(
       });
     }
   }
-  const progressByItem = new Map<string, { pages: number; chapters: number }>();
-  for (const s of sessions ?? []) {
-    const cur = progressByItem.get(s.item_id) ?? { pages: 0, chapters: 0 };
-    if (s.unit_end != null) cur.pages = Math.max(cur.pages, s.unit_end);
-    if (s.chapter_end != null) cur.chapters = Math.max(cur.chapters, s.chapter_end);
-    progressByItem.set(s.item_id, cur);
-  }
+  const posicaoPorItem = posicaoAtualPorItem(
+    (sessions ?? []).map((s) => ({
+      item_id: s.item_id as string,
+      unit_end: s.unit_end as number | null,
+      chapter_end: s.chapter_end as number | null,
+      created_at: s.created_at as string,
+    })),
+  );
+  const progressByItem = new Map(
+    [...posicaoPorItem.entries()].map(([id, pos]) => [
+      id,
+      { pages: pos.paginas, chapters: pos.capitulos },
+    ]),
+  );
 
   const shelfByFriend = new Map<string, FriendShelf>();
   for (const fid of friendIds) {
@@ -151,9 +161,17 @@ export async function getFriendsShelf(
   for (const it of itemRows) {
     const progress = progressByItem.get(it.id);
     let progressLabel: string | null = null;
-    if (it.status === "reading" && progress) {
-      if (progress.chapters > 0) progressLabel = `cap. ${progress.chapters}`;
-      else if (progress.pages > 0) progressLabel = `pág. ${progress.pages}`;
+    let percentLido: number | null = null;
+    if (progress) {
+      if (it.status === "reading") {
+        if (progress.chapters > 0) progressLabel = `cap. ${progress.chapters}`;
+        else if (progress.pages > 0) progressLabel = `pág. ${progress.pages}`;
+      }
+      if (it.total_units && progress.pages > 0) {
+        percentLido = Math.min(100, Math.round((progress.pages / it.total_units) * 100));
+      } else if (it.total_chapters && progress.chapters > 0) {
+        percentLido = Math.min(100, Math.round((progress.chapters / it.total_chapters) * 100));
+      }
     }
     shelfByFriend.get(it.user_id)?.items.push({
       id: it.id,
@@ -165,6 +183,8 @@ export async function getFriendsShelf(
       status: it.status,
       stars: starsByItem.get(it.id) ?? null,
       progressLabel,
+      percent_lido: percentLido,
+      total_units: it.total_units,
       lastComment: lastCommentByItem.get(it.id) ?? null,
     });
   }

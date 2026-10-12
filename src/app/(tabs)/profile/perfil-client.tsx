@@ -18,7 +18,9 @@ import { AVATARES, AVATAR_FUNDOS, AVATAR_FUNDO_PADRAO, avatarDeExibicao, avatarP
 import { nomeExibicao } from "@/lib/nome-exibicao";
 import { faseDaImagem } from "@/lib/gamification";
 import { BookThumb } from "@/components/book-thumb";
+import { EstanteShelf, type DbStatus, type ShelfBook } from "@/components/estante-shelf";
 import { EmptyState } from "@/components/empty-state";
+import { Portal } from "@/components/portal";
 
 export type BadgeView = {
   id: string;
@@ -337,7 +339,7 @@ export function PerfilClient({
                 <span>
                   <span className="block text-sm font-bold">Importar da Amazon</span>
                   <span className="block text-[11px] text-ink-soft">
-                    o CSV da sua biblioteca Kindle · só admin por enquanto
+                    CSV do Kindle pra estante de alguém · só admin por enquanto
                   </span>
                 </span>
                 <span className="text-lg">›</span>
@@ -639,6 +641,8 @@ function AmigosDialog({
 }) {
   const [busca, setBusca] = useState("");
   const [abertoId, setAbertoId] = useState<string | null>(null);
+  // Visão em grade (capa + %) sobre a lista padrão — só pro amigo aberto.
+  const [modoGrade, setModoGrade] = useState(false);
 
   const filtrados = amigos.filter((a) =>
     a.name.toLowerCase().includes(busca.trim().toLowerCase()),
@@ -649,6 +653,48 @@ function AmigosDialog({
   // ---- Estante de um amigo -------------------------------------------
   if (selecionado) {
     const livros = estante?.items ?? [];
+
+    if (modoGrade) {
+      // Mesma estante que a sua — grade, busca, filtros, paginação, % de
+      // progresso — só travada pra leitura (sem editar nota, sem "adicionar
+      // livro", sem guardar filtro/busca de uma visita anterior).
+      const livrosParaEstante: ShelfBook[] = livros.map((l) => ({
+        id: l.id,
+        title: l.title,
+        creator: l.creator,
+        cover_kind: l.cover_kind,
+        cover_url: l.cover_url,
+        cover_palette: l.cover_palette,
+        status: l.status as DbStatus,
+        stars: l.stars ?? 0,
+        total_units: l.total_units,
+        percent_lido: l.percent_lido,
+      }));
+      // Tela toda, não modal — a caixinha de 85vh do diálogo apertava demais
+      // uma estante inteira (busca, filtros, grade). Portal pra escapar do
+      // pano de fundo do diálogo (z-50) e da própria tab bar (z-20).
+      return (
+        <Portal>
+          <div className="fixed inset-0 z-[60] flex flex-col overflow-y-auto bg-paper">
+            <header className="sticky top-0 z-10 flex items-center gap-3 border-b-2 border-ink bg-paper px-4 py-3">
+              <button
+                type="button"
+                onClick={() => setModoGrade(false)}
+                aria-label={`Voltar para o perfil de ${selecionado.name}`}
+                className="shadow-hard-sm flex h-9 w-9 shrink-0 items-center justify-center rounded-md border-2 border-ink bg-card text-ink active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+              >
+                ‹
+              </button>
+              <h1 className="min-w-0 truncate font-display text-base uppercase tracking-tight text-ink">
+                Estante de {selecionado.name}
+              </h1>
+            </header>
+            <EstanteShelf books={livrosParaEstante} readOnly ownerName={selecionado.name} />
+          </div>
+        </Portal>
+      );
+    }
+
     return (
       <DialogShell title="Perfil do amigo" onClose={onClose}>
         <button
@@ -675,6 +721,17 @@ function AmigosDialog({
           </div>
         </div>
 
+        {livros.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setModoGrade(true)}
+            className="shadow-hard-sm mb-3 flex w-full items-center justify-between rounded-md border-2 border-ink bg-navy px-3 py-2.5 font-display text-xs uppercase tracking-widest text-paper active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+          >
+            Ver estante completa
+            <span>›</span>
+          </button>
+        )}
+
         {livros.length === 0 ? (
           <EmptyState
             compacto
@@ -686,7 +743,9 @@ function AmigosDialog({
           <ul className="space-y-3">
             {livros.map((l) => (
               <li key={l.id} className="rounded-md border-2 border-ink bg-paper p-3">
-                <div className="flex items-start gap-3">
+                {/* Mesmo destino que a aba Amigos: a página do livro do amigo
+                    (com comentários e "adicionar à minha estante"). */}
+                <Link href={`/books/${l.id}`} className="flex items-start gap-3">
                   <BookThumb item={l} />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-bold uppercase leading-tight">{l.title}</p>
@@ -698,12 +757,11 @@ function AmigosDialog({
                       {l.progressLabel ? ` · ${l.progressLabel}` : ""}
                       {l.stars ? ` · ${"★".repeat(l.stars)}` : ""}
                     </p>
-                    {/* O mesmo botão da aba Amigos: os livros do amigo
-                        aparecem aqui também, e aqui o adicionar não existia. */}
-                    <div className="mt-2">
-                      <BotaoAddLivroAmigo itemId={l.id} />
-                    </div>
                   </div>
+                </Link>
+                {/* Fora do link — botão próprio, não pode ficar dentro de outro elemento clicável. */}
+                <div className="mt-2">
+                  <BotaoAddLivroAmigo itemId={l.id} />
                 </div>
                 {/* Só comentários públicos chegam até aqui (getFriendsShelf filtra) */}
                 {l.lastComment && (
@@ -771,7 +829,10 @@ function AmigosDialog({
                 >
                   <button
                     type="button"
-                    onClick={() => setAbertoId(a.id)}
+                    onClick={() => {
+                      setAbertoId(a.id);
+                      setModoGrade(false);
+                    }}
                     className="flex w-full items-center gap-3 bg-card p-3 text-left transition-colors active:bg-paper"
                   >
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-ink bg-navy">
