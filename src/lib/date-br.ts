@@ -17,6 +17,11 @@ const hourFormatter = new Intl.DateTimeFormat("en-US", {
   hourCycle: "h23",
 });
 
+const weekdayFormatter = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: TIMEZONE,
+  weekday: "long",
+});
+
 /** Data (YYYY-MM-DD) de um timestamp, no fuso do Brasil — não o dia UTC cru. */
 export function localDateKey(input: string | Date): string {
   const d = typeof input === "string" ? new Date(input) : input;
@@ -32,6 +37,12 @@ export function todayLocalDateKey(): string {
 export function localHour(input: string | Date): number {
   const d = typeof input === "string" ? new Date(input) : input;
   return Number(hourFormatter.format(d));
+}
+
+/** Dia da semana por extenso ("sábado", "segunda-feira"...), no fuso do Brasil. */
+export function localWeekday(input: string | Date): string {
+  const d = typeof input === "string" ? new Date(input) : input;
+  return weekdayFormatter.format(d);
 }
 
 /**

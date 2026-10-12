@@ -11,7 +11,7 @@
 export const PILL_CATALOG = [
   { key: "streak", label: "Sequência atual" },
   { key: "pages_per_day", label: "Média de páginas / dia" },
-  { key: "genres_read", label: "Gêneros diferentes lidos" },
+  { key: "preferred_weekday", label: "Dia da semana preferido" },
   { key: "minutes_this_week", label: "Tempo lido na semana" },
   { key: "books_this_month", label: "Livros no mês" },
   { key: "best_time", label: "Melhor horário de leitura" },
@@ -31,7 +31,7 @@ export const MAX_PILLS = 6;
 export const DEFAULT_PILLS: PillKey[] = [
   "streak",
   "pages_per_day",
-  "genres_read",
+  "preferred_weekday",
   "minutes_this_week",
   "books_this_month",
   "best_time",
@@ -55,14 +55,12 @@ export function pillsEscolhidas(bruto: unknown): PillKey[] {
 export type PillStats = {
   streak: number;
   pagesPerDay: number;
-  /** Quantos gêneros distintos aparecem nos livros terminados. */
-  genresCount: number;
-  /** Preenchido só quando `genresCount === 1` — aí a pílula mostra o nome em vez do número. */
-  singleGenre: string | null;
+  /** Dia da semana com mais sessões no ano ("sábado"), ou null sem dado. */
+  preferredWeekday: string | null;
   /** Minutos crus — `pillDisplay` decide a unidade (min ou horas). */
   minutesThisWeek: number;
   booksThisMonth: number;
-  /** Mês corrente abreviado, para a unidade de "Livros no mês". */
+  /** Mês corrente abreviado, para a unidade de "Livros/mês". */
   mesCurto: string;
   bestTime: string | null;
   booksPerYear: number;
@@ -78,7 +76,7 @@ export type PillTone = "coral" | "paper" | "mustard" | "moss" | "navy" | "ink";
 const TOM: Record<PillKey, PillTone> = {
   streak: "moss",
   pages_per_day: "paper",
-  genres_read: "navy",
+  preferred_weekday: "navy",
   minutes_this_week: "ink",
   books_this_month: "mustard",
   best_time: "coral",
@@ -122,12 +120,10 @@ export function pillDisplay(key: PillKey, s: PillStats): PillView {
       return { ...base, label: "Sequência", valor: String(s.streak), unidade: "dias" };
     case "pages_per_day":
       return { ...base, label: "Média/dia", valor: String(s.pagesPerDay), unidade: "pág" };
-    case "genres_read": {
-      if (s.genresCount === 0) return { ...base, label: "Gêneros", valor: "—", unidade: "sem dados" };
-      if (s.genresCount === 1) {
-        return { ...base, label: "Gêneros", valor: s.singleGenre!, unidade: "único gênero" };
-      }
-      return { ...base, label: "Gêneros", valor: String(s.genresCount), unidade: "diferentes" };
+    case "preferred_weekday": {
+      const dia = s.preferredWeekday;
+      const valor = dia ? dia[0]!.toUpperCase() + dia.slice(1) : "—";
+      return { ...base, label: "Dia preferido", valor, unidade: "" };
     }
     case "minutes_this_week": {
       const { valor, unidade } = formatarMinutos(s.minutesThisWeek);
@@ -138,7 +134,7 @@ export function pillDisplay(key: PillKey, s: PillStats): PillView {
         ...base,
         label: "Livros/mês",
         valor: String(s.booksThisMonth),
-        unidade: `no ${s.mesCurto}`,
+        unidade: `em ${s.mesCurto}`,
       };
     case "best_time":
       return { ...base, label: "Melhor hora", valor: s.bestTime ?? "—", unidade: "pico" };

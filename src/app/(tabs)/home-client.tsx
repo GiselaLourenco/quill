@@ -359,8 +359,8 @@ function PilulasGrid({ pilulas }: { pilulas: Pilula[] }) {
       <div className="grid grid-cols-2 gap-3">
         {visiveis.map((p) => {
           const dark = p.tone === "moss" || p.tone === "navy" || p.tone === "ink";
-          // Pílula de gênero único pode trazer um nome comprido ("Ficção
-          // científica") em vez de um número — reduz a fonte e corta com
+          // Pílula de texto (ex.: dia da semana) pode trazer um nome comprido
+          // ("quarta-feira") em vez de um número — reduz a fonte e corta com
           // reticências pra nunca empurrar o tamanho da box.
           const valorGrande = p.valor.length <= 4;
           return (
@@ -380,11 +380,14 @@ function PilulasGrid({ pilulas }: { pilulas: Pilula[] }) {
                 >
                   {p.valor}
                 </span>
-                <span
-                  className={`shrink-0 font-sans text-[10px] font-normal uppercase ${dark ? "text-paper/80" : "text-ink/60"}`}
-                >
-                  {p.unidade}
-                </span>
+                {p.unidade && (
+                  <span
+                    className={`min-w-0 truncate font-sans text-[10px] font-normal uppercase ${dark ? "text-paper/80" : "text-ink/60"}`}
+                    title={p.unidade}
+                  >
+                    {p.unidade}
+                  </span>
+                )}
               </div>
             </div>
           );

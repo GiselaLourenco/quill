@@ -11,7 +11,7 @@ import { pillsEscolhidas, pillDisplay, type PillStats } from "@/lib/pills";
 import { getNotificacoes } from "@/lib/notificacoes";
 import { nomeExibicao } from "@/lib/nome-exibicao";
 import { AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
-import { localDateKey, todayLocalDateKey, localHour } from "@/lib/date-br";
+import { localDateKey, todayLocalDateKey, localHour, localWeekday } from "@/lib/date-br";
 import HomeClient, { type Meta, type SemanaDados, type MesCalendario } from "./home-client";
 
 const DIA_LABEL = ["D", "S", "T", "Q", "Q", "S", "S"];
@@ -73,7 +73,6 @@ export default async function HomePage() {
     { data: goals },
     { count: livrosTerminados },
     { count: livrosNoMes },
-    { data: generoRows },
   ] = await Promise.all([
       supabase
         .from("profiles")
@@ -105,13 +104,6 @@ export default async function HomePage() {
           "finished_at",
           iso(new Date(anoAtual, agora.getMonth() + 1, 0)),
         ),
-      // Gêneros distintos entre os livros terminados — a pílula "Gêneros".
-      supabase
-        .from("media_items")
-        .select("genre")
-        .eq("user_id", userId)
-        .eq("status", "finished")
-        .not("genre", "is", null),
     ]);
 
   const todas = (sessionRows ?? []) as SessionLite[];
@@ -226,25 +218,18 @@ export default async function HomePage() {
   const mediaPaginas =
     diasComLeituraAno.size > 0 ? Math.round(paginasAno / diasComLeituraAno.size) : 0;
 
-  // Gêneros distintos entre os livros terminados (comparação sem caixa, mas
-  // mantendo a grafia original pra exibir quando sobra só um).
-  const generosVistos = new Map<string, string>();
-  for (const row of generoRows ?? []) {
-    const bruto = (row.genre as string | null)?.trim();
-    if (!bruto) continue;
-    const chave = bruto.toLowerCase();
-    if (!generosVistos.has(chave)) generosVistos.set(chave, bruto);
-  }
-  const generosUnicos = [...generosVistos.values()];
-
   // Tempo lido na semana corrente (a última do array de semanas).
   const minutosSemana = semanas[semanas.length - 1]!.dias.reduce((soma, d) => soma + d.min, 0);
 
-  // Horário de ouro: a hora do dia em que mais sessões começaram.
+  // Horário de ouro e dia da semana preferido: a hora/dia em que mais sessões
+  // começaram — mesma lógica, duas contagens no mesmo laço.
   const porHora = new Map<number, number>();
+  const porDiaSemana = new Map<string, number>();
   for (const s of doAno) {
     const h = localHour(s.started_at);
     porHora.set(h, (porHora.get(h) ?? 0) + 1);
+    const dia = localWeekday(s.started_at);
+    porDiaSemana.set(dia, (porDiaSemana.get(dia) ?? 0) + 1);
   }
   let melhorHora: string | null = null;
   let maiorContagem = 0;
@@ -254,6 +239,14 @@ export default async function HomePage() {
       melhorHora = `${h}h`;
     }
   }
+  let diaPreferido: string | null = null;
+  let maiorContagemDia = 0;
+  for (const [dia, n] of porDiaSemana) {
+    if (n > maiorContagemDia) {
+      maiorContagemDia = n;
+      diaPreferido = dia;
+    }
+  }
 
   const mesCurto = agora.toLocaleString("pt-BR", { month: "short" }).replace(".", "");
   const streakCompleto = computeStreak(todas);
@@ -261,8 +254,7 @@ export default async function HomePage() {
   const stats: PillStats = {
     streak: streakCompleto.current,
     pagesPerDay: mediaPaginas,
-    genresCount: generosUnicos.length,
-    singleGenre: generosUnicos.length === 1 ? generosUnicos[0]! : null,
+    preferredWeekday: diaPreferido,
     minutesThisWeek: minutosSemana,
     booksThisMonth: livrosNoMes ?? 0,
     mesCurto,
