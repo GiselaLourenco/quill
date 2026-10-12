@@ -44,6 +44,31 @@ export async function createComment(input: {
 }
 
 /**
+ * Alterna a visibilidade de uma nota já publicada (🔒 só eu ↔ 🌍 amigos) —
+ * a mesma decisão que a pessoa faz ao escrever, só que depois de publicada.
+ */
+export async function alterarVisibilidadeComentario(input: {
+  id: string;
+  itemId: string;
+  isPublic: boolean;
+}): Promise<{ error: string | null }> {
+  const userId = await requireUserId();
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("comments")
+    .update({ is_public: input.isPublic })
+    .eq("id", input.id)
+    .eq("user_id", userId);
+
+  if (error) return { error: "Não foi possível atualizar a visibilidade." };
+
+  revalidatePath(`/books/${input.itemId}`);
+  revalidatePath("/estante/diario");
+  return { error: null };
+}
+
+/**
  * Apaga uma anotação minha.
  *
  * O `.eq("user_id", ...)` é redundante com a RLS ("own comments - all"), e é

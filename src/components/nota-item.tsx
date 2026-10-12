@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { excluirComentario } from "@/app/actions/comments";
+import { excluirComentario, alterarVisibilidadeComentario } from "@/app/actions/comments";
 
 export type Nota = {
   id: string;
@@ -26,6 +26,8 @@ export function NotaItem({ nota, itemId }: { nota: Nota; itemId: string }) {
   const [confirmando, setConfirmando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [apagando, iniciar] = useTransition();
+  const [isPublic, setIsPublic] = useState(nota.is_public);
+  const [alternando, iniciarAlternancia] = useTransition();
 
   function apagar() {
     setErro(null);
@@ -40,6 +42,21 @@ export function NotaItem({ nota, itemId }: { nota: Nota; itemId: string }) {
     });
   }
 
+  function alternarVisibilidade() {
+    const novo = !isPublic;
+    setErro(null);
+    setIsPublic(novo); // otimista — desfaz se der erro
+    iniciarAlternancia(async () => {
+      const r = await alterarVisibilidadeComentario({ id: nota.id, itemId, isPublic: novo });
+      if (r.error) {
+        setErro(r.error);
+        setIsPublic(!novo);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
   return (
     <li className="border-2 border-ink border-l-8 border-l-navy bg-paper p-4 shadow-hard-sm">
       <div className="mb-2 flex items-center gap-2">
@@ -48,9 +65,17 @@ export function NotaItem({ nota, itemId }: { nota: Nota; itemId: string }) {
             cap. {nota.chapter_ref}
           </span>
         )}
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-soft">
-          {nota.is_public ? "🌍 público" : "🔒 privado"}
-        </span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={isPublic}
+          aria-label={isPublic ? "Tornar esta nota privada" : "Tornar esta nota pública"}
+          onClick={alternarVisibilidade}
+          disabled={alternando}
+          className="rounded-full border border-ink/25 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-soft transition-opacity hover:opacity-70 disabled:opacity-60"
+        >
+          {isPublic ? "🌍 público" : "🔒 privado"}
+        </button>
         {!confirmando && (
           <button
             type="button"
