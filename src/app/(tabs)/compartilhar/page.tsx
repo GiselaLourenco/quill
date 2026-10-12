@@ -22,6 +22,13 @@ type SessionRow = {
   item_id: string | null;
 };
 
+type LivroRow = {
+  id: string;
+  title: string | null;
+  creator: string | null;
+  status: string;
+};
+
 /** Últimos N meses (mais antigo primeiro), como chaves "AAAA-MM". */
 function ultimosMeses(qtd: number): { id: string; ano: number; mes: number }[] {
   const hojeKey = todayLocalDateKey();
@@ -61,23 +68,35 @@ export default async function CompartilharPage() {
   const inicio = `${meses[0]!.id}-01`;
 
   const supabase = await createClient();
-  const [{ data: sessions }, { data: livros }, { data: ratings }] = await Promise.all([
+  const [{ data: sessions }, { data: livrosRows }, { data: ratings }] = await Promise.all([
     supabase
       .from("sessions")
       .select("started_at, duration_seconds, unit_start, unit_end, item_id")
       .eq("user_id", userId)
       .gte("started_at", `${inicio}T00:00:00`),
+    // Estante inteira — alimenta tanto o "livro do período" quanto a busca.
     supabase
       .from("media_items")
       .select("id, title, creator, status")
       .eq("user_id", userId)
-      .in("status", ["reading", "finished"])
-      .order("created_at", { ascending: false })
-      .limit(40),
+      .order("created_at", { ascending: false }),
     supabase.from("ratings").select("item_id, stars").eq("user_id", userId),
   ]);
 
   const rows = (sessions ?? []) as SessionRow[];
+  const livrosTodos = (livrosRows ?? []) as LivroRow[];
+  const estrelasPorItem = new Map((ratings ?? []).map((r) => [r.item_id, r.stars]));
+
+  const paraCartaz = (l: LivroRow): LivroCartaz => ({
+    id: l.id,
+    titulo: l.title ?? "Sem título",
+    autor: l.creator ?? "",
+    nota: estrelasPorItem.get(l.id) ?? null,
+  });
+
+  const livroPorId = new Map(livrosTodos.map((l) => [l.id, l]));
+  const livrosFinalizados = livrosTodos.filter((l) => l.status === "finished").map(paraCartaz);
+  const todosLivros = livrosTodos.map(paraCartaz);
 
   const periodos: PeriodoStats[] = meses.map(({ id, ano, mes }) => {
     const doMes = rows.filter((s) => localDateKey(s.started_at).slice(0, 7) === id);
@@ -91,6 +110,22 @@ export default async function CompartilharPage() {
     const diasLidos = new Set(doMes.map((s) => localDateKey(s.started_at))).size;
     const diasNoMes = new Date(ano, mes + 1, 0).getDate();
 
+    // Livros com alguma atualização de leitura neste mês, da sessão mais
+    // recente pra mais antiga. Sem nenhum, cai pros "terminei" — sempre tem
+    // algo pra mostrar no cartaz.
+    const idsComAtividade: string[] = [];
+    const vistos = new Set<string>();
+    for (const s of [...doMes].sort((a, b) => b.started_at.localeCompare(a.started_at))) {
+      if (s.item_id && !vistos.has(s.item_id) && livroPorId.has(s.item_id)) {
+        vistos.add(s.item_id);
+        idsComAtividade.push(s.item_id);
+      }
+    }
+    const livrosDoMes =
+      idsComAtividade.length > 0
+        ? idsComAtividade.map((itemId) => paraCartaz(livroPorId.get(itemId)!))
+        : livrosFinalizados;
+
     return {
       id,
       rotulo: `${MESES[mes]} ${ano}`,
@@ -99,17 +134,10 @@ export default async function CompartilharPage() {
       diasLidos: `${diasLidos}/${diasNoMes}`,
       horaOuro: horaDeOuro(doMes),
       temDados: doMes.length > 0,
+      livros: livrosDoMes,
+      livrosDeAtividade: idsComAtividade.length > 0,
     };
   });
 
-  const estrelasPorItem = new Map((ratings ?? []).map((r) => [r.item_id, r.stars]));
-
-  const livrosCartaz: LivroCartaz[] = (livros ?? []).map((l) => ({
-    id: l.id as string,
-    titulo: (l.title as string) ?? "Sem título",
-    autor: (l.creator as string | null) ?? "",
-    nota: estrelasPorItem.get(l.id) ?? null,
-  }));
-
-  return <CompartilharClient periodos={periodos} livros={livrosCartaz} />;
+  return <CompartilharClient periodos={periodos} todosLivros={todosLivros} />;
 }

@@ -18,6 +18,10 @@ export type PeriodoStats = {
   diasLidos: string;
   horaOuro: string;
   temDados: boolean;
+  /** Livros com atualização de leitura no mês — ou, sem nenhum, os "terminei". */
+  livros: LivroCartaz[];
+  /** `livros` veio de atividade real no mês (true) ou do fallback "terminei" (false). */
+  livrosDeAtividade: boolean;
 };
 
 export type LivroCartaz = {
@@ -27,22 +31,47 @@ export type LivroCartaz = {
   nota: number | null;
 };
 
+/** Sem acento e sem caixa — "machado" acha "Machado de Assis". */
+const normalizar = (t: string) =>
+  t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
 export default function CompartilharClient({
   periodos,
-  livros,
+  todosLivros,
 }: {
   periodos: PeriodoStats[];
-  livros: LivroCartaz[];
+  todosLivros: LivroCartaz[];
 }) {
   const [indice, setIndice] = useState(periodos.length - 1);
-  const [livroId, setLivroId] = useState(livros[0]?.id ?? "");
+  const periodo = periodos[indice]!;
+  const [livroId, setLivroId] = useState(periodo.livros[0]?.id ?? todosLivros[0]?.id ?? "");
   const [escolhendoLivro, setEscolhendoLivro] = useState(false);
+  const [buscaLivro, setBuscaLivro] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const cartazRef = useRef<HTMLDivElement>(null);
 
-  const periodo = periodos[indice]!;
-  const livro = livros.find((l) => l.id === livroId);
+  // Trocar de período troca a lista sugerida — o livro escolhido some do
+  // painel se não pertencer mais a ela, então volta pro 1º da nova lista.
+  // Ajustado durante a renderização (mesmo padrão da estante): sem isto, o
+  // cartaz piscaria com o livro do período anterior por um frame.
+  const [indiceAnterior, setIndiceAnterior] = useState(indice);
+  if (indice !== indiceAnterior) {
+    setIndiceAnterior(indice);
+    setLivroId(periodo.livros[0]?.id ?? todosLivros[0]?.id ?? "");
+    setBuscaLivro("");
+  }
+
+  const livro = todosLivros.find((l) => l.id === livroId);
+
+  const termoBusca = normalizar(buscaLivro);
+  const resultadosBusca =
+    termoBusca.length > 0
+      ? todosLivros.filter(
+          (l) => normalizar(l.titulo).includes(termoBusca) || normalizar(l.autor).includes(termoBusca),
+        )
+      : [];
+  const listaPainel = termoBusca.length > 0 ? resultadosBusca : periodo.livros;
 
   async function salvarImagem() {
     if (!cartazRef.current) return;
@@ -162,19 +191,58 @@ export default function CompartilharClient({
         <button
           type="button"
           onClick={() => setEscolhendoLivro((v) => !v)}
-          disabled={livros.length === 0}
+          disabled={todosLivros.length === 0}
           aria-expanded={escolhendoLivro}
           className="shadow-hard-sm flex w-full items-center justify-between rounded-md border-2 border-ink bg-card px-4 py-3 disabled:opacity-50"
         >
           <span className="font-display text-[11px] uppercase tracking-widest text-ink">
-            {livros.length === 0 ? "Nenhum livro na estante ainda" : "Escolher livro do período"}
+            {todosLivros.length === 0 ? "Nenhum livro na estante ainda" : "Escolher livro do período"}
           </span>
           <span className="font-display text-xs text-ink/60">{escolhendoLivro ? "▲" : "▼"}</span>
         </button>
 
         {escolhendoLivro && (
+          <>
+            <label className="relative mt-3 block">
+              <span className="sr-only">Buscar livro na estante</span>
+              <svg
+                viewBox="0 0 24 24"
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              >
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
+              </svg>
+              <input
+                type="search"
+                value={buscaLivro}
+                onChange={(e) => setBuscaLivro(e.target.value)}
+                placeholder="Buscar qualquer livro da estante"
+                className="w-full rounded-md border-2 border-ink bg-paper py-2 pl-9 pr-3 text-sm shadow-hard-sm placeholder:text-ink-soft focus:outline-none"
+              />
+            </label>
+
+            {termoBusca.length === 0 && periodo.livros.length > 0 && (
+              <p className="mt-2 text-[11px] text-ink-soft">
+                {periodo.livrosDeAtividade
+                  ? `Livros com leitura registrada em ${periodo.rotulo}`
+                  : `Sem leitura registrada em ${periodo.rotulo} — mostrando os "terminei"`}
+              </p>
+            )}
+          </>
+        )}
+
+        {escolhendoLivro && (
           <ul className="mt-3 space-y-2">
-            {livros.map((l) => {
+            {listaPainel.length === 0 && (
+              <li className="rounded-md border-2 border-dashed border-ink/40 p-3 text-center font-serif text-sm italic text-ink-soft">
+                Nenhum livro bate com essa busca.
+              </li>
+            )}
+            {listaPainel.map((l) => {
               const on = l.id === livroId;
               return (
                 <li key={l.id}>
