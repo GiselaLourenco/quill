@@ -230,6 +230,7 @@ export default async function DesafioDetalhePage({
         codigoConvite,
       }}
       semana={semana}
+      checkinDiasUsuario={Array.from(checkinsDoUsuario)}
       ranking={ranking}
       atividade={atividade}
       livros={livrosLendo}

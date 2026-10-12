@@ -4,10 +4,22 @@ import Image from "next/image";
 import { ConvidarAmigoDesafio, type AmigoConvidavel } from "@/components/convidar-amigo-desafio";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { CheckinSheet, type LivroLendo } from "@/components/checkin-sheet";
+import { SegmentToggle } from "@/components/segment-toggle";
 import { leaveChallenge } from "@/app/actions/groups";
 import { avatarDeExibicao, AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
+import { todayLocalDateKey } from "@/lib/date-br";
+
+const MES_LABEL = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
+const DIAS_SEMANA_LABEL = ["D", "S", "T", "Q", "Q", "S", "S"];
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
 
 type Avatar = { avatarUrl: string | null; avatarZoom: number; avatarBg: string };
 type SemanaItem = { data: number; label: string; estado: "vazio" | "feito" | "hoje" | "hoje-feito" };
@@ -46,11 +58,12 @@ function AvatarMembro({
 }
 
 export default function DesafioDetalheClient({
-  group, semana, ranking, atividade, livros, amigosConvidaveis,
+  group, semana, checkinDiasUsuario, ranking, atividade, livros, amigosConvidaveis,
 }: {
   amigosConvidaveis: AmigoConvidavel[];
   group: Group;
   semana: SemanaItem[];
+  checkinDiasUsuario: string[];
   ranking: RankingItem[];
   atividade: AtividadeItem[];
   livros: LivroLendo[];
@@ -64,6 +77,38 @@ export default function DesafioDetalheClient({
   const [menuAberto, setMenuAberto] = useState(false);
   const [confirmarSaida, setConfirmarSaida] = useState(false);
   const [saindo, startSaida] = useTransition();
+
+  const [visaoCheckins, setVisaoCheckins] = useState<"semana" | "mes">("semana");
+  const hoje = new Date();
+  const [mesAno, setMesAno] = useState({ ano: hoje.getFullYear(), mes: hoje.getMonth() + 1 });
+
+  const diasComCheckin = useMemo(() => new Set(checkinDiasUsuario), [checkinDiasUsuario]);
+
+  const limiteInicio = group.comecaEm ? group.comecaEm.slice(0, 7) : null; // "YYYY-MM"
+  const limiteFim = `${hoje.getFullYear()}-${pad2(hoje.getMonth() + 1)}`;
+  const mesAtualChave = `${mesAno.ano}-${pad2(mesAno.mes)}`;
+  const podeMesAnterior = !limiteInicio || mesAtualChave > limiteInicio;
+  const podeProximoMes = mesAtualChave < limiteFim;
+
+  const mudarMes = (delta: number) => {
+    setMesAno(({ ano, mes }) => {
+      const base = new Date(ano, mes - 1 + delta, 1);
+      return { ano: base.getFullYear(), mes: base.getMonth() + 1 };
+    });
+  };
+
+  const celulasDoMes = useMemo(() => {
+    const { ano, mes } = mesAno;
+    const offset = new Date(ano, mes - 1, 1).getDay();
+    const diasNoMes = new Date(ano, mes, 0).getDate();
+    const hojeChave = todayLocalDateKey();
+    const celulas: { chave: string; dia: number; feito: boolean; hoje: boolean }[] = [];
+    for (let dia = 1; dia <= diasNoMes; dia++) {
+      const chave = `${ano}-${pad2(mes)}-${pad2(dia)}`;
+      celulas.push({ chave, dia, feito: diasComCheckin.has(chave), hoje: chave === hojeChave });
+    }
+    return { offset, celulas };
+  }, [mesAno, diasComCheckin]);
 
   const atividadeVisivel = verMais ? atividade : atividade.slice(0, 3);
 
@@ -147,23 +192,78 @@ export default function DesafioDetalheClient({
         </div>
       </section>
 
-      {/* Semana */}
+      {/* Check-ins: semana ou mês */}
       <section className="px-4 pt-5">
-        <h3 className="mb-3 font-display text-[10px] uppercase tracking-widest text-ink">Meus check-ins · Semana</h3>
-        <div className="flex justify-between gap-1">
-          {semana.map((d) => {
-            const isHoje = d.estado === "hoje" || d.estado === "hoje-feito";
-            const preenchido = d.estado === "feito" || d.estado === "hoje-feito";
-            return (
-              <div key={d.data} className={`flex flex-1 flex-col items-center gap-1 ${isHoje ? "scale-110" : ""}`}>
-                <span className={`font-display text-[9px] uppercase tracking-wider ${isHoje ? "text-coral" : "text-ink-soft"}`}>{d.label}</span>
-                <div className={["flex aspect-square w-full items-center justify-center border-2 border-ink text-xs font-black", preenchido ? "bg-moss text-paper" : "bg-paper text-ink", isHoje ? "border-[3px] bg-mustard text-ink shadow-hard-sm" : ""].join(" ")}>
-                  {d.data}
-                </div>
-              </div>
-            );
-          })}
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="font-display text-[10px] uppercase tracking-widest text-ink">Meus check-ins</h3>
+          <SegmentToggle
+            ariaLabel="Ver check-ins por semana ou por mês"
+            value={visaoCheckins}
+            onChange={setVisaoCheckins}
+            options={[
+              { value: "semana", label: "Semana" },
+              { value: "mes", label: "Mês" },
+            ]}
+          />
         </div>
+
+        {visaoCheckins === "semana" ? (
+          <div className="flex justify-between gap-1">
+            {semana.map((d) => {
+              const isHoje = d.estado === "hoje" || d.estado === "hoje-feito";
+              const preenchido = d.estado === "feito" || d.estado === "hoje-feito";
+              return (
+                <div key={d.data} className={`flex flex-1 flex-col items-center gap-1 ${isHoje ? "scale-110" : ""}`}>
+                  <span className={`font-display text-[9px] uppercase tracking-wider ${isHoje ? "text-coral" : "text-ink-soft"}`}>{d.label}</span>
+                  <div className={["flex aspect-square w-full items-center justify-center border-2 border-ink text-xs font-black", preenchido ? "bg-moss text-paper" : "bg-paper text-ink", isHoje ? "border-[3px] bg-mustard text-ink shadow-hard-sm" : ""].join(" ")}>
+                    {d.data}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div>
+            <div className="mb-2.5 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => mudarMes(-1)}
+                disabled={!podeMesAnterior}
+                aria-label="Mês anterior"
+                className="flex h-7 w-7 items-center justify-center border-2 border-ink bg-paper shadow-hard-sm disabled:opacity-35"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m15 18-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </button>
+              <span className="font-serif text-base italic text-ink">{MES_LABEL[mesAno.mes - 1]} {mesAno.ano}</span>
+              <button
+                type="button"
+                onClick={() => mudarMes(1)}
+                disabled={!podeProximoMes}
+                aria-label="Próximo mês"
+                className="flex h-7 w-7 items-center justify-center border-2 border-ink bg-paper shadow-hard-sm disabled:opacity-35"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m9 18 6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-7 gap-1">
+              {DIAS_SEMANA_LABEL.map((l, i) => (
+                <span key={i} className="text-center font-display text-[9px] uppercase text-ink-soft">{l}</span>
+              ))}
+              {Array.from({ length: celulasDoMes.offset }, (_, i) => (
+                <span key={`v-${i}`} />
+              ))}
+              {celulasDoMes.celulas.map((c) => (
+                <div
+                  key={c.chave}
+                  className={["flex aspect-square items-center justify-center border-2 border-ink text-[11px] font-black", c.hoje ? "border-[3px] bg-mustard text-ink shadow-hard-sm" : c.feito ? "bg-moss text-paper" : "bg-paper text-ink"].join(" ")}
+                >
+                  {c.dia}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Ranking */}
