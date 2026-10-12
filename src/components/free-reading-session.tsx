@@ -7,7 +7,7 @@ import {
   type UnidadeTempo,
 } from "@/lib/tempo";
 import { BookThumb } from "@/components/book-thumb";
-import type { CoverFields } from "@/components/book-cover";
+import { BookCover, type CoverFields } from "@/components/book-cover";
 import { useEffect, useState, useTransition } from "react";
 import {
   createSession,
@@ -15,6 +15,7 @@ import {
   saveSessionMemory,
   type SessionUnit,
 } from "@/app/actions/sessions";
+import { updateItemStatus } from "@/app/actions/media-items";
 import type { ActiveChallenge } from "@/lib/challenges";
 
 export type BookOption = CoverFields & {
@@ -74,6 +75,11 @@ export function FreeReadingSession({
   const [minutosSessao, setMinutosSessao] = useState(30);
   const [origem, setOrigem] = useState<"timer" | "manual">("manual");
   const [resumo, setResumo] = useState<{ minutos: number; titulo: string; quantidade: number; unidade: SessionUnit } | null>(null);
+  // Nota escrita com o timer rodando (botão "+ Nota") — fica guardada aqui
+  // até a tela de registro, onde o livro é escolhido e ela vira comentário
+  // de verdade junto com o resto da sessão.
+  const [notaRascunho, setNotaRascunho] = useState("");
+  const [notaRascunhoPublica, setNotaRascunhoPublica] = useState(false);
 
   const rodando = fase === "rodando" && !pausado;
 
@@ -106,6 +112,8 @@ export function FreeReadingSession({
     setElapsed(0);
     setRunStartMs(Date.now());
     setPausado(false);
+    setNotaRascunho("");
+    setNotaRascunhoPublica(false);
     setFase("rodando");
   }
 
@@ -150,6 +158,8 @@ export function FreeReadingSession({
     setPausado(false);
     setStartedAt(null);
     setResumo(null);
+    setNotaRascunho("");
+    setNotaRascunhoPublica(false);
   }
 
   if (fase === "salvo" && resumo) {
@@ -165,6 +175,8 @@ export function FreeReadingSession({
         minutosIniciais={minutosSessao}
         origem={origem}
         startedAt={startedAt ?? new Date().toISOString()}
+        notaInicial={notaRascunho}
+        notaPublicaInicial={notaRascunhoPublica}
         onVoltar={voltarAoInicio}
         onSalvo={(r) => {
           setResumo(r);
@@ -181,7 +193,12 @@ export function FreeReadingSession({
         pausado={pausado}
         onPausar={alternarPausa}
         onEncerrar={encerrar}
-        onManual={abrirManual}
+        nota={notaRascunho}
+        notaPublica={notaRascunhoPublica}
+        onSalvarNota={(texto, publica) => {
+          setNotaRascunho(texto);
+          setNotaRascunhoPublica(publica);
+        }}
       />
     );
   }
@@ -273,14 +290,19 @@ function TelaRodando({
   pausado,
   onPausar,
   onEncerrar,
-  onManual,
+  nota,
+  notaPublica,
+  onSalvarNota,
 }: {
   segundos: number;
   pausado: boolean;
   onPausar: () => void;
   onEncerrar: () => void;
-  onManual: () => void;
+  nota: string;
+  notaPublica: boolean;
+  onSalvarNota: (texto: string, publica: boolean) => void;
 }) {
+  const [notaAberta, setNotaAberta] = useState(false);
   const h = Math.floor(segundos / 3600);
   const m = Math.floor((segundos % 3600) / 60);
   const s = segundos % 60;
@@ -328,14 +350,119 @@ function TelaRodando({
         </button>
       </div>
 
-      <div className="mt-6 text-center">
-        <button
-          type="button"
-          onClick={onManual}
-          className="text-sm font-medium text-moss-dark underline underline-offset-4"
-        >
-          Leu sem o timer? Registrar manualmente
-        </button>
+      <button
+        type="button"
+        onClick={() => setNotaAberta(true)}
+        className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-navy font-display text-xs tracking-wide text-navy"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        + NOTA
+        {nota.trim() && <span className="ml-1 h-1.5 w-1.5 rounded-full bg-coral" aria-label="nota salva" />}
+      </button>
+
+      {notaAberta && (
+        <ModalNotaSessao
+          segundos={segundos}
+          textoInicial={nota}
+          publicaInicial={notaPublica}
+          onFechar={() => setNotaAberta(false)}
+          onSalvar={(texto, publica) => {
+            onSalvarNota(texto, publica);
+            setNotaAberta(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Modal "+ Nota" — escrever com o timer rodando, sem pausar           */
+/* ------------------------------------------------------------------ */
+
+function ModalNotaSessao({
+  segundos,
+  textoInicial,
+  publicaInicial,
+  onFechar,
+  onSalvar,
+}: {
+  segundos: number;
+  textoInicial: string;
+  publicaInicial: boolean;
+  onFechar: () => void;
+  onSalvar: (texto: string, publica: boolean) => void;
+}) {
+  const [texto, setTexto] = useState(textoInicial);
+  const [publica, setPublica] = useState(publicaInicial);
+  const m = Math.floor(segundos / 60);
+  const s = segundos % 60;
+
+  return (
+    <div className="fixed inset-0 z-30 flex items-end justify-center bg-ink/55" role="dialog" aria-modal="true" aria-label="Adicionar nota">
+      <div className="w-full max-w-[390px] rounded-t-2xl border-2 border-ink bg-paper p-5 pb-7">
+        <div className="mb-1 flex items-center justify-between">
+          <span className="font-display text-[10px] uppercase tracking-widest text-ink-soft">
+            sessão continua rodando — {String(m).padStart(2, "0")}:{String(s).padStart(2, "0")}
+          </span>
+          <button
+            type="button"
+            onClick={onFechar}
+            aria-label="Fechar"
+            className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-ink bg-paper text-xs"
+          >
+            ✕
+          </button>
+        </div>
+
+        <h2 className="mt-2 mb-3 font-display text-lg uppercase tracking-tight text-ink">
+          Adicionar nota
+        </h2>
+
+        <textarea
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          placeholder="Anota aquela frase ou sentimento…"
+          autoFocus
+          className="min-h-[92px] w-full resize-none rounded-md border-2 border-ink bg-white p-3 text-sm placeholder:text-ink-soft/60 focus:outline-none"
+        />
+
+        <div className="mt-2 flex items-center gap-2">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={publica}
+            aria-label={publica ? "Visível para amigos" : "Só você"}
+            onClick={() => setPublica((v) => !v)}
+            className="rounded-full border-2 border-ink bg-paper px-2.5 py-1 text-xs"
+          >
+            {publica ? "🌍 amigos" : "🔒 só eu"}
+          </button>
+          <span className="text-[11px] text-ink-soft">quem pode ver essa nota</span>
+        </div>
+
+        <p className="mt-2 font-serif text-[11px] italic text-ink-soft">
+          Fica guardada com a sessão — você escolhe o livro no fim, como hoje.
+        </p>
+
+        <div className="mt-4 flex gap-3">
+          <button
+            type="button"
+            onClick={onFechar}
+            className="shadow-hard-sm h-12 flex-1 rounded-md border-2 border-ink bg-paper font-display text-xs uppercase tracking-wide text-ink active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => onSalvar(texto, publica)}
+            className="shadow-hard-sm h-12 flex-1 rounded-md border-2 border-ink bg-moss-dark font-display text-xs uppercase tracking-wide text-paper active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+          >
+            Salvar nota
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -373,6 +500,8 @@ function TelaRegistro({
   minutosIniciais,
   origem,
   startedAt,
+  notaInicial,
+  notaPublicaInicial,
   onVoltar,
   onSalvo,
 }: {
@@ -381,13 +510,23 @@ function TelaRegistro({
   minutosIniciais: number;
   origem: "timer" | "manual";
   startedAt: string;
+  notaInicial: string;
+  notaPublicaInicial: boolean;
   onVoltar: () => void;
   onSalvo: (r: { minutos: number; titulo: string; quantidade: number; unidade: SessionUnit }) => void;
 }) {
-  const lendo = books.filter((b) => b.status === "reading");
-  const disponiveis = lendo.length > 0 ? lendo : books;
+  // Livros achados pela busca da estante (passo 1) e marcados "lendo" nesta
+  // tela — somam à lista de quem já estava "lendo". `books` é a prop original
+  // e não muda; isto é só o que a pessoa acabou de escolher aqui.
+  const [recemMarcados, setRecemMarcados] = useState<BookOption[]>([]);
+  // Só "lendo" (mais o que acabou de ser marcado) — nada de cair pra "quero
+  // ler" quando não tem nenhum em andamento. O texto vazio logo abaixo já
+  // cobre esse caso.
+  const disponiveis = [...books.filter((b) => b.status === "reading"), ...recemMarcados];
 
   const [livroId, setLivroId] = useState<string | null>(disponiveis[0]?.id ?? null);
+  const [buscaEstante, setBuscaEstante] = useState("");
+  const [, startMarcarLendo] = useTransition();
   const [unidade, setUnidade] = useState<SessionUnit>("pages");
   const [quantidade, setQuantidade] = useState(0);
   // `total` é sempre minuto — é o que a sessão grava. A unidade só muda como o
@@ -395,8 +534,12 @@ function TelaRegistro({
   const [total, setTotal] = useState(minutosIniciais);
   const [unidadeTempo, setUnidadeTempo] = useState<UnidadeTempo>("min");
   const [tags, setTags] = useState<Set<string>>(new Set());
-  const [nota, setNota] = useState("");
-  const [visibilidade, setVisibilidade] = useState<"eu" | "amigos">("eu");
+  // Pode já vir preenchida — nota escrita com o timer rodando, no passo
+  // "+ Nota" (ver TelaRodando).
+  const [nota, setNota] = useState(notaInicial);
+  const [visibilidade, setVisibilidade] = useState<"eu" | "amigos">(
+    notaPublicaInicial ? "amigos" : "eu",
+  );
   const [desafiosOn, setDesafiosOn] = useState<Set<string>>(
     () => new Set(activeChallenges.filter((d) => d.scoring_metric === "active_days").map((d) => d.id)),
   );
@@ -404,6 +547,31 @@ function TelaRegistro({
   const [salvando, startSave] = useTransition();
 
   const livro = disponiveis.find((l) => l.id === livroId) ?? null;
+
+  // Livros da estante que ainda não aparecem no passo 1 (qualquer status
+  // menos "lendo" — "quero ler", "terminei" etc.) e batem com a busca.
+  const normalizar = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const termoEstante = normalizar(buscaEstante.trim());
+  const resultadosEstante =
+    termoEstante.length >= 2
+      ? books
+          .filter(
+            (b) =>
+              !disponiveis.some((d) => d.id === b.id) &&
+              (normalizar(b.title).includes(termoEstante) || normalizar(b.author).includes(termoEstante)),
+          )
+          .slice(0, 6)
+      : [];
+
+  // Escolher na busca marca "lendo" de verdade (não só nesta tela) — assim o
+  // livro passa a aparecer aqui de cara nas próximas sessões, sem precisar
+  // buscar de novo toda vez.
+  function escolherDaEstante(escolhido: BookOption) {
+    setRecemMarcados((prev) => [...prev, escolhido]);
+    setLivroId(escolhido.id);
+    setBuscaEstante("");
+    startMarcarLendo(() => updateItemStatus(escolhido.id, "reading"));
+  }
 
   function toggleTag(value: string) {
     setTags((prev) => {
@@ -525,8 +693,8 @@ function TelaRegistro({
         <Passo numero="01" titulo="Em qual livro?">
           {disponiveis.length === 0 ? (
             <p className="rounded-md border-2 border-dashed border-ink bg-card p-4 text-center font-serif text-sm italic text-ink-soft">
-              Você não tem nenhum livro marcado como “lendo” — a sessão vale
-              pelo tempo.
+              Você não tem nenhum livro marcado como “lendo” — busque um da
+              sua estante abaixo, ou a sessão vale só pelo tempo.
             </p>
           ) : (
             <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
@@ -568,6 +736,48 @@ function TelaRegistro({
               </button>
             </div>
           )}
+
+          {/* Busca na estante: acha livro com outro status ("quero ler",
+              "terminei"...) pra retomar. Escolher marca "lendo" de verdade —
+              não só nesta tela — e some da lista de resultados. */}
+          <div className="mt-3">
+            <input
+              type="search"
+              value={buscaEstante}
+              onChange={(e) => setBuscaEstante(e.target.value)}
+              placeholder="Buscar outro livro da sua estante"
+              className="w-full rounded-md border-2 border-ink bg-card px-3 py-2 text-sm placeholder:text-ink-soft focus:outline-none"
+            />
+            {termoEstante.length >= 2 &&
+              (resultadosEstante.length > 0 ? (
+                <ul className="mt-2 flex flex-col gap-1.5">
+                  {resultadosEstante.map((l) => (
+                    <li key={l.id}>
+                      <button
+                        type="button"
+                        onClick={() => escolherDaEstante(l)}
+                        className="flex w-full items-center gap-2 rounded-md border-2 border-ink bg-card p-1.5 text-left transition-all hover:shadow-hard-sm active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+                      >
+                        <span className="h-9 w-6 shrink-0 overflow-hidden rounded-sm border border-ink/40">
+                          <BookCover item={l} />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-xs font-medium">{l.title}</span>
+                          <span className="block truncate text-[10px] text-ink-soft">
+                            {l.author || "sem autor"}
+                          </span>
+                        </span>
+                        <span className="shrink-0 font-display text-[9px] uppercase tracking-wide text-moss-dark">
+                          marcar lendo
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-xs text-ink-soft">Não achei esse livro na sua estante.</p>
+              ))}
+          </div>
         </Passo>
 
         {/* 02 — Quanto leu */}
@@ -605,12 +815,22 @@ function TelaRegistro({
               >
                 −
               </button>
-              <div className="flex-1 rounded-md border-2 border-ink bg-card py-2 text-center">
-                <span className="font-display text-3xl leading-none tabular-nums">{quantidade}</span>
-                <span className="ml-1 text-xs uppercase text-ink-soft">
+              <label className="shadow-hard-sm flex flex-1 cursor-text items-baseline justify-center gap-1 rounded-md border-2 border-ink bg-card py-2 transition-colors focus-within:bg-paper">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={quantidade}
+                  onChange={(e) => {
+                    const limpo = e.target.value.replace(/[^0-9]/g, "");
+                    setQuantidade(limpo ? Math.min(9999, Number(limpo)) : 0);
+                  }}
+                  aria-label={unidade === "pages" ? "Páginas lidas" : "Capítulos lidos"}
+                  className="w-16 bg-transparent text-center font-display text-3xl leading-none tabular-nums focus:outline-none"
+                />
+                <span className="text-xs uppercase text-ink-soft">
                   {unidade === "pages" ? "pág" : "cap"}
                 </span>
-              </div>
+              </label>
               <button
                 type="button"
                 onClick={() => setQuantidade((q) => q + (unidade === "pages" ? 5 : 1))}
