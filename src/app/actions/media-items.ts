@@ -15,6 +15,7 @@ export async function createMediaItem(formData: FormData) {
   }
 
   const creator = String(formData.get("creator") ?? "").trim() || null;
+  const genre = String(formData.get("genre") ?? "").trim() || null;
   const spotifyUrl = String(formData.get("spotify_url") ?? "").trim() || null;
   const totalUnitsRaw = String(formData.get("total_units") ?? "").trim();
   const totalUnits = totalUnitsRaw ? Number(totalUnitsRaw) : null;
@@ -35,6 +36,7 @@ export async function createMediaItem(formData: FormData) {
     user_id: userId,
     title,
     creator,
+    genre,
     spotify_url: spotifyUrl,
     total_units: totalUnits,
     total_chapters: totalChapters,
@@ -51,6 +53,62 @@ export async function createMediaItem(formData: FormData) {
   redirect("/estante");
 }
 
+/**
+ * Corrige título, autor, capa, páginas, capítulos ou playlist de um livro já
+ * na estante. Status fica de fora de propósito: já tem editor próprio
+ * (`updateItemStatus` / `StatusEditor`) na página do livro.
+ */
+export async function updateMediaItem(formData: FormData) {
+  const userId = await requireUserId();
+
+  const id = String(formData.get("id") ?? "");
+  if (!id) redirect("/estante");
+
+  const title = String(formData.get("title") ?? "").trim();
+  if (!title) {
+    redirect(`/books/${id}/editar?error=Título é obrigatório.`);
+  }
+
+  const creator = String(formData.get("creator") ?? "").trim() || null;
+  const genre = String(formData.get("genre") ?? "").trim() || null;
+  const spotifyUrl = String(formData.get("spotify_url") ?? "").trim() || null;
+  const totalUnitsRaw = String(formData.get("total_units") ?? "").trim();
+  const totalUnits = totalUnitsRaw ? Number(totalUnitsRaw) : null;
+  const totalChaptersRaw = String(formData.get("total_chapters") ?? "").trim();
+  const totalChapters =
+    totalChaptersRaw && Number(totalChaptersRaw) > 0 ? Number(totalChaptersRaw) : null;
+  const coverKind = String(formData.get("cover_kind") ?? "illustrated");
+  const coverUrl =
+    coverKind === "real"
+      ? String(formData.get("cover_url") ?? "").trim() || null
+      : null;
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("media_items")
+    .update({
+      title,
+      creator,
+      genre,
+      spotify_url: spotifyUrl,
+      total_units: totalUnits,
+      total_chapters: totalChapters,
+      cover_kind: coverKind === "real" && coverUrl ? "real" : "illustrated",
+      cover_url: coverUrl,
+      cover_palette: paletteIndexForTitle(title),
+    })
+    .eq("id", id)
+    .eq("user_id", userId);
+
+  if (error) {
+    redirect(`/books/${id}/editar?error=Não foi possível salvar as alterações.`);
+  }
+
+  revalidatePath(`/books/${id}`);
+  revalidatePath("/estante");
+  redirect(`/books/${id}`);
+}
+
 const VALID_STATUSES = ["want", "reading", "finished", "recomendado", "abandoned"];
 
 export async function updateItemStatus(itemId: string, status: string) {
@@ -58,13 +116,27 @@ export async function updateItemStatus(itemId: string, status: string) {
   await requireUserId();
 
   const supabase = await createClient();
-  await supabase
-    .from("media_items")
-    .update({
-      status,
-      finished_at: status === "finished" ? new Date().toISOString().slice(0, 10) : null,
-    })
-    .eq("id", itemId);
+
+  const updates: { status: string; finished_at: string | null; started_at?: string } = {
+    status,
+    finished_at: status === "finished" ? new Date().toISOString().slice(0, 10) : null,
+  };
+
+  // "Dias lidos" conta do primeiro "lendo" até o "terminei" — grava só na
+  // primeira vez que entra como lendo; abandonar e retomar depois não
+  // reinicia essa data.
+  if (status === "reading") {
+    const { data: atual } = await supabase
+      .from("media_items")
+      .select("started_at")
+      .eq("id", itemId)
+      .maybeSingle();
+    if (!atual?.started_at) {
+      updates.started_at = new Date().toISOString().slice(0, 10);
+    }
+  }
+
+  await supabase.from("media_items").update(updates).eq("id", itemId);
 
   revalidatePath(`/books/${itemId}`);
   revalidatePath("/estante");

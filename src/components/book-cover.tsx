@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { IllustratedCover } from "@/components/illustrated-cover";
 
 export type CoverFields = {
@@ -12,12 +11,14 @@ export function BookCover({ item }: { item: CoverFields }) {
   if (item.cover_kind === "real" && item.cover_url) {
     return (
       <div className="cover-card h-full w-full">
-        <Image
+        {/* eslint-disable-next-line @next/next/no-img-element -- capa do Open
+        Library/Google Books já vem no tamanho certo; next/image só gastava
+        cota de transformação da Vercel à toa (ver busca-livro.tsx). */}
+        <img
           src={item.cover_url}
           alt={`Capa de ${item.title}`}
-          fill
-          sizes="120px"
-          className="object-cover"
+          loading="lazy"
+          className="h-full w-full object-cover"
         />
       </div>
     );

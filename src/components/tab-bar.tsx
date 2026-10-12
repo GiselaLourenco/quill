@@ -76,7 +76,12 @@ export function TabBar() {
     <Portal>
     <nav
       aria-label="Navegação principal"
-      className="fixed inset-x-0 bottom-0 z-20 border-t-2 border-ink bg-paper pb-[max(env(safe-area-inset-bottom),0.5rem)]"
+      // `transform-gpu` força a barra pra própria camada de composição — no
+      // Chrome Android, `position: fixed` sem isso pode "arrastar" um frame
+      // atrás do conteúdo durante rolagem rápida ou quando a barra de
+      // endereço do navegador recolhe/expande, especialmente em página bem
+      // mais alta que a viewport (o perfil é a mais comprida do app).
+      className="fixed inset-x-0 bottom-0 z-20 transform-gpu border-t-2 border-ink bg-paper pb-[max(env(safe-area-inset-bottom),0.5rem)]"
     >
       <ul className="mx-auto flex w-full max-w-[390px] items-stretch justify-between gap-1 px-2 py-1.5">
         {TABS.map((tab) => {
