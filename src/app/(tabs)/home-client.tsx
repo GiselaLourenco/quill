@@ -359,20 +359,29 @@ function PilulasGrid({ pilulas }: { pilulas: Pilula[] }) {
       <div className="grid grid-cols-2 gap-3">
         {visiveis.map((p) => {
           const dark = p.tone === "moss" || p.tone === "navy" || p.tone === "ink";
+          // Pílula de gênero único pode trazer um nome comprido ("Ficção
+          // científica") em vez de um número — reduz a fonte e corta com
+          // reticências pra nunca empurrar o tamanho da box.
+          const valorGrande = p.valor.length <= 4;
           return (
             <div
               key={p.id}
-              className={`shadow-hard-sm rounded-xl border-2 border-ink p-3 ${TONE_BG[p.tone]}`}
+              className={`shadow-hard-sm overflow-hidden rounded-xl border-2 border-ink p-3 ${TONE_BG[p.tone]}`}
             >
               <p
                 className={`font-display text-[11px] uppercase leading-tight tracking-wide ${dark ? "text-paper" : "text-ink"}`}
               >
                 {p.label}
               </p>
-              <div className="mt-2 flex items-baseline gap-1">
-                <span className="font-display text-2xl leading-none">{p.valor}</span>
+              <div className="mt-2 flex min-w-0 items-baseline gap-1">
                 <span
-                  className={`text-[10px] font-bold uppercase ${dark ? "text-paper" : "text-ink/80"}`}
+                  className={`min-w-0 truncate font-display font-bold leading-none ${valorGrande ? "text-2xl" : "text-base"}`}
+                  title={valorGrande ? undefined : p.valor}
+                >
+                  {p.valor}
+                </span>
+                <span
+                  className={`shrink-0 font-sans text-[10px] font-normal uppercase ${dark ? "text-paper/80" : "text-ink/60"}`}
                 >
                   {p.unidade}
                 </span>

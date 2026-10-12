@@ -11,7 +11,7 @@
 export const PILL_CATALOG = [
   { key: "streak", label: "Sequência atual" },
   { key: "pages_per_day", label: "Média de páginas / dia" },
-  { key: "speed_pages_per_hour", label: "Velocidade (pág / hora)" },
+  { key: "genres_read", label: "Gêneros diferentes lidos" },
   { key: "minutes_this_week", label: "Tempo lido na semana" },
   { key: "books_this_month", label: "Livros no mês" },
   { key: "best_time", label: "Melhor horário de leitura" },
@@ -31,7 +31,7 @@ export const MAX_PILLS = 6;
 export const DEFAULT_PILLS: PillKey[] = [
   "streak",
   "pages_per_day",
-  "speed_pages_per_hour",
+  "genres_read",
   "minutes_this_week",
   "books_this_month",
   "best_time",
@@ -55,9 +55,12 @@ export function pillsEscolhidas(bruto: unknown): PillKey[] {
 export type PillStats = {
   streak: number;
   pagesPerDay: number;
-  speedPagesPerHour: number;
-  /** Já formatado ("2h30", "45min") — a unidade muda conforme o total. */
-  minutesThisWeek: string;
+  /** Quantos gêneros distintos aparecem nos livros terminados. */
+  genresCount: number;
+  /** Preenchido só quando `genresCount === 1` — aí a pílula mostra o nome em vez do número. */
+  singleGenre: string | null;
+  /** Minutos crus — `pillDisplay` decide a unidade (min ou horas). */
+  minutesThisWeek: number;
   booksThisMonth: number;
   /** Mês corrente abreviado, para a unidade de "Livros no mês". */
   mesCurto: string;
@@ -75,7 +78,7 @@ export type PillTone = "coral" | "paper" | "mustard" | "moss" | "navy" | "ink";
 const TOM: Record<PillKey, PillTone> = {
   streak: "moss",
   pages_per_day: "paper",
-  speed_pages_per_hour: "navy",
+  genres_read: "navy",
   minutes_this_week: "ink",
   books_this_month: "mustard",
   best_time: "coral",
@@ -94,6 +97,24 @@ export type PillView = {
   tone: PillTone;
 };
 
+/**
+ * Minutos lidos → número + unidade separados (o valor fica só com o dígito,
+ * pro visual de "número grande em negrito" nunca engolir a unidade junto —
+ * era o caso de "26min" virando tudo uma coisa só). Acima de 1h, troca pra
+ * horas (arredondado pra meia hora, igual ao resto do painel já faz com
+ * horas do mês) em vez de empilhar "1h30".
+ */
+function formatarMinutos(minutos: number): { valor: string; unidade: string } {
+  if (minutos < 60) {
+    return { valor: String(minutos), unidade: "min lidos" };
+  }
+  const horas = Math.round((minutos / 60) * 2) / 2;
+  return {
+    valor: Number.isInteger(horas) ? String(horas) : horas.toFixed(1),
+    unidade: horas === 1 ? "hora lida" : "horas lidas",
+  };
+}
+
 export function pillDisplay(key: PillKey, s: PillStats): PillView {
   const base = { id: key, tone: TOM[key] };
   switch (key) {
@@ -101,15 +122,17 @@ export function pillDisplay(key: PillKey, s: PillStats): PillView {
       return { ...base, label: "Sequência", valor: String(s.streak), unidade: "dias" };
     case "pages_per_day":
       return { ...base, label: "Média/dia", valor: String(s.pagesPerDay), unidade: "pág" };
-    case "speed_pages_per_hour":
-      return {
-        ...base,
-        label: "Velocidade",
-        valor: String(s.speedPagesPerHour),
-        unidade: "p/h",
-      };
-    case "minutes_this_week":
-      return { ...base, label: "Semana", valor: s.minutesThisWeek, unidade: "lidas" };
+    case "genres_read": {
+      if (s.genresCount === 0) return { ...base, label: "Gêneros", valor: "—", unidade: "sem dados" };
+      if (s.genresCount === 1) {
+        return { ...base, label: "Gêneros", valor: s.singleGenre!, unidade: "único gênero" };
+      }
+      return { ...base, label: "Gêneros", valor: String(s.genresCount), unidade: "diferentes" };
+    }
+    case "minutes_this_week": {
+      const { valor, unidade } = formatarMinutos(s.minutesThisWeek);
+      return { ...base, label: "Semana", valor, unidade };
+    }
     case "books_this_month":
       return {
         ...base,

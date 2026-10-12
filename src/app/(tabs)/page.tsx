@@ -73,6 +73,7 @@ export default async function HomePage() {
     { data: goals },
     { count: livrosTerminados },
     { count: livrosNoMes },
+    { data: generoRows },
   ] = await Promise.all([
       supabase
         .from("profiles")
@@ -104,6 +105,13 @@ export default async function HomePage() {
           "finished_at",
           iso(new Date(anoAtual, agora.getMonth() + 1, 0)),
         ),
+      // Gêneros distintos entre os livros terminados — a pílula "Gêneros".
+      supabase
+        .from("media_items")
+        .select("genre")
+        .eq("user_id", userId)
+        .eq("status", "finished")
+        .not("genre", "is", null),
     ]);
 
   const todas = (sessionRows ?? []) as SessionLite[];
@@ -218,26 +226,19 @@ export default async function HomePage() {
   const mediaPaginas =
     diasComLeituraAno.size > 0 ? Math.round(paginasAno / diasComLeituraAno.size) : 0;
 
-  // Velocidade: só entram sessões que registraram páginas, senão o tempo de
-  // sessões sem página derrubaria a média.
-  let paginasComTempo = 0;
-  let segundosComPaginas = 0;
-  for (const s of doAno) {
-    const pags = paginasDa(s);
-    if (pags > 0) {
-      paginasComTempo += pags;
-      segundosComPaginas += s.duration_seconds ?? 0;
-    }
+  // Gêneros distintos entre os livros terminados (comparação sem caixa, mas
+  // mantendo a grafia original pra exibir quando sobra só um).
+  const generosVistos = new Map<string, string>();
+  for (const row of generoRows ?? []) {
+    const bruto = (row.genre as string | null)?.trim();
+    if (!bruto) continue;
+    const chave = bruto.toLowerCase();
+    if (!generosVistos.has(chave)) generosVistos.set(chave, bruto);
   }
-  const velocidade =
-    segundosComPaginas > 0 ? Math.round((paginasComTempo / segundosComPaginas) * 3600) : 0;
+  const generosUnicos = [...generosVistos.values()];
 
   // Tempo lido na semana corrente (a última do array de semanas).
   const minutosSemana = semanas[semanas.length - 1]!.dias.reduce((soma, d) => soma + d.min, 0);
-  const semanaTexto =
-    minutosSemana >= 60
-      ? `${Math.floor(minutosSemana / 60)}h${String(minutosSemana % 60).padStart(2, "0")}`
-      : `${minutosSemana}min`;
 
   // Horário de ouro: a hora do dia em que mais sessões começaram.
   const porHora = new Map<number, number>();
@@ -260,8 +261,9 @@ export default async function HomePage() {
   const stats: PillStats = {
     streak: streakCompleto.current,
     pagesPerDay: mediaPaginas,
-    speedPagesPerHour: velocidade,
-    minutesThisWeek: semanaTexto,
+    genresCount: generosUnicos.length,
+    singleGenre: generosUnicos.length === 1 ? generosUnicos[0]! : null,
+    minutesThisWeek: minutosSemana,
     booksThisMonth: livrosNoMes ?? 0,
     mesCurto,
     bestTime: melhorHora,
