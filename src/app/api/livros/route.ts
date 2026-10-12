@@ -2,22 +2,33 @@ import { NextResponse, type NextRequest } from "next/server";
 import { unstable_cache } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { buscarLivros, MIN_CARACTERES } from "@/lib/open-library";
+import { buscarLivrosGoogleBooks } from "@/lib/google-books";
 
 /**
- * Proxy da busca da Open Library.
+ * Proxy da busca de livro pro cadastro/edição.
  *
- * Existe em vez de o browser chamar direto (a API até libera CORS) por três
- * motivos: dá pra mandar o User-Agent que eles pedem, que o navegador não
- * deixa definir; dá pra cachear, que a Open Library não faz (medi o mesmo
- * termo duas vezes: 0,96s e 1,00s); e mantém o formato da resposta nosso, então
- * trocar de fonte um dia não mexe na UI.
+ * Existe em vez de o browser chamar direto (as APIs até liberam CORS) por
+ * três motivos: dá pra mandar o User-Agent que a Open Library pede, que o
+ * navegador não deixa definir; dá pra cachear, que nenhuma das duas faz; e
+ * mantém o formato da resposta nosso, então trocar de fonte não mexe na UI.
+ *
+ * Google Books primeiro, Open Library como fallback — ao contrário da
+ * importação em lote. Lá ninguém revisa o resultado, então título tem que
+ * bater exato; aqui a pessoa escolhe visualmente numa lista, então o ruído
+ * do Google (coletâneas, edição estrangeira) não é problema, e a cobertura
+ * de livro brasileiro/traduzido é bem melhor. Só cai pra Open Library sem
+ * `GOOGLE_BOOKS_API_KEY` configurada ou sem nenhum resultado.
  */
 
 // Um dia de cache por termo: ficha de livro não muda, e a segunda busca por
 // "dom casmurro" — sua ou de qualquer pessoa — volta instantânea.
 const buscaCacheada = unstable_cache(
-  async (termo: string) => buscarLivros(termo),
-  ["open-library-busca"],
+  async (termo: string) => {
+    const doGoogle = await buscarLivrosGoogleBooks(termo);
+    if (doGoogle.length > 0) return doGoogle;
+    return buscarLivros(termo);
+  },
+  ["livros-busca"],
   { revalidate: 86_400 },
 );
 

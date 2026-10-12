@@ -48,6 +48,7 @@ create table public.media_items (
   total_units int,                           -- páginas / fases
   total_chapters int                         -- só livros; preenchido à mão
               check (total_chapters is null or total_chapters > 0),
+  genre       text,                          -- livre; puxado do Google Books quando disponível
   status      text not null default 'reading'
               check (status in ('want','reading','finished','abandoned','platinum')),
   spotify_url text,

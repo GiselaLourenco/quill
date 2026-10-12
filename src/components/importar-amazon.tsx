@@ -1,15 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { importarLivros, type LivroImportado } from "@/app/actions/importar";
-
-const STATUS = [
-  { valor: "want", rotulo: "quero ler" },
-  { valor: "reading", rotulo: "lendo" },
-  { valor: "finished", rotulo: "terminei" },
-  { valor: "recomendado", rotulo: "sem decidir" },
-];
+import {
+  importarLivros,
+  listarUsuariosParaImportar,
+  type LivroImportado,
+  type UsuarioImportacao,
+} from "@/app/actions/importar";
 
 /**
  * Divide uma linha de CSV respeitando aspas.
@@ -65,16 +63,32 @@ export function ImportarAmazon() {
   const router = useRouter();
   const [livros, setLivros] = useState<LivroImportado[] | null>(null);
   const [marcados, setMarcados] = useState<Set<number>>(new Set());
-  const [status, setStatus] = useState("want");
+  const [usuarios, setUsuarios] = useState<UsuarioImportacao[] | null>(null);
+  const [usuarioId, setUsuarioId] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [resultado, setResultado] = useState<{ criados: number; pulados: number } | null>(null);
   const [enviando, iniciar] = useTransition();
 
+  useEffect(() => {
+    listarUsuariosParaImportar().then((r) => {
+      if (r.error) {
+        setErro(r.error);
+        return;
+      }
+      setUsuarios(r.usuarios);
+    });
+  }, []);
+
   async function lerArquivo(arquivo: File) {
     setErro(null);
     setResultado(null);
-    const texto = await arquivo.text();
-    const linhas = texto.split(/\r?\n/).filter((l) => l.trim().length > 0);
+    // O Excel prefixa alguns CSVs com BOM + uma linha "sep=," (dica de
+    // delimitador pra ele mesmo) antes do cabeçalho de verdade. Sem tirar os
+    // dois, "sep=," vira o cabeçalho lido e nenhuma coluna bate com nada.
+    const texto = (await arquivo.text()).replace(/^\uFEFF/, "");
+    const brutas = texto.split(/\r?\n/);
+    const semDicaDeExcel = /^sep=.$/i.test(brutas[0]?.trim() ?? "") ? brutas.slice(1) : brutas;
+    const linhas = semDicaDeExcel.filter((l) => l.trim().length > 0);
     if (linhas.length < 2) {
       setErro("O arquivo não tem linhas de livro.");
       return;
@@ -118,12 +132,12 @@ export function ImportarAmazon() {
   }
 
   function importar() {
-    if (!livros) return;
+    if (!livros || !usuarioId) return;
     setErro(null);
     iniciar(async () => {
       const r = await importarLivros({
         livros: livros.filter((_, i) => marcados.has(i)),
-        status,
+        userId: usuarioId,
       });
       if (r.error) {
         setErro(r.error);
@@ -135,12 +149,14 @@ export function ImportarAmazon() {
     });
   }
 
+  const nomeDestino = usuarios?.find((u) => u.id === usuarioId)?.nome;
+
   if (resultado) {
     return (
       <div className="rounded-md border-2 border-moss bg-moss/15 p-3 text-sm text-moss-dark">
         <p className="font-bold">
           {resultado.criados} {resultado.criados === 1 ? "livro entrou" : "livros entraram"} na
-          estante.
+          estante{nomeDestino ? ` de ${nomeDestino}` : ""}, como lidos.
         </p>
         {resultado.pulados > 0 && (
           <p className="mt-1 text-xs">
@@ -156,15 +172,37 @@ export function ImportarAmazon() {
     <div className="flex flex-col gap-3">
       <p className="text-[11px] leading-relaxed text-ink-soft">
         Na Amazon: <strong>Conta → Gerenciar conteúdo e dispositivos → Livros → Export</strong>.
-        Chega um CSV por e-mail. Só título e autor são lidos — páginas e capa você completa
-        depois, abrindo o livro.
+        Chega um CSV por e-mail. Título e autor saem do arquivo; capa e páginas a gente tenta
+        buscar sozinho — o que não achar, você completa depois, abrindo o livro.
       </p>
 
-      <label className="shadow-hard-sm cursor-pointer rounded-md border-2 border-dashed border-ink bg-paper px-3 py-4 text-center font-display text-[11px] uppercase tracking-wider">
+      <label className="flex items-center gap-2 text-xs">
+        importar para
+        <select
+          value={usuarioId}
+          onChange={(e) => setUsuarioId(e.target.value)}
+          disabled={!usuarios}
+          className="min-w-0 flex-1 rounded-md border-2 border-ink bg-card px-2 py-1 text-xs disabled:opacity-60"
+        >
+          <option value="">{usuarios ? "escolha um usuário" : "carregando…"}</option>
+          {usuarios?.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.nome}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label
+        className={`shadow-hard-sm rounded-md border-2 border-dashed border-ink bg-paper px-3 py-4 text-center font-display text-[11px] uppercase tracking-wider ${
+          usuarioId ? "cursor-pointer" : "cursor-not-allowed opacity-60"
+        }`}
+      >
         {livros ? "trocar arquivo" : "escolher o CSV"}
         <input
           type="file"
           accept=".csv,text/csv"
+          disabled={!usuarioId}
           className="sr-only"
           onChange={(e) => {
             const f = e.target.files?.[0];
@@ -196,20 +234,9 @@ export function ImportarAmazon() {
             </button>
           </div>
 
-          <label className="flex items-center gap-2 text-xs">
-            entram como
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="rounded-md border-2 border-ink bg-card px-2 py-1 text-xs"
-            >
-              {STATUS.map((s) => (
-                <option key={s.valor} value={s.valor}>
-                  {s.rotulo}
-                </option>
-              ))}
-            </select>
-          </label>
+          <p className="text-[11px] text-ink-soft">
+            Entram todos como <strong>lidos</strong>.
+          </p>
 
           {/* Lista rolável: uma biblioteca Kindle tem centenas de títulos e a
               lista inteira empurraria o botão de importar pra fora da tela. */}
@@ -237,7 +264,7 @@ export function ImportarAmazon() {
           <button
             type="button"
             onClick={importar}
-            disabled={enviando || marcados.size === 0}
+            disabled={enviando || marcados.size === 0 || !usuarioId}
             className="shadow-hard rounded-md border-2 border-ink bg-moss py-2.5 font-display text-xs uppercase tracking-widest text-paper active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-60"
           >
             {enviando ? "Importando…" : `Importar ${marcados.size}`}

@@ -34,6 +34,13 @@ const nextConfig: NextConfig = {
         hostname: "covers.openlibrary.org",
         pathname: "/b/**",
       },
+      {
+        // Capa do Google Books, usado como segunda tentativa quando a Open
+        // Library não acha o livro (ver src/lib/google-books.ts).
+        protocol: "https",
+        hostname: "books.google.com",
+        pathname: "/books/**",
+      },
       ...(hostSupabase
         ? [
             {

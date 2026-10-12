@@ -1,11 +1,9 @@
 /**
- * Busca de livros na Open Library — a fonte que preenche autor, páginas e capa
- * no cadastro.
- *
- * Por que Open Library e não Google Books: não pede chave nem cadastro. O
- * Google Books tem catálogo brasileiro melhor, mas a cota anônima é um balde
- * compartilhado que vive estourado (HTTP 429 em setembro/2026) — usar exigiria
- * chave própria e uma env a mais.
+ * Busca de livros na Open Library — primeira tentativa pra preencher autor,
+ * páginas e capa (no cadastro manual e na importação em lote). Não pede
+ * chave nem cadastro, então é sempre a fonte inicial; quando não acha nada,
+ * quem chama tenta de novo no Google Books (`google-books.ts`), que tem
+ * catálogo brasileiro/traduzido melhor mas exige `GOOGLE_BOOKS_API_KEY`.
  *
  * O que ela NÃO tem: número de capítulos. Sumário não entra em base
  * bibliográfica; esse campo é manual em qualquer cenário.
@@ -19,6 +17,8 @@ export type LivroEncontrado = {
   ano: number | null;
   capaThumb: string | null;
   capaGrande: string | null;
+  /** Vem só do Google Books — a busca da Open Library não traz gênero. */
+  genero: string | null;
 };
 
 type DocOpenLibrary = {
@@ -36,7 +36,7 @@ const CAMPOS =
 /** Menos que isto busca meio mundo e não ajuda ninguém. */
 export const MIN_CARACTERES = 3;
 
-export async function buscarLivros(termo: string): Promise<LivroEncontrado[]> {
+export async function buscarLivros(termo: string, timeoutMs = 6000): Promise<LivroEncontrado[]> {
   const limpo = termo.trim();
   if (limpo.length < MIN_CARACTERES) return [];
 
@@ -53,8 +53,8 @@ export async function buscarLivros(termo: string): Promise<LivroEncontrado[]> {
       // Eles pedem User-Agent identificado; anônimo pode ser limitado.
       headers: { "User-Agent": "Quill (app de leitura) quill-three-tau.vercel.app" },
       // A busca leva ~1s e às vezes trava. Melhor devolver vazio e deixar a
-      // pessoa digitar do que segurar o formulário.
-      signal: AbortSignal.timeout(6000),
+      // pessoa digitar (ou o lote seguir sem essa capa) do que travar tudo.
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch {
     return [];
@@ -79,5 +79,6 @@ export async function buscarLivros(termo: string): Promise<LivroEncontrado[]> {
     capaGrande: doc.cover_i
       ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`
       : null,
+    genero: null,
   }));
 }

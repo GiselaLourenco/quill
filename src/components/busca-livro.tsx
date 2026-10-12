@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useState } from "react";
 import { MIN_CARACTERES, type LivroEncontrado } from "@/lib/open-library";
 
@@ -8,21 +7,23 @@ const ESPERA_MS = 400;
 
 type Props = {
   termo: string;
-  escolhido: LivroEncontrado | null;
   onEscolher: (livro: LivroEncontrado) => void;
-  onLimpar: () => void;
   /** Fecha a lista sem escolher nada. */
   onDispensar: () => void;
 };
 
 /**
- * Busca o título digitado na Open Library e oferece o resultado pra preencher
- * o formulário. Nunca preenche sozinha: no teste, "pequeno príncipe" trouxe um
- * autor errado com toda a confiança — quem escolhe é a pessoa.
+ * Busca o termo digitado (Google Books, com Open Library como fallback — ver
+ * /api/livros) e oferece o resultado pra preencher o formulário. Nunca
+ * preenche sozinha: no teste, "pequeno príncipe" trouxe um autor errado com
+ * toda a confiança — quem escolhe é a pessoa.
+ *
+ * Quem chama controla quando isto aparece: some assim que a pessoa escolhe um
+ * resultado, e só volta se ela mexer no campo de novo (título ou autor).
  *
  * O formulário inteiro segue utilizável enquanto isto carrega (ou falha).
  */
-export function BuscaLivro({ termo, escolhido, onEscolher, onLimpar, onDispensar }: Props) {
+export function BuscaLivro({ termo, onEscolher, onDispensar }: Props) {
   // A resposta carrega o termo que a gerou: enquanto a pessoa digita, a lista
   // antiga não fica pendurada embaixo de um título que já mudou.
   const [resposta, setResposta] = useState<{
@@ -31,7 +32,7 @@ export function BuscaLivro({ termo, escolhido, onEscolher, onLimpar, onDispensar
   } | null>(null);
 
   const limpo = termo.trim();
-  const ativo = !escolhido && limpo.length >= MIN_CARACTERES;
+  const ativo = limpo.length >= MIN_CARACTERES;
 
   useEffect(() => {
     if (!ativo) return;
@@ -61,12 +62,11 @@ export function BuscaLivro({ termo, escolhido, onEscolher, onLimpar, onDispensar
     };
   }, [limpo, ativo]);
 
-  if (!ativo && !escolhido) return null;
+  if (!ativo) return null;
 
-  // Escolhido, a lista continua na tela com o marcado aceso — é assim que dá
-  // pra trocar de ideia sem recomeçar a busca. Sem escolha, resposta de um
-  // termo anterior não vale pro que está escrito agora.
-  const atual = escolhido ? resposta : resposta?.termo === limpo ? resposta : null;
+  // Resposta de um termo anterior (ainda chegando quando a pessoa já digitou
+  // mais) não vale pro que está escrito agora.
+  const atual = resposta?.termo === limpo ? resposta : null;
 
   if (!atual) {
     return (
@@ -103,34 +103,33 @@ export function BuscaLivro({ termo, escolhido, onEscolher, onLimpar, onDispensar
           <li key={livro.id}>
             <button
               type="button"
-              // Tocar no que já está marcado desmarca: volta ao preenchimento
-              // manual. Um de cada vez — marcar outro troca a escolha.
-              onClick={() =>
-                escolhido?.id === livro.id ? onLimpar() : onEscolher(livro)
-              }
-              aria-pressed={escolhido?.id === livro.id}
-              className={`flex w-full items-center gap-2 rounded-md border-2 bg-white p-1.5 text-left transition-all active:translate-x-[1px] active:translate-y-[1px] active:shadow-none ${
-                escolhido?.id === livro.id
-                  ? "border-moss shadow-hard-sm"
-                  : "border-ink hover:shadow-hard-sm"
-              }`}
+              // Sem isto, tocar no resultado tira o foco do campo de texto
+              // ANTES do clique — e some com toda essa lista bem no meio do
+              // caminho do toque, sem realmente registrar a escolha. Impedir
+              // o foco de sair mantém a lista (e o clique) de pé.
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onEscolher(livro)}
+              className="flex w-full items-center gap-2 rounded-md border-2 border-ink bg-white p-1.5 text-left transition-all hover:shadow-hard-sm active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
             >
               {livro.capaThumb ? (
-                <Image
+                // Thumb do Open Library/Google Books já vem no tamanho certo; passar
+                // pelo next/image só gastava cota de transformação da Vercel à toa
+                // (busca ao vivo = uma transformação nova por tecla, pra uma capa
+                // quase sempre descartada).
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
                   src={livro.capaThumb}
                   alt=""
                   aria-hidden
                   width={26}
                   height={36}
+                  loading="lazy"
                   className="h-9 w-[26px] shrink-0 rounded-sm border border-ink/40 object-cover"
                 />
               ) : (
                 <span className="h-9 w-[26px] shrink-0 rounded-sm border border-ink/40 bg-cover-3" />
               )}
               <span className="min-w-0 flex-1">
-                {/* O catálogo indexa a obra pelo nome original, então este
-                    título pode vir em outro idioma. Serve pra confirmar que é o
-                    livro certo; o que vai pro cadastro é o que você digitou. */}
                 <span className="block truncate text-xs font-medium">{livro.titulo}</span>
                 <span className="block truncate text-[11px] text-ink/60">
                   {livro.autor ?? "autor desconhecido"}
@@ -142,47 +141,25 @@ export function BuscaLivro({ termo, escolhido, onEscolher, onLimpar, onDispensar
                   {livro.ano ? ` · ${livro.ano}` : ""}
                 </span>
               </span>
-              {/* O check diz qual livro está preenchendo o formulário. Vazio em
-                  todos = preenchimento manual. */}
-              <span
-                aria-hidden
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold ${
-                  escolhido?.id === livro.id
-                    ? "border-moss bg-moss text-paper"
-                    : "border-ink/30 text-transparent"
-                }`}
-              >
-                ✓
-              </span>
             </button>
           </li>
         ))}
       </ul>
-      {escolhido ? (
-        <p className="flex items-start gap-2 rounded-md border-2 border-moss bg-moss/15 px-2.5 py-2 text-xs leading-snug text-moss-dark">
-          <span aria-hidden>✓</span>
-          <span>
-            Autor, páginas e capa vieram deste livro — pode editar tudo. O
-            título é o que você escreveu. Toque no check pra desmarcar.
-          </span>
+      {/* A busca casa por palavra solta, então uma lista sem nada a ver é
+          resultado normal — e antes ela ficava plantada na tela enquanto a
+          pessoa preenchia o resto do formulário. */}
+      <div className="flex items-center justify-between gap-2">
+        <p className="font-serif text-xs italic text-ink/60">
+          toque um pra preencher tudo, ou siga digitando
         </p>
-      ) : (
-        /* A Open Library casa por palavra solta, então uma lista sem nada a ver
-           é resultado normal — e antes ela ficava plantada na tela enquanto a
-           pessoa preenchia o resto do formulário. */
-        <div className="flex items-center justify-between gap-2">
-          <p className="font-serif text-xs italic text-ink/60">
-            marque um pra preencher, ou siga digitando
-          </p>
-          <button
-            type="button"
-            onClick={onDispensar}
-            className="shrink-0 text-xs font-semibold text-ink/60 underline underline-offset-2 hover:text-coral"
-          >
-            nenhum desses
-          </button>
-        </div>
-      )}
+        <button
+          type="button"
+          onClick={onDispensar}
+          className="shrink-0 text-xs font-semibold text-ink/60 underline underline-offset-2 hover:text-coral"
+        >
+          nenhum desses
+        </button>
+      </div>
     </div>
   );
 }
