@@ -216,7 +216,11 @@ export function PerfilClient({
       >
         <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full border-2 border-ink bg-paper">
           <AppImage
-            slot={phaseImg ? `perfil.fase.${faseDaImagem(phaseImg)}` : "perfil.meta-ano"}
+            // Mesmo slot da faixa de fases em /metas: cada fase mostra aqui a
+            // arte que o admin escolheu lá. Antes era `perfil.fase.*`, um slot
+            // à parte — o admin só alcançava pelo lápis a fase em que ele
+            // próprio estava, e quem estava em outra fase via a arte padrão.
+            slot={phaseImg ? `metas.fase.${faseDaImagem(phaseImg)}` : "perfil.meta-ano"}
             src={phaseImg ?? "/img/perfil/quill-ok.webp"}
             alt=""
             aria-hidden
