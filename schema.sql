@@ -409,3 +409,13 @@ create policy "members read challenge photos" on storage.objects for select to a
 -- NOTA: para "trechos públicos" (Wattpad-style), highlights públicos precisarão de
 -- leitura pública do arquivo — resolver com bucket público dedicado ou signed URLs
 -- quando implementar essa parte (fase social).
+
+-- ------------------------------------------------------------
+-- 2026-10-17 (migration recomendado_como_marca): "recomendado" vira marca que
+-- convive com o status de leitura. status = 'recomendado' segue significando
+-- "chegou de um amigo, ainda não decidi". recommendation_id guarda a indicação
+-- que trouxe o livro (a página do livro mostra quem indicou e o recado).
+-- ------------------------------------------------------------
+alter table public.media_items
+  add column if not exists is_recommended boolean not null default false,
+  add column if not exists recommendation_id uuid references public.recommendations(id) on delete set null;

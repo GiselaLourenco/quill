@@ -65,7 +65,7 @@ export default async function BookPage({
   const { data: item } = await supabase
     .from("media_items")
     .select(
-      "id, user_id, title, creator, status, cover_kind, cover_url, cover_palette, spotify_url, total_units, total_chapters, started_at, finished_at",
+      "id, user_id, title, creator, status, is_recommended, recommendation_id, cover_kind, cover_url, cover_palette, spotify_url, total_units, total_chapters, started_at, finished_at",
     )
     .eq("id", id)
     .single();
@@ -78,7 +78,7 @@ export default async function BookPage({
     return <FriendBookView item={item} userId={userId} supabase={supabase} />;
   }
 
-  const [{ data: sessions }, { data: comments }, { data: myRating }] =
+  const [{ data: sessions }, { data: comments }, { data: myRating }, indicacao] =
     await Promise.all([
       supabase
         .from("sessions")
@@ -96,7 +96,10 @@ export default async function BookPage({
         .eq("item_id", id)
         .eq("user_id", userId)
         .maybeSingle(),
+      getIndicacao(supabase, item.recommendation_id as string | null),
     ]);
+
+  const recomendado = item.is_recommended || item.status === "recomendado";
 
   const stats = computeReadingStats(sessions ?? []);
   const prediction = predictFinish(stats, item.total_units);
@@ -145,12 +148,21 @@ export default async function BookPage({
         <section className="flex gap-5">
           <BookThumb item={item} className="shadow-[4px_4px_0_0_var(--color-ink)]" />
           <div className="flex min-w-0 flex-1 flex-col justify-center gap-2">
-            <div>
+            <div className="flex flex-wrap gap-1.5">
               <span
                 className={`inline-flex items-center border-2 border-ink px-2 py-0.5 font-display text-[10px] uppercase tracking-wider ${statusStyle}`}
               >
                 {statusLabel}
               </span>
+              {/* A marca aparece junto do status de leitura — quando o status
+                  já é "recomendado" (ainda não decidiu), uma etiqueta basta. */}
+              {recomendado && item.status !== "recomendado" && (
+                <span
+                  className={`inline-flex items-center border-2 border-ink px-2 py-0.5 font-display text-[10px] uppercase tracking-wider ${STATUS_STYLE.recomendado}`}
+                >
+                  {STATUS_LABEL.recomendado}
+                </span>
+              )}
             </div>
             <h2 className="font-display text-xl uppercase leading-tight text-ink">
               {item.title}
@@ -164,12 +176,30 @@ export default async function BookPage({
           </div>
         </section>
 
+        {/* Quem indicou + recado. Só existe quando o livro chegou por uma
+            indicação — livro marcado como recomendado à mão não tem de quem. */}
+        {indicacao && (
+          <section className="border-2 border-ink bg-navy p-3 text-paper shadow-hard-sm">
+            <p className="font-display text-[10px] uppercase tracking-widest text-paper/70">
+              Indicação
+            </p>
+            <p className="mt-1 text-sm">
+              <strong className="font-bold">{indicacao.deQuem}</strong> indicou esse livro pra você
+            </p>
+            {indicacao.recado && (
+              <p className="mt-2 border-l-2 border-mustard pl-2 font-serif text-sm italic leading-relaxed">
+                “{indicacao.recado}”
+              </p>
+            )}
+          </section>
+        )}
+
         {/* Status editor */}
         <section className="border-2 border-ink bg-paper p-3 shadow-hard-sm">
           <p className="mb-2 font-display text-[10px] uppercase tracking-widest text-ink-soft">
             Mudar status
           </p>
-          <StatusEditor itemId={item.id} status={item.status} />
+          <StatusEditor itemId={item.id} status={item.status} isRecommended={recomendado} />
         </section>
 
         {/* Páginas é o dado que a maioria dos livros tem (capítulo é a
@@ -241,6 +271,32 @@ export default async function BookPage({
       </div>
     </div>
   );
+}
+
+async function getIndicacao(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  recommendationId: string | null,
+): Promise<{ deQuem: string; recado: string | null } | null> {
+  if (!recommendationId) return null;
+  const { data: rec } = await supabase
+    .from("recommendations")
+    .select("from_user_id, message")
+    .eq("id", recommendationId)
+    .maybeSingle();
+  if (!rec) return null;
+  const { data: perfil } = rec.from_user_id
+    ? await supabase
+        .from("profiles")
+        .select("display_name, username")
+        .eq("id", rec.from_user_id)
+        .maybeSingle()
+    : { data: null };
+  return {
+    deQuem: perfil
+      ? nomeExibicao(perfil.display_name as string | null, perfil.username as string | null)
+      : "um amigo",
+    recado: (rec.message as string | null)?.trim() || null,
+  };
 }
 
 function StatBox({ label, value }: { label: string; value: string }) {

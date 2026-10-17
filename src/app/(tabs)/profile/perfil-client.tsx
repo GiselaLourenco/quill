@@ -670,6 +670,7 @@ function AmigosDialog({
         cover_url: l.cover_url,
         cover_palette: l.cover_palette,
         status: l.status as DbStatus,
+        recomendado: l.is_recommended,
         stars: l.stars ?? 0,
         total_units: l.total_units,
         percent_lido: l.percent_lido,

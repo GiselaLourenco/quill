@@ -177,7 +177,7 @@ async function MyShelf({
     supabase
       .from("media_items")
       .select(
-        "id, title, creator, cover_kind, cover_url, cover_palette, status, total_units, total_chapters",
+        "id, title, creator, cover_kind, cover_url, cover_palette, status, is_recommended, total_units, total_chapters",
       )
       .eq("user_id", userId)
       // `id` como desempate: um insert em lote (import do Kindle) pode gravar
@@ -227,6 +227,7 @@ async function MyShelf({
       cover_url: item.cover_url,
       cover_palette: item.cover_palette,
       status: item.status as DbStatus,
+      recomendado: !!item.is_recommended,
       stars: starsByItem.get(item.id) ?? 0,
       total_units: item.total_units,
       percent_lido: percentLido,

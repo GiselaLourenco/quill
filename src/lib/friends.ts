@@ -44,6 +44,7 @@ export type FriendItem = {
   cover_url: string | null;
   cover_palette: number;
   status: string;
+  is_recommended: boolean;
   stars: number | null;
   progressLabel: string | null;
   percent_lido: number | null; // posição atual ÷ total (páginas ou capítulos) — mesmo cálculo da estante
@@ -85,7 +86,7 @@ export async function getFriendsShelf(
     supabase
       .from("media_items")
       .select(
-        "id, user_id, title, creator, cover_kind, cover_url, cover_palette, status, created_at, total_units, total_chapters",
+        "id, user_id, title, creator, cover_kind, cover_url, cover_palette, status, is_recommended, created_at, total_units, total_chapters",
       )
       .in("user_id", friendIds)
       .order("created_at", { ascending: false }),
@@ -181,6 +182,7 @@ export async function getFriendsShelf(
       cover_url: it.cover_url,
       cover_palette: it.cover_palette,
       status: it.status,
+      is_recommended: !!it.is_recommended,
       stars: starsByItem.get(it.id) ?? null,
       progressLabel,
       percent_lido: percentLido,

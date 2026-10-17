@@ -283,7 +283,7 @@ function Card({
             disabled={pendente || !!resolvido}
             onClick={() =>
               iniciar(async () => {
-                const r = await addFriendBookToShelf({ sourceItemId: n.itemRef! });
+                const r = await addFriendBookToShelf({ sourceItemId: n.itemRef!, recommendationId: n.recId });
                 onResolver(r.error && !r.itemId ? r.error : "Na sua estante ✓");
                 router.refresh();
               })

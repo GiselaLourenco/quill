@@ -23,6 +23,8 @@ export type ShelfBook = {
   cover_url: string | null;
   cover_palette: number;
   status: DbStatus;
+  /** Marca "recomendado" — convive com o status de leitura (recomendado + quero ler, etc.). */
+  recomendado?: boolean;
   stars: number; // 0 = sem nota
   total_units: number | null; // páginas
   percent_lido: number | null; // posição atual ÷ total (páginas ou capítulos) — null sem dado
@@ -44,6 +46,8 @@ const FILTROS: { status: DbStatus | "todos"; label: string }[] = [
   { status: "recomendado", label: "Recomendados" },
   { status: "abandoned", label: "Abandonei" },
 ];
+
+const ehRecomendado = (b: ShelfBook) => !!b.recomendado || b.status === "recomendado";
 
 /** Sem acento e sem caixa, pra "harry potter" achar "Harry Potter e a...". */
 const normalizar = (t: string) =>
@@ -100,14 +104,25 @@ export function EstanteShelf({
       recomendado: 0,
       abandoned: 0,
     };
-    for (const b of books) map[b.status]++;
+    // Um livro recomendado conta no status de leitura dele E em
+    // "Recomendados". O status `recomendado` sozinho (ainda não decidiu) só
+    // conta lá.
+    for (const b of books) {
+      if (b.status !== "recomendado") map[b.status]++;
+      if (ehRecomendado(b)) map.recomendado++;
+    }
     return map;
   }, [books]);
 
   const total = books.length;
 
   const filtrados = useMemo(() => {
-    const porStatus = filtro === "todos" ? books : books.filter((b) => b.status === filtro);
+    const porStatus =
+      filtro === "todos"
+        ? books
+        : filtro === "recomendado"
+          ? books.filter(ehRecomendado)
+          : books.filter((b) => b.status === filtro);
     const termo = normalizar(busca);
     if (!termo) return porStatus;
     return porStatus.filter(

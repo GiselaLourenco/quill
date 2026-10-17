@@ -37,12 +37,15 @@ export default async function StatusGridPage({
   const dbStatus = PARAM_TO_DB[status] ?? "reading";
   const meta = STATUS_META[dbStatus];
 
-  const { data: items } = await supabase
+  // "Recomendado" é marca (convive com quero ler, lendo…), não só status.
+  const base = supabase
     .from("media_items")
     .select("id, title, creator, cover_kind, cover_url, cover_palette")
-    .eq("user_id", userId)
-    .eq("status", dbStatus)
-    .order("created_at", { ascending: false });
+    .eq("user_id", userId);
+  const { data: items } = await (dbStatus === "recomendado"
+    ? base.or("is_recommended.eq.true,status.eq.recomendado")
+    : base.eq("status", dbStatus)
+  ).order("created_at", { ascending: false });
 
   const itemIds = (items ?? []).map((i) => i.id as string);
   const { data: ratings } = itemIds.length
