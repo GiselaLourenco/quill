@@ -5,8 +5,12 @@ export type AchievementCriteria =
   | { type: "books_finished"; target: number }
   | { type: "streak_record"; target: number }
   | { type: "max_session_pages"; target: number }
-  /** Terminar um livro específico — `titles` são os começos de título aceitos. */
-  | { type: "specific_book"; titles: string[]; target: 1 };
+  /**
+   * Terminar um livro específico — `titles` são os começos de título aceitos;
+   * `exactTitles` só valem como título inteiro (quando o começo sozinho
+   * também abre as continuações, como "Mistborn: O Poço da Ascensão").
+   */
+  | { type: "specific_book"; titles: string[]; exactTitles?: string[]; target: 1 };
 
 export type Achievement = {
   key: string;
@@ -22,9 +26,19 @@ export type Achievement = {
   avatar?: { arquivo: string; nome: string; dica: string };
 };
 
-/** Minúsculas e sem acento — "Trono de Vídro" e "trono de vidro" são o mesmo. */
+/**
+ * Minúsculas e sem acento — "Trono de Vídro" e "trono de vidro" são o mesmo.
+ * Dois-pontos e travessões viram um separador só: "Mistborn - O Império
+ * Final" e "Mistborn: O Império Final" também.
+ */
 function normalizarTitulo(t: string): string {
-  return t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  return t
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s*[:–—]\s*|\s+-\s+/g, ": ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /**
@@ -34,8 +48,11 @@ function normalizarTitulo(t: string): string {
  * e "Trono de vidro - Trono de vidro - vol. 1 (Portuguese Edition)" (import do
  * Kindle) entra. Um volume explícito diferente de 1 também fica de fora.
  */
-export function tituloEhLivro(titulo: string, aceitos: string[]): boolean {
+export function tituloEhLivro(titulo: string, aceitos: string[], exatos: string[] = []): boolean {
   const t = normalizarTitulo(titulo);
+  // Título inteiro, tirando um "(Portuguese Edition)" do fim.
+  const semEdicao = t.replace(/\s*\([^)]*\)$/, "");
+  if (exatos.some((e) => normalizarTitulo(e) === semEdicao)) return true;
   // Depois do começo aceito vem fim, espaço ou pontuação — nunca o meio de
   // outra palavra.
   const casou = aceitos.some((a) => {
@@ -140,6 +157,25 @@ export const ACHIEVEMENTS: Achievement[] = [
       dica: "Termine Trono de Vidro",
     },
   },
+  {
+    key: "mistborn",
+    name: "Mistborn",
+    description: "Termine Mistborn: O Império Final e ganhe a foto do nascido da bruma.",
+    tier: "prata",
+    criteria: {
+      type: "specific_book",
+      // Só o volume 1. "Mistborn" sozinho é como o Google Books grava o
+      // livro, mas como começo pegaria a série toda — por isso é exato.
+      titles: ["Mistborn: O Império Final", "Mistborn: The Final Empire", "O Império Final", "The Final Empire", "Nascidos da Bruma: O Império Final"],
+      exactTitles: ["Mistborn"],
+      target: 1,
+    },
+    avatar: {
+      arquivo: "quill-nascido-da-bruma.png",
+      nome: "Nascido da Bruma",
+      dica: "Termine Mistborn",
+    },
+  },
 ];
 
 /** As conquistas que liberam foto de perfil. */
@@ -150,7 +186,9 @@ export const ACHIEVEMENTS_COM_AVATAR = ACHIEVEMENTS.filter(
 /** Conquistas de livro específico que este título completa. */
 export function conquistasDoTitulo(titulo: string): Achievement[] {
   return ACHIEVEMENTS.filter(
-    (a) => a.criteria.type === "specific_book" && tituloEhLivro(titulo, a.criteria.titles),
+    (a) =>
+      a.criteria.type === "specific_book" &&
+      tituloEhLivro(titulo, a.criteria.titles, a.criteria.exactTitles),
   );
 }
 
@@ -177,8 +215,8 @@ export function currentProgress(
     case "max_session_pages":
       return ctx.maxSessionPages;
     case "specific_book": {
-      const { titles } = criteria;
-      return ctx.finishedTitles.some((t) => tituloEhLivro(t, titles)) ? 1 : 0;
+      const { titles, exactTitles } = criteria;
+      return ctx.finishedTitles.some((t) => tituloEhLivro(t, titles, exactTitles)) ? 1 : 0;
     }
   }
 }
