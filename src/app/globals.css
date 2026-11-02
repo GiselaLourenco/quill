@@ -94,3 +94,12 @@ body {
   background: color-mix(in srgb, var(--cover-bg, var(--color-cover-1)) 70%, black);
   opacity: 0.7;
 }
+
+/* Folha de baixo pra cima (detalhe da conquista). */
+@keyframes subir {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [class*="animate-[subir"] { animation: none !important; }
+}
