@@ -136,11 +136,11 @@ export default function HomeClient({
       {/* Calendário */}
       <CalendarioCard semanas={semanas} meses={meses} mesInicial={mesAtualIdx} />
 
-      {/* Desafios */}
-      {desafios.length > 0 ? <DesafiosCard desafios={desafios} /> : <DesafiosVazio />}
-
       {/* Conquistas */}
       <ConquistasCard conquistas={conquistas} />
+
+      {/* Desafios */}
+      {desafios.length > 0 ? <DesafiosCard desafios={desafios} /> : <DesafiosVazio />}
 
       {/* Compartilhar */}
       <CompartilharBtn />
