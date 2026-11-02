@@ -52,11 +52,16 @@ function Barra({ valor, fina = false }: { valor: number; fina?: boolean }) {
   );
 }
 
-/** Mais recentes primeiro; sem data (registro antigo) vai pro fim. */
+/**
+ * Mais recentes primeiro. Sem data vem na FRENTE: só as de livro específico
+ * ficam sem data (quem terminou o livro antes da conquista existir não ganha
+ * linha em `user_achievements`) e, no fim da fila, sumiam atrás do "+N" da
+ * home — justo as que dão foto.
+ */
 function recentes(conquistas: ConquistaView[]) {
   return conquistas
     .filter((c) => c.desbloqueada)
-    .sort((a, b) => (b.desbloqueadaEmIso ?? "").localeCompare(a.desbloqueadaEmIso ?? ""));
+    .sort((a, b) => (b.desbloqueadaEmIso ?? "~").localeCompare(a.desbloqueadaEmIso ?? "~"));
 }
 
 /** A que falta menos (em proporção) entre as que já começaram. */
