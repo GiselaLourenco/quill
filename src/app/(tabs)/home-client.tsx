@@ -116,6 +116,7 @@ export default function HomeClient({
         <AvatarMenu
           src={avatarPerfil.src}
           nome={avatarPerfil.nome}
+          foto={avatarPerfil.foto}
           bg={avatarBg}
           zoom={avatarZoom}
           notificacoes={notificacoes}
@@ -143,12 +144,14 @@ export default function HomeClient({
 function AvatarMenu({
   src,
   nome,
+  foto,
   bg,
   zoom,
   notificacoes,
 }: {
   src: string;
   nome: string;
+  foto?: boolean;
   bg: string;
   zoom: number;
   notificacoes: number;
@@ -175,7 +178,7 @@ function AvatarMenu({
             alt={nome}
             width={64}
             height={64}
-            className="h-full w-full object-contain"
+            className={`h-full w-full ${foto ? "object-cover" : "object-contain"}`}
             style={{ transform: `scale(${zoom / 100})` }}
             draggable={false}
           />

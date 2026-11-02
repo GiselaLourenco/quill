@@ -5,6 +5,9 @@
  * não esbarra na decisão de 2026-07-06 que tirou upload de foto do produto.
  * A lista também é a lista de permissão do servidor: só um `src` daqui entra
  * no banco, então o cliente não consegue gravar uma URL arbitrária.
+ *
+ * Exceção: o admin pode enviar uma foto própria (bucket `artes`). O servidor
+ * confere que é admin e que o arquivo existe no bucket antes de gravar.
  */
 export const AVATARES = [
   { id: "ok", nome: "Quill ok", src: "/img/perfil/quill-ok.webp" },
@@ -15,7 +18,38 @@ export const AVATARES = [
   { id: "zen", nome: "Quill zen", src: "/img/perfil/quill-zen.webp" },
 ] as const;
 
-export type AvatarOpcao = (typeof AVATARES)[number];
+export type AvatarOpcao = {
+  id: string;
+  nome: string;
+  src: string;
+  /** Foto enviada (só o admin pode): preenche o círculo em vez de caber nele. */
+  foto?: boolean;
+};
+
+/** `id` da foto enviada no editor de perfil — não é uma arte do catálogo. */
+export const AVATAR_FOTO_ID = "foto";
+
+/**
+ * Início da URL de uma imagem no bucket `artes`. Repete o prefixo de
+ * `lib/artes.ts` porque aquele arquivo lê o disco e não roda no navegador.
+ */
+const PREFIXO_FOTO = `${
+  process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
+}/storage/v1/object/public/artes/`;
+
+/** É uma foto enviada (mora no Storage), e não uma arte do catálogo? */
+export function ehFotoEnviada(src: string | null): src is string {
+  return Boolean(
+    src &&
+      PREFIXO_FOTO.length > "/storage/v1/object/public/artes/".length &&
+      src.startsWith(PREFIXO_FOTO) &&
+      !src.includes(".."),
+  );
+}
+
+export function avatarDeFoto(src: string): AvatarOpcao {
+  return { id: AVATAR_FOTO_ID, nome: "Foto do perfil", src, foto: true };
+}
 
 /** Fundo padrão do círculo quando há avatar. */
 export const AVATAR_FUNDO_PADRAO = "#6D6885";
@@ -28,6 +62,7 @@ export const AVATAR_FUNDOS = [
 
 export function avatarPorSrc(src: string | null): AvatarOpcao | null {
   if (!src) return null;
+  if (ehFotoEnviada(src)) return avatarDeFoto(src);
   return AVATARES.find((a) => a.src === src) ?? null;
 }
 

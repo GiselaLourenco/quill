@@ -14,7 +14,18 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useActionState, useState, useTransition } from "react";
 import type { Friend, FriendShelf } from "@/lib/friends";
-import { AVATARES, AVATAR_FUNDOS, AVATAR_FUNDO_PADRAO, avatarDeExibicao, avatarPorSrc } from "@/lib/avatares";
+import {
+  AVATARES,
+  AVATAR_FOTO_ID,
+  AVATAR_FUNDOS,
+  AVATAR_FUNDO_PADRAO,
+  avatarDeExibicao,
+  avatarDeFoto,
+  avatarPorSrc,
+  type AvatarOpcao,
+  ehFotoEnviada,
+} from "@/lib/avatares";
+import { enviarArte } from "@/app/actions/admin";
 import { nomeExibicao } from "@/lib/nome-exibicao";
 import { faseDaImagem } from "@/lib/gamification";
 import { BookThumb } from "@/components/book-thumb";
@@ -113,6 +124,7 @@ export function PerfilClient({
   const [rascunhoAvatar, setRascunhoAvatar] = useState<string>(avatarAtual?.id ?? AVATARES[0].id);
   const [rascunhoZoom, setRascunhoZoom] = useState(avatarZoom);
   const [rascunhoFundo, setRascunhoFundo] = useState(avatarBg || AVATAR_FUNDO_PADRAO);
+  const [rascunhoFoto, setRascunhoFoto] = useState<string | null>(ehFotoEnviada(avatarUrl) ? avatarUrl : null);
   const [rascunhoNome, setRascunhoNome] = useState(nomeExibicao(displayName, username));
   const [rascunhoUsername, setRascunhoUsername] = useState(username ?? "");
 
@@ -141,7 +153,7 @@ export function PerfilClient({
               alt={avatarExibido.nome}
               width={96}
               height={96}
-              className="h-full w-full object-contain"
+              className={`h-full w-full ${avatarExibido.foto ? "object-cover" : "object-contain"}`}
               style={{ transform: `scale(${avatarZoom / 100})` }}
             />
           </div>
@@ -151,6 +163,7 @@ export function PerfilClient({
               setRascunhoAvatar(avatarAtual?.id ?? AVATARES[0].id);
               setRascunhoZoom(avatarZoom);
               setRascunhoFundo(avatarBg || AVATAR_FUNDO_PADRAO);
+              setRascunhoFoto(ehFotoEnviada(avatarUrl) ? avatarUrl : null);
               setRascunhoNome(nomeExibicao(displayName, username));
               setRascunhoUsername(username ?? "");
               setAberto("foto");
@@ -379,6 +392,7 @@ export function PerfilClient({
               setRascunhoAvatar(avatarAtual?.id ?? AVATARES[0].id);
               setRascunhoZoom(avatarZoom);
               setRascunhoFundo(avatarBg || AVATAR_FUNDO_PADRAO);
+              setRascunhoFoto(ehFotoEnviada(avatarUrl) ? avatarUrl : null);
               setRascunhoNome(nomeExibicao(displayName, username));
               setRascunhoUsername(username ?? "");
               setAberto("foto");
@@ -438,6 +452,9 @@ export function PerfilClient({
                 escolhido={rascunhoAvatar}
                 zoom={rascunhoZoom}
                 fundo={rascunhoFundo}
+                admin={admin}
+                foto={rascunhoFoto}
+                onFoto={setRascunhoFoto}
                 onNome={setRascunhoNome}
                 onEscolher={setRascunhoAvatar}
                 onZoom={setRascunhoZoom}
@@ -872,6 +889,9 @@ function EditarPerfilDialog({
   escolhido,
   zoom,
   fundo,
+  admin,
+  foto,
+  onFoto,
   onNome,
   onEscolher,
   onZoom,
@@ -885,6 +905,10 @@ function EditarPerfilDialog({
   escolhido: string;
   zoom: number;
   fundo: string;
+  /** Admin pode enviar uma foto própria além das artes do Quill. */
+  admin: boolean;
+  foto: string | null;
+  onFoto: (url: string) => void;
   onNome: (v: string) => void;
   onEscolher: (id: string) => void;
   onZoom: (z: number) => void;
@@ -893,6 +917,7 @@ function EditarPerfilDialog({
     nome: string;
     username: string;
     avatarId: string;
+    fotoUrl?: string | null;
     zoom: number;
     fundo: string;
   }) => Promise<{ error: string | null }>;
@@ -901,7 +926,11 @@ function EditarPerfilDialog({
   const router = useRouter();
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, startSave] = useTransition();
-  const arte = AVATARES.find((a) => a.id === escolhido) ?? AVATARES[0];
+  const [enviando, startEnvio] = useTransition();
+  const arte: AvatarOpcao =
+    escolhido === AVATAR_FOTO_ID && foto
+      ? avatarDeFoto(foto)
+      : (AVATARES.find((a) => a.id === escolhido) ?? AVATARES[0]);
 
   return (
     <DialogShell title="Editar perfil" onClose={onClose}>
@@ -950,7 +979,7 @@ function EditarPerfilDialog({
             alt={arte.nome}
             width={112}
             height={112}
-            className="h-full w-full object-contain"
+            className={`h-full w-full ${arte.foto ? "object-cover" : "object-contain"}`}
             style={{ transform: `scale(${zoom / 100})` }}
           />
         </div>
@@ -994,6 +1023,56 @@ function EditarPerfilDialog({
             </button>
           );
         })}
+        {admin && foto && (
+          <button
+            type="button"
+            aria-label="Foto enviada"
+            aria-pressed={escolhido === AVATAR_FOTO_ID}
+            onClick={() => onEscolher(AVATAR_FOTO_ID)}
+            style={{ backgroundColor: fundo }}
+            className={`flex aspect-square items-center justify-center overflow-hidden rounded-full border-2 border-ink ${
+              escolhido === AVATAR_FOTO_ID ? "shadow-hard" : "opacity-70"
+            }`}
+          >
+            <Image src={foto} alt="" width={72} height={72} className="h-full w-full object-cover" />
+          </button>
+        )}
+        {admin && (
+          // Mesmo envio do /admin: a imagem vai para o bucket `artes` e o
+          // servidor só aceita no perfil uma URL que exista lá.
+          <label
+            aria-label="Adicionar imagem"
+            className={`flex aspect-square cursor-pointer flex-col items-center justify-center rounded-full border-2 border-dashed border-ink bg-card text-center font-display text-[9px] uppercase leading-tight tracking-tight ${
+              enviando ? "opacity-60" : ""
+            }`}
+          >
+            <span className="text-lg leading-none">{enviando ? "…" : "+"}</span>
+            {enviando ? "enviando" : "imagem"}
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
+              disabled={enviando}
+              className="sr-only"
+              onChange={(e) => {
+                const arquivo = e.target.files?.[0];
+                e.target.value = "";
+                if (!arquivo) return;
+                setErro(null);
+                const dados = new FormData();
+                dados.append("arquivo", arquivo);
+                startEnvio(async () => {
+                  const r = await enviarArte(dados);
+                  if (r.error || !r.url) {
+                    setErro(r.error ?? "Não foi possível enviar a imagem.");
+                    return;
+                  }
+                  onFoto(r.url);
+                  onEscolher(AVATAR_FOTO_ID);
+                });
+              }}
+            />
+          </label>
+        )}
       </div>
 
       <div className="mt-3">
@@ -1030,10 +1109,10 @@ function EditarPerfilDialog({
         </button>
         <button
           type="button"
-          disabled={salvando}
+          disabled={salvando || enviando}
           onClick={() =>
             startSave(async () => {
-              const r = await onSalvar({ nome, username, avatarId: escolhido, zoom, fundo });
+              const r = await onSalvar({ nome, username, avatarId: escolhido, fotoUrl: foto, zoom, fundo });
               if (r.error) { setErro(r.error); return; }
               router.refresh();
               onClose();

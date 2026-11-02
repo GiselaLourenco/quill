@@ -189,7 +189,7 @@ export function Avatar({
         alt={nome}
         width={tamanho}
         height={tamanho}
-        className="h-full w-full object-contain"
+        className={`h-full w-full ${arte.foto ? "object-cover" : "object-contain"}`}
         draggable={false}
       />
     </span>
