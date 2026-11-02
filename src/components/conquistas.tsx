@@ -137,9 +137,9 @@ function ConquistaDetalhe({ conquista: c, onClose }: { conquista: ConquistaView;
   );
 }
 
-/* ---------- Bloco do perfil ---------- */
+/* ---------- Card da home ---------- */
 
-export function ConquistasPerfil({ conquistas }: { conquistas: ConquistaView[] }) {
+export function ConquistasCard({ conquistas }: { conquistas: ConquistaView[] }) {
   const [aberta, setAberta] = useState<ConquistaView | null>(null);
   const feitas = recentes(conquistas);
   const mostrar = feitas.slice(0, 4);
@@ -147,7 +147,7 @@ export function ConquistasPerfil({ conquistas }: { conquistas: ConquistaView[] }
   const proxima = quaseLa(conquistas);
 
   return (
-    <div className="shadow-hard mt-8 overflow-hidden rounded-md border-2 border-ink bg-card">
+    <section aria-label="Conquistas" className="shadow-hard overflow-hidden rounded-md border-2 border-ink bg-card">
       <div className="grid gap-3 p-3.5">
         <div className="flex items-baseline gap-2">
           <h2 className="font-display text-sm uppercase tracking-tight">Conquistas</h2>
@@ -227,7 +227,7 @@ export function ConquistasPerfil({ conquistas }: { conquistas: ConquistaView[] }
       </Link>
 
       {aberta && <ConquistaDetalhe conquista={aberta} onClose={() => setAberta(null)} />}
-    </div>
+    </section>
   );
 }
 
@@ -258,8 +258,8 @@ export function ColecaoConquistas({ conquistas }: { conquistas: ConquistaView[] 
     <div className="px-[18px] pb-8 pt-[18px]">
       <div className="flex items-center gap-2.5">
         <Link
-          href="/profile"
-          aria-label="Voltar ao perfil"
+          href="/"
+          aria-label="Voltar para a home"
           className="shadow-hard-sm grid h-[34px] w-[34px] place-items-center rounded-full border-2 border-ink bg-card text-lg font-bold active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
         >
           ←

@@ -32,8 +32,6 @@ import { BookThumb } from "@/components/book-thumb";
 import { EstanteShelf, type DbStatus, type ShelfBook } from "@/components/estante-shelf";
 import { EmptyState } from "@/components/empty-state";
 import { Portal } from "@/components/portal";
-import { ConquistasPerfil } from "@/components/conquistas";
-import type { ConquistaView } from "@/lib/conquistas-view";
 
 export type DesafioRanking = {
   id: string;
@@ -71,7 +69,6 @@ type Props = {
   recordeStreak: number;
   amigos: Friend[];
   estantes: FriendShelf[];
-  conquistas: ConquistaView[];
   desafios: DesafioRanking[];
   totalFinished: number;
   annualTarget: number;
@@ -100,7 +97,6 @@ export function PerfilClient({
   recordeStreak,
   amigos,
   estantes,
-  conquistas,
   desafios,
   totalFinished,
   annualTarget,
@@ -250,10 +246,8 @@ export function PerfilClient({
         </div>
       </Link>
 
-      <ConquistasPerfil conquistas={conquistas} />
-
       {/* A história do Quill — fora de Preferências e de Conta de propósito:
-          não é ajuste nem dado, é leitura. Fica logo depois das conquistas, que é
+          não é ajuste nem dado, é leitura. Fica logo depois da meta do ano, que é
           onde o perfil deixa de falar de números. */}
       <Link
         href="/lore"

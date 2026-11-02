@@ -3,6 +3,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import { AppImage } from "@/components/app-image";
+import { ConquistasCard } from "@/components/conquistas";
+import type { ConquistaView } from "@/lib/conquistas-view";
 import { avatarDeExibicao, AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
 import { useMemo, useState } from "react";
 import { DiaLeituraSheet } from "@/components/dia-leitura-sheet";
@@ -75,6 +77,7 @@ export default function HomeClient({
   notificacoes,
   desafios,
   pilulas,
+  conquistas,
 }: {
   nomeUsuario: string;
   avatarUrl: string | null;
@@ -87,6 +90,7 @@ export default function HomeClient({
   notificacoes: number;
   desafios: Desafio[];
   pilulas: Pilula[];
+  conquistas: ConquistaView[];
 }) {
   const dataHoje = new Date();
   const dataStr = dataHoje.toLocaleDateString("pt-BR", {
@@ -134,6 +138,9 @@ export default function HomeClient({
 
       {/* Desafios */}
       {desafios.length > 0 ? <DesafiosCard desafios={desafios} /> : <DesafiosVazio />}
+
+      {/* Conquistas */}
+      <ConquistasCard conquistas={conquistas} />
 
       {/* Compartilhar */}
       <CompartilharBtn />

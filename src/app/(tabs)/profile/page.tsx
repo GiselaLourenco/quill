@@ -7,8 +7,7 @@ import { logout, deleteAccount } from "@/app/actions/auth";
 import { toggleCompete } from "@/app/actions/groups";
 import { quillPhase } from "@/lib/gamification";
 import { evaluateAchievements } from "@/lib/achievements";
-import { datasDeDesbloqueio, loadAchievementData } from "@/lib/achievement-context";
-import { montarConquistas } from "@/lib/conquistas-view";
+import { loadAchievementData } from "@/lib/achievement-context";
 import { listarAvataresEnviados } from "@/lib/artes";
 import {
   SRCS_AVATAR_DE_CONQUISTA,
@@ -90,13 +89,6 @@ export default async function ProfilePage() {
   // Conquistas reais, calculadas a partir das sessões e da estante.
   const avaliadas = evaluateAchievements(ctxConquistas);
 
-  const datas = await datasDeDesbloqueio(
-    supabase,
-    userId,
-    avaliadas.filter((e) => e.met).map((e) => e.achievement.key),
-  );
-  const conquistasView = montarConquistas(ctxConquistas, datas);
-
   // Fotos de conquista: liberadas pra quem fez a conquista — e pra quem já
   // usava a foto antes dela virar prêmio.
   const avatarUrl = (profile?.avatar_url as string | null) ?? null;
@@ -151,7 +143,6 @@ export default async function ProfilePage() {
       pedidos={pedidos}
       notificacoes={notificacoes.novas}
       estantes={estantes}
-      conquistas={conquistasView}
       desafios={desafios}
       totalFinished={totalFinished}
       annualTarget={annualTarget}

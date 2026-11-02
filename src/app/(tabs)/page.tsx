@@ -6,7 +6,9 @@ import {
   computeChaptersPerWeek,
   type SessionRow,
 } from "@/lib/gamification";
-import { loadAchievementData } from "@/lib/achievement-context";
+import { datasDeDesbloqueio, loadAchievementData } from "@/lib/achievement-context";
+import { evaluateAchievements } from "@/lib/achievements";
+import { montarConquistas } from "@/lib/conquistas-view";
 import { pillsEscolhidas, pillDisplay, type PillStats } from "@/lib/pills";
 import { getNotificacoes } from "@/lib/notificacoes";
 import { nomeExibicao } from "@/lib/nome-exibicao";
@@ -280,6 +282,14 @@ export default async function HomePage() {
     getNotificacoes(supabase, userId),
   ]);
 
+  const conquistasFeitas = evaluateAchievements(historico.ctx)
+    .filter((e) => e.met)
+    .map((e) => e.achievement.key);
+  const conquistas = montarConquistas(
+    historico.ctx,
+    await datasDeDesbloqueio(supabase, userId, conquistasFeitas),
+  );
+
   return (
     <HomeClient
       nomeUsuario={nomeExibicao(profile?.display_name as string | null, profile?.username as string | null)}
@@ -296,6 +306,7 @@ export default async function HomePage() {
         tone: (["coral", "moss", "mustard"] as const)[i % 3]!,
       }))}
       pilulas={pilulas}
+      conquistas={conquistas}
     />
   );
 }
