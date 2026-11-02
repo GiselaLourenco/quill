@@ -30,6 +30,28 @@ async function todasAsSessoes(supabase: SupabaseClient, userId: string): Promise
 }
 
 /**
+ * Títulos de tudo que está como "terminei". Serve à contagem de livros e às
+ * conquistas de livro específico. O validador do avatar usa só esta parte —
+ * não precisa do histórico de sessões.
+ */
+export async function titulosTerminados(supabase: SupabaseClient, userId: string): Promise<string[]> {
+  const titulos: string[] = [];
+  for (let de = 0; ; de += PAGINA) {
+    const { data, error } = await supabase
+      .from("media_items")
+      .select("title")
+      .eq("user_id", userId)
+      .eq("status", "finished")
+      .order("created_at", { ascending: true })
+      .range(de, de + PAGINA - 1);
+    if (error) throw error;
+    titulos.push(...(data ?? []).map((linha) => linha.title as string));
+    if (!data || data.length < PAGINA) break;
+  }
+  return titulos;
+}
+
+/**
  * Histórico completo de sessões (sem janela de data) + o contexto pronto pra
  * `evaluateAchievements`. Ajustes manuais de posição (duração 0) contam como
  * sessão — decisão de produto.
@@ -38,23 +60,19 @@ export async function loadAchievementData(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<{ ctx: AchievementContext; sessions: SessionRow[] }> {
-  const [sessions, { count: booksFinished, error }] = await Promise.all([
+  const [sessions, finishedTitles] = await Promise.all([
     todasAsSessoes(supabase, userId),
-    supabase
-      .from("media_items")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .eq("status", "finished"),
+    titulosTerminados(supabase, userId),
   ]);
-  if (error) throw error;
 
   return {
     sessions,
     ctx: {
       sessionsCount: sessions.length,
-      booksFinished: booksFinished ?? 0,
+      booksFinished: finishedTitles.length,
       streakRecord: computeStreak(sessions).record,
       maxSessionPages: computeMaxSessionPages(sessions),
+      finishedTitles,
     },
   };
 }

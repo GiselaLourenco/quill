@@ -2,8 +2,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getPedidosRecebidos } from "@/lib/friends";
 import { getReceivedRecommendations } from "@/lib/recommendations";
 import { todayLocalDateKey, addDaysToKey } from "@/lib/date-br";
+import { ACHIEVEMENTS_COM_AVATAR } from "@/lib/achievements";
+import { srcDoAvatarDeConquista } from "@/lib/avatares";
 
-export type TipoNotificacao = "amizade" | "desafio" | "indicacao";
+export type TipoNotificacao = "amizade" | "desafio" | "indicacao" | "conquista";
 
 export type Notificacao = {
   id: string;
@@ -24,6 +26,9 @@ export type Notificacao = {
   livroTitulo?: string;
   itemRef?: string | null;
   recado?: string | null;
+  /** Conquista que liberou foto de perfil. */
+  conquistaNome?: string;
+  fotoSrc?: string;
 };
 
 /** "há 2h", "ontem" — o mesmo vocabulário que o resto do app usa. */
@@ -64,7 +69,7 @@ export async function getNotificacoes(
   const hoje = todayLocalDateKey();
   const daquiA7 = addDaysToKey(hoje, 7);
 
-  const [pedidos, recs, { data: membros }, { data: perfil }] = await Promise.all([
+  const [pedidos, recs, { data: membros }, { data: perfil }, { data: conquistas }] = await Promise.all([
     getPedidosRecebidos(supabase, userId),
     getReceivedRecommendations(supabase, userId),
     supabase
@@ -76,6 +81,13 @@ export async function getNotificacoes(
       .select("notificacoes_limpas_em")
       .eq("id", userId)
       .maybeSingle(),
+    // Só as que dão foto viram notificação — a linha é gravada ao terminar o
+    // livro (ver `registrarConquistaDeLivro`).
+    supabase
+      .from("user_achievements")
+      .select("achievement_key, unlocked_at")
+      .eq("user_id", userId)
+      .in("achievement_key", ACHIEVEMENTS_COM_AVATAR.map((a) => a.key)),
   ]);
 
   const limpasEm = perfil?.notificacoes_limpas_em
@@ -129,6 +141,20 @@ export async function getNotificacoes(
       desafioId: g.id,
       desafioNome: g.name,
       comecaEm: g.starts_at,
+    });
+  }
+
+  for (const c of conquistas ?? []) {
+    const a = ACHIEVEMENTS_COM_AVATAR.find((x) => x.key === c.achievement_key);
+    if (!a) continue;
+    const { texto, ms } = quandoRelativo(c.unlocked_at as string);
+    notas.push({
+      id: `conquista-${a.key}`,
+      tipo: "conquista",
+      quando: texto,
+      emMs: ms,
+      conquistaNome: a.name,
+      fotoSrc: srcDoAvatarDeConquista(a.avatar.arquivo),
     });
   }
 

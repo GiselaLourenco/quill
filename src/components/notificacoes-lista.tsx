@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -14,6 +15,7 @@ const FILTROS: { id: "todas" | TipoNotificacao; label: string }[] = [
   { id: "amizade", label: "Amizades" },
   { id: "desafio", label: "Desafios" },
   { id: "indicacao", label: "Indicações" },
+  { id: "conquista", label: "Conquistas" },
 ];
 
 /**
@@ -54,6 +56,11 @@ const VAZIO: Record<"todas" | TipoNotificacao, { titulo: string; texto: string }
     titulo: "Nenhuma indicação",
     texto:
       "Livro indicado por amigo cai aqui. Você também pode indicar: é o botão na aba Amigos da estante.",
+  },
+  conquista: {
+    titulo: "Nenhuma ainda",
+    texto:
+      "Algumas conquistas liberam foto de perfil. Quando você liberar uma, ela aparece aqui.",
   },
 };
 
@@ -243,6 +250,33 @@ function Card({
             </button>
           </div>
         )}
+      </article>
+    );
+  }
+
+  if (n.tipo === "conquista") {
+    return (
+      <article className={`${base} bg-paper`}>
+        <div className="flex items-center gap-3">
+          {n.fotoSrc && (
+            <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full border-2 border-ink bg-[#6D6885]">
+              <Image src={n.fotoSrc} alt="" width={56} height={56} className="h-full w-full object-cover" />
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="text-sm leading-snug text-ink">
+              Conquista <strong className="font-serif font-semibold">“{n.conquistaNome}”</strong>!
+              Você liberou uma foto de perfil nova.
+            </p>
+            <Quando texto={n.quando} />
+          </div>
+        </div>
+        <Link
+          href="/profile"
+          className="shadow-hard-sm mt-3 inline-flex rounded-md border-2 border-ink bg-coral px-3 py-1.5 font-display text-[10px] uppercase tracking-wider text-paper"
+        >
+          Usar no perfil
+        </Link>
       </article>
     );
   }

@@ -9,6 +9,11 @@ import { quillPhase } from "@/lib/gamification";
 import { evaluateAchievements, ACHIEVEMENT_ICON } from "@/lib/achievements";
 import { loadAchievementData } from "@/lib/achievement-context";
 import { listarAvataresEnviados } from "@/lib/artes";
+import {
+  SRCS_AVATAR_DE_CONQUISTA,
+  srcDoAvatarDeConquista,
+  type AvatarDeConquista,
+} from "@/lib/avatares";
 import { getFriends, getFriendsShelf, getPedidosRecebidos } from "@/lib/friends";
 import { PerfilClient, type BadgeView, type DesafioRanking } from "./perfil-client";
 
@@ -94,12 +99,31 @@ export default async function ProfilePage() {
     id: achievement.key,
     titulo: achievement.name,
     descricao: achievement.description,
-    icone: ACHIEVEMENT_ICON[achievement.criteria.type],
+    // Conquista que dá foto mostra a própria foto: o prêmio é o chamariz.
+    icone: achievement.avatar
+      ? srcDoAvatarDeConquista(achievement.avatar.arquivo)
+      : ACHIEVEMENT_ICON[achievement.criteria.type],
     cor: BADGE_COR[achievement.tier] ?? "bg-mustard",
     desbloqueada: met,
     progresso: progress,
     alvo: achievement.criteria.target,
   }));
+
+  // Fotos de conquista: liberadas pra quem fez a conquista — e pra quem já
+  // usava a foto antes dela virar prêmio.
+  const avatarUrl = (profile?.avatar_url as string | null) ?? null;
+  const avataresConquista: AvatarDeConquista[] = avaliadas
+    .filter(({ achievement }) => achievement.avatar)
+    .map(({ achievement, met }) => {
+      const src = srcDoAvatarDeConquista(achievement.avatar!.arquivo);
+      return {
+        src,
+        nome: achievement.avatar!.nome,
+        dica: achievement.avatar!.dica,
+        liberado: met || avatarUrl === src,
+      };
+    });
+  const avataresGerais = avataresExtras.filter((src) => !SRCS_AVATAR_DE_CONQUISTA.includes(src));
 
   type GroupRow = { id: string; name: string; format: string };
   const desafios: DesafioRanking[] = (memberships ?? [])
@@ -125,10 +149,11 @@ export default async function ProfilePage() {
       pilulas={pillsEscolhidas(profile?.metrics_prefs).map(rotuloDaPill)}
       displayName={profile?.display_name ?? null}
       username={profile?.username ?? null}
-      avatarUrl={(profile?.avatar_url as string | null) ?? null}
+      avatarUrl={avatarUrl}
       avatarZoom={(profile?.avatar_zoom as number | null) ?? 100}
       avatarBg={(profile?.avatar_bg as string | null) ?? "#6D6885"}
-      avataresExtras={avataresExtras}
+      avataresExtras={avataresGerais}
+      avataresConquista={avataresConquista}
       updateAvatarAction={updateAvatar}
       membroDesde={membroDesde}
       totalLivros={totalBooks ?? 0}

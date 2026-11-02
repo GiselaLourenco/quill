@@ -22,6 +22,7 @@ import {
   avatarDeFoto,
   avatarPorSrc,
   type AvatarOpcao,
+  type AvatarDeConquista,
   ehFotoEnviada,
 } from "@/lib/avatares";
 import { enviarAvatar, removerAvatar } from "@/app/actions/admin";
@@ -65,6 +66,7 @@ type Props = {
   avatarBg: string;
   /** Fotos que o admin adicionou às opções de avatar — valem pra todo mundo. */
   avataresExtras: string[];
+  avataresConquista: AvatarDeConquista[];
   updateAvatarAction: (input: {
     nome: string;
     username: string;
@@ -99,6 +101,7 @@ export function PerfilClient({
   avatarZoom,
   avatarBg,
   avataresExtras,
+  avataresConquista,
   updateAvatarAction,
   membroDesde,
   totalLivros,
@@ -453,6 +456,7 @@ export function PerfilClient({
                 fundo={rascunhoFundo}
                 admin={admin}
                 extras={avataresExtras}
+                conquistas={avataresConquista}
                 onNome={setRascunhoNome}
                 onEscolher={setRascunhoAvatar}
                 onZoom={setRascunhoZoom}
@@ -889,6 +893,7 @@ function EditarPerfilDialog({
   fundo,
   admin,
   extras,
+  conquistas,
   onNome,
   onEscolher,
   onZoom,
@@ -905,6 +910,8 @@ function EditarPerfilDialog({
   /** Admin adiciona (e tira) fotos das opções de avatar de todo mundo. */
   admin: boolean;
   extras: string[];
+  /** Fotos de conquista: as liberadas viram opção; as outras, cadeado com dica. */
+  conquistas: AvatarDeConquista[];
   onNome: (v: string) => void;
   /** Recebe o `src` da opção — é ele que vai pro banco. */
   onEscolher: (src: string) => void;
@@ -928,14 +935,21 @@ function EditarPerfilDialog({
   const [novas, setNovas] = useState<{ previa: string; arquivo: File }[]>([]);
   const [removidas, setRemovidas] = useState<string[]>([]);
   const fotos = extras.filter((f) => !removidas.includes(f));
+  const bloqueadas = conquistas.filter((c) => !c.liberado);
+  const [dica, setDica] = useState<string | null>(null);
   const opcoes: AvatarOpcao[] = [
     ...AVATARES,
+    ...conquistas
+      .filter((c) => c.liberado)
+      .map((c) => ({ ...avatarDeFoto(c.src), nome: c.nome })),
     ...fotos.map(avatarDeFoto),
     ...novas.map((n) => avatarDeFoto(n.previa)),
   ];
   // Foto que já saiu das opções (ou a antiga do admin, da raiz do bucket)
   // continua aparecendo pra quem está com ela.
-  if (ehFotoEnviada(escolhido) && !extras.includes(escolhido)) opcoes.push(avatarDeFoto(escolhido));
+  if (ehFotoEnviada(escolhido) && !opcoes.some((o) => o.src === escolhido)) {
+    opcoes.push(avatarDeFoto(escolhido));
+  }
   const arte: AvatarOpcao = opcoes.find((o) => o.src === escolhido) ?? AVATARES[0];
   const ehNova = (src: string) => novas.some((n) => n.previa === src);
 
@@ -1020,7 +1034,10 @@ function EditarPerfilDialog({
                 type="button"
                 aria-label={op.nome}
                 aria-pressed={ativo}
-                onClick={() => onEscolher(op.src)}
+                onClick={() => {
+                  setDica(null);
+                  onEscolher(op.src);
+                }}
                 style={{ backgroundColor: fundo }}
                 className={`flex aspect-square w-full items-center justify-center overflow-hidden rounded-full border-2 border-ink ${
                   ativo ? "shadow-hard" : "opacity-70"
@@ -1058,6 +1075,33 @@ function EditarPerfilDialog({
             </div>
           );
         })}
+        {bloqueadas.map((c) => (
+          // Cadeado: aparece pra dar vontade, mas não seleciona — tocar só
+          // mostra o que falta. O servidor recusa a foto do mesmo jeito.
+          <button
+            key={c.src}
+            type="button"
+            aria-label={`${c.nome} — bloqueada. ${c.dica}`}
+            onClick={() => setDica(dica === c.dica ? null : c.dica)}
+            style={{ backgroundColor: fundo }}
+            className="relative flex aspect-square w-full items-center justify-center rounded-full border-2 border-dashed border-ink"
+          >
+            <span className="absolute inset-0 overflow-hidden rounded-full">
+              <Image
+                src={c.src}
+                alt=""
+                width={72}
+                height={72}
+                className="h-full w-full object-cover opacity-40 grayscale"
+              />
+            </span>
+            <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-ink bg-mustard">
+              <svg viewBox="0 0 16 16" aria-hidden className="h-3 w-3" fill="currentColor">
+                <path d="M4.5 7V5a3.5 3.5 0 0 1 7 0v2h.5a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h.5Zm1.5 0h4V5a2 2 0 1 0-4 0v2Z" />
+              </svg>
+            </span>
+          </button>
+        ))}
         {admin && (
           // Só prévia por enquanto: o envio pra pasta `avatares/` (que é o que
           // põe a foto na grade de todo mundo) acontece no "Salvar".
@@ -1087,6 +1131,15 @@ function EditarPerfilDialog({
           </label>
         )}
       </div>
+
+      {dica && (
+        <p
+          role="status"
+          className="mt-2 rounded-md border-2 border-ink bg-mustard px-3 py-2 text-center font-display text-[10px] uppercase tracking-wider text-ink"
+        >
+          {dica} pra liberar esta foto
+        </p>
+      )}
 
       <div className="mt-3">
         <span className="text-[11px] font-bold uppercase tracking-tight text-ink-soft">Cor de fundo</span>

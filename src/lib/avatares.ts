@@ -1,3 +1,5 @@
+import { ACHIEVEMENTS_COM_AVATAR } from "@/lib/achievements";
+
 /**
  * Artes disponíveis para foto de perfil.
  *
@@ -44,6 +46,27 @@ export function ehFotoEnviada(src: string | null): src is string {
       !src.includes(".."),
   );
 }
+
+/**
+ * Foto de perfil que vem de conquista (ver `avatar` em `lib/achievements.ts`).
+ * Mora na mesma pasta `avatares/` das fotos do admin, mas NÃO entra na lista
+ * geral: aparece com cadeado até a pessoa desbloquear.
+ */
+export type AvatarDeConquista = {
+  src: string;
+  nome: string;
+  dica: string;
+  liberado: boolean;
+};
+
+export function srcDoAvatarDeConquista(arquivo: string): string {
+  return `${PREFIXO_FOTO}avatares/${arquivo}`;
+}
+
+/** Os `src` de todas as fotos de conquista — pra tirar da lista geral. */
+export const SRCS_AVATAR_DE_CONQUISTA: string[] = ACHIEVEMENTS_COM_AVATAR.map((a) =>
+  srcDoAvatarDeConquista(a.avatar.arquivo),
+);
 
 export function avatarDeFoto(src: string): AvatarOpcao {
   return { id: src, nome: "Foto do perfil", src, foto: true };

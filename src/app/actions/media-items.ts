@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
+import { conquistasDoTitulo } from "@/lib/achievements";
 import { paletteIndexForTitle } from "@/lib/covers";
 
 export async function createMediaItem(formData: FormData) {
@@ -142,7 +143,7 @@ export async function toggleRecommended(itemId: string) {
 
 export async function updateItemStatus(itemId: string, status: string) {
   if (!VALID_STATUSES.includes(status)) return;
-  await requireUserId();
+  const userId = await requireUserId();
 
   const supabase = await createClient();
 
@@ -174,9 +175,38 @@ export async function updateItemStatus(itemId: string, status: string) {
 
   await supabase.from("media_items").update(updates).eq("id", itemId);
 
+  if (status === "finished") await registrarConquistaDeLivro(supabase, userId, itemId);
+
   revalidatePath(`/books/${itemId}`);
   revalidatePath("/estante");
   revalidatePath("/");
+}
+
+/**
+ * Terminar um livro que tem conquista própria (Trono de Vidro → foto) grava
+ * o momento em `user_achievements`. O desbloqueio em si não depende disso — é
+ * calculado da estante, por isso quem terminou antes já ganha. A linha existe
+ * pra notificação ter hora: só quem termina daqui pra frente é avisado.
+ */
+async function registrarConquistaDeLivro(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  itemId: string,
+) {
+  const { data: item } = await supabase
+    .from("media_items")
+    .select("title")
+    .eq("id", itemId)
+    .maybeSingle();
+  if (!item) return;
+  const keys = conquistasDoTitulo(item.title as string).map((a) => a.key);
+  if (keys.length === 0) return;
+  await supabase.from("user_achievements").upsert(
+    keys.map((achievement_key) => ({ user_id: userId, achievement_key })),
+    { onConflict: "user_id,achievement_key", ignoreDuplicates: true },
+  );
+  revalidatePath("/notificacoes");
+  revalidatePath("/profile");
 }
 
 // "Adicionar à minha estante" a partir do livro de um amigo: copia os dados

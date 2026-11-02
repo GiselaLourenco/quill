@@ -4,7 +4,9 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
-import { AVATARES, AVATAR_FUNDOS } from "@/lib/avatares";
+import { AVATARES, AVATAR_FUNDOS, srcDoAvatarDeConquista } from "@/lib/avatares";
+import { ACHIEVEMENTS_COM_AVATAR, currentProgress } from "@/lib/achievements";
+import { titulosTerminados } from "@/lib/achievement-context";
 import { arteEnviadaValida, avatarEnviadoValido } from "@/lib/artes";
 import { ehAdmin } from "@/app/actions/admin";
 
@@ -70,6 +72,29 @@ export async function updateAvatar(input: {
     ((await arteEnviadaValida(supabase, input.avatarSrc)) && (await ehAdmin()));
   if (!valido) return { error: "Avatar inválido." };
   const avatarSrc = input.avatarSrc;
+
+  // Foto de conquista só com a conquista feita. Quem já estava com ela antes
+  // de virar prêmio continua podendo salvar o perfil sem perdê-la.
+  const conquista = ACHIEVEMENTS_COM_AVATAR.find(
+    (a) => srcDoAvatarDeConquista(a.avatar.arquivo) === avatarSrc,
+  );
+  if (conquista) {
+    const [{ data: perfil }, finishedTitles] = await Promise.all([
+      supabase.from("profiles").select("avatar_url").eq("id", userId).maybeSingle(),
+      titulosTerminados(supabase, userId),
+    ]);
+    const jaUsava = perfil?.avatar_url === avatarSrc;
+    // Só `finishedTitles` importa pra `specific_book`; o resto do contexto não é lido.
+    const feita =
+      currentProgress(conquista.criteria, {
+        sessionsCount: 0,
+        booksFinished: 0,
+        streakRecord: 0,
+        maxSessionPages: 0,
+        finishedTitles,
+      }) >= conquista.criteria.target;
+    if (!jaUsava && !feita) return { error: `Foto bloqueada: ${conquista.avatar.dica}.` };
+  }
 
   const fundo = (AVATAR_FUNDOS as readonly string[]).includes(input.fundo)
     ? input.fundo

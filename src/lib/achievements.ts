@@ -4,7 +4,9 @@ export type AchievementCriteria =
   | { type: "sessions_count"; target: number }
   | { type: "books_finished"; target: number }
   | { type: "streak_record"; target: number }
-  | { type: "max_session_pages"; target: number };
+  | { type: "max_session_pages"; target: number }
+  /** Terminar um livro específico — `titles` são os começos de título aceitos. */
+  | { type: "specific_book"; titles: string[]; target: 1 };
 
 export type Achievement = {
   key: string;
@@ -12,7 +14,41 @@ export type Achievement = {
   description: string;
   tier: AchievementTier;
   criteria: AchievementCriteria;
+  /**
+   * Foto de perfil que a conquista libera: nome do arquivo na pasta
+   * `avatares/` do bucket `artes`. Enquanto bloqueada, ela aparece no seletor
+   * com cadeado e `dica`, e o servidor recusa gravá-la.
+   */
+  avatar?: { arquivo: string; nome: string; dica: string };
 };
+
+/** Minúsculas e sem acento — "Trono de Vídro" e "trono de vidro" são o mesmo. */
+function normalizarTitulo(t: string): string {
+  return t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
+/**
+ * O título é este livro? Não há ISBN nem id do Google Books em `media_items`,
+ * então vale o título: precisa COMEÇAR com um dos aceitos — assim
+ * "Coroa da meia-noite - Trono de vidro - vol. 2" (continuação) fica de fora
+ * e "Trono de vidro - Trono de vidro - vol. 1 (Portuguese Edition)" (import do
+ * Kindle) entra. Um volume explícito diferente de 1 também fica de fora.
+ */
+export function tituloEhLivro(titulo: string, aceitos: string[]): boolean {
+  const t = normalizarTitulo(titulo);
+  // Depois do começo aceito vem fim, espaço ou pontuação — nunca o meio de
+  // outra palavra.
+  const casou = aceitos.some((a) => {
+    const prefixo = normalizarTitulo(a);
+    if (!t.startsWith(prefixo)) return false;
+    const resto = t.slice(prefixo.length);
+    // "Trono de vidro 2" é continuação, não o livro.
+    return !/^[a-z0-9]/.test(resto) && !/^[\s:\-–—#]*[2-9]/.test(resto);
+  });
+  if (!casou) return false;
+  const volume = t.match(/\bvol(?:ume)?\.?\s*(\d+(?:[.,]\d+)?)/);
+  return !volume || volume[1] === "1";
+}
 
 /**
  * Ícone da conquista — escolhido pelo CRITÉRIO, não pelo nível.
@@ -25,6 +61,7 @@ export const ACHIEVEMENT_ICON: Record<AchievementCriteria["type"], string> = {
   books_finished: "/img/conquistas/livro.webp",
   streak_record: "/img/conquistas/mochila.webp",
   max_session_pages: "/img/conquistas/simbolo.webp",
+  specific_book: "/img/conquistas/livro.webp",
 };
 
 export const ACHIEVEMENTS: Achievement[] = [
@@ -91,13 +128,39 @@ export const ACHIEVEMENTS: Achievement[] = [
     tier: "ouro",
     criteria: { type: "sessions_count", target: 50 },
   },
+  {
+    key: "trono_de_vidro",
+    name: "Trono de Vidro",
+    description: "Termine Trono de Vidro e ganhe a foto do guardião.",
+    tier: "prata",
+    criteria: { type: "specific_book", titles: ["Trono de Vidro", "Throne of Glass"], target: 1 },
+    avatar: {
+      arquivo: "chibi-guardiao-botanico-com-capa-dourada-mvzlfgii.png",
+      nome: "Guardião de Trono de Vidro",
+      dica: "Termine Trono de Vidro",
+    },
+  },
 ];
+
+/** As conquistas que liberam foto de perfil. */
+export const ACHIEVEMENTS_COM_AVATAR = ACHIEVEMENTS.filter(
+  (a): a is Achievement & { avatar: NonNullable<Achievement["avatar"]> } => Boolean(a.avatar),
+);
+
+/** Conquistas de livro específico que este título completa. */
+export function conquistasDoTitulo(titulo: string): Achievement[] {
+  return ACHIEVEMENTS.filter(
+    (a) => a.criteria.type === "specific_book" && tituloEhLivro(titulo, a.criteria.titles),
+  );
+}
 
 export type AchievementContext = {
   sessionsCount: number;
   booksFinished: number;
   streakRecord: number;
   maxSessionPages: number;
+  /** Títulos de tudo que está como "terminei" — para `specific_book`. */
+  finishedTitles: string[];
 };
 
 export function currentProgress(
@@ -113,6 +176,10 @@ export function currentProgress(
       return ctx.streakRecord;
     case "max_session_pages":
       return ctx.maxSessionPages;
+    case "specific_book": {
+      const { titles } = criteria;
+      return ctx.finishedTitles.some((t) => tituloEhLivro(t, titles)) ? 1 : 0;
+    }
   }
 }
 
