@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 import { AVATARES, AVATAR_FUNDOS, srcDoAvatarDeConquista } from "@/lib/avatares";
-import { ACHIEVEMENTS_COM_AVATAR, currentProgress } from "@/lib/achievements";
+import { ACHIEVEMENTS_COM_AVATAR, CONTEXTO_VAZIO, currentProgress } from "@/lib/achievements";
 import { titulosTerminados } from "@/lib/achievement-context";
 import { arteEnviadaValida, avatarEnviadoValido } from "@/lib/artes";
 import { ehAdmin } from "@/app/actions/admin";
@@ -86,13 +86,8 @@ export async function updateAvatar(input: {
     const jaUsava = perfil?.avatar_url === avatarSrc;
     // Só `finishedTitles` importa pra `specific_book`; o resto do contexto não é lido.
     const feita =
-      currentProgress(conquista.criteria, {
-        sessionsCount: 0,
-        booksFinished: 0,
-        streakRecord: 0,
-        maxSessionPages: 0,
-        finishedTitles,
-      }) >= conquista.criteria.target;
+      currentProgress(conquista.criteria, { ...CONTEXTO_VAZIO, finishedTitles }) >=
+      conquista.criteria.target;
     if (!jaUsava && !feita) return { error: `Foto bloqueada: ${conquista.avatar.dica}.` };
   }
 

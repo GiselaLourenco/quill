@@ -32,17 +32,8 @@ import { BookThumb } from "@/components/book-thumb";
 import { EstanteShelf, type DbStatus, type ShelfBook } from "@/components/estante-shelf";
 import { EmptyState } from "@/components/empty-state";
 import { Portal } from "@/components/portal";
-
-export type BadgeView = {
-  id: string;
-  titulo: string;
-  descricao: string;
-  icone: string;
-  cor: string;
-  desbloqueada: boolean;
-  progresso: number;
-  alvo: number;
-};
+import { ConquistasPerfil } from "@/components/conquistas";
+import type { ConquistaView } from "@/lib/conquistas-view";
 
 export type DesafioRanking = {
   id: string;
@@ -50,7 +41,7 @@ export type DesafioRanking = {
   competes: boolean;
 };
 
-type DialogId = "amigos" | "metas" | "badges" | "pilulas" | "ranking" | "senha" | "excluir" | "foto" | "importar" | null;
+type DialogId = "amigos" | "metas" | "pilulas" | "ranking" | "senha" | "excluir" | "foto" | "importar" | null;
 
 type Props = {
   /** Rótulos das pílulas que a pessoa escolheu, na ordem em que aparecem. */
@@ -80,7 +71,7 @@ type Props = {
   recordeStreak: number;
   amigos: Friend[];
   estantes: FriendShelf[];
-  badges: BadgeView[];
+  conquistas: ConquistaView[];
   desafios: DesafioRanking[];
   totalFinished: number;
   annualTarget: number;
@@ -109,7 +100,7 @@ export function PerfilClient({
   recordeStreak,
   amigos,
   estantes,
-  badges,
+  conquistas,
   desafios,
   totalFinished,
   annualTarget,
@@ -135,13 +126,6 @@ export function PerfilClient({
   const nome = nomeExibicao(displayName, username);
   const metaPercent =
     annualTarget > 0 ? Math.min(100, Math.round((totalFinished / annualTarget) * 100)) : 0;
-
-  const desbloqueadas = badges.filter((b) => b.desbloqueada);
-  // Sem nenhuma conquista ainda, mostra as três mais próximas de sair.
-  const destaques =
-    desbloqueadas.length > 0
-      ? desbloqueadas.slice(-3)
-      : [...badges].sort((a, b) => b.progresso / b.alvo - a.progresso / a.alvo).slice(0, 3);
 
   return (
     <div className="flex-1 bg-paper px-6 pb-24 pt-8 text-ink">
@@ -266,46 +250,10 @@ export function PerfilClient({
         </div>
       </Link>
 
-      {/* Badges em destaque */}
-      <div className="mt-8 space-y-3">
-        <div className="flex items-end justify-between">
-          <h2 className="font-display text-sm uppercase tracking-tight">Badges em destaque</h2>
-          <button
-            type="button"
-            onClick={() => setAberto("badges")}
-            className="text-xs font-bold underline underline-offset-2"
-          >
-            ver todas
-          </button>
-        </div>
-        <div className="shadow-hard-sm flex gap-4 rounded-md border-2 border-ink bg-card p-3">
-          {destaques.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => setAberto("badges")}
-              aria-label={c.titulo}
-              className={`shadow-hard-sm flex h-14 w-14 items-center justify-center rounded-full border-2 border-ink ${c.cor} transition-all active:translate-x-[1px] active:translate-y-[1px] active:shadow-none`}
-            >
-              <AppImage slot={`conquista.${c.id}`} src={c.icone} alt="" aria-hidden width={34} height={34} className="h-[34px] w-[34px] object-contain" />
-            </button>
-          ))}
-          <div className="flex flex-1 items-center justify-end">
-            <AppImage
-              slot="perfil.badges"
-              src="/img/perfil/quill-rindo.webp"
-              alt=""
-              aria-hidden
-              width={56}
-              height={56}
-              className="h-14 w-14 object-contain"
-            />
-          </div>
-        </div>
-      </div>
+      <ConquistasPerfil conquistas={conquistas} />
 
       {/* A história do Quill — fora de Preferências e de Conta de propósito:
-          não é ajuste nem dado, é leitura. Fica logo depois das badges, que é
+          não é ajuste nem dado, é leitura. Fica logo depois das conquistas, que é
           onde o perfil deixa de falar de números. */}
       <Link
         href="/lore"
@@ -479,9 +427,6 @@ export function PerfilClient({
                 onToggle={toggleCompeteAction}
                 onClose={() => setAberto(null)}
               />
-            )}
-            {aberto === "badges" && (
-              <BadgesDialog badges={badges} onClose={() => setAberto(null)} />
             )}
             {aberto === "senha" && <SenhaDialog onClose={() => setAberto(null)} />}
             {aberto === "excluir" && (
@@ -1324,44 +1269,6 @@ function RankingDialog({
           salvando…
         </p>
       )}
-    </DialogShell>
-  );
-}
-
-function BadgesDialog({ badges, onClose }: { badges: BadgeView[]; onClose: () => void }) {
-  return (
-    <DialogShell title="Conquistas" onClose={onClose}>
-      <ul className="space-y-3">
-        {badges.map((c) => (
-          <li
-            key={c.id}
-            className={`flex items-center gap-3 rounded-md border-2 border-ink p-3 ${
-              c.desbloqueada ? "bg-card" : "bg-card opacity-50"
-            }`}
-          >
-            <div
-              className={`flex h-12 w-12 items-center justify-center rounded-md border-2 border-ink ${c.cor}`}
-            >
-              <AppImage slot={`conquista.${c.id}`} src={c.icone} alt="" aria-hidden width={30} height={30} className="h-[30px] w-[30px] object-contain" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold uppercase">{c.titulo}</p>
-              <p className="font-serif text-xs italic">{c.descricao}</p>
-              {!c.desbloqueada && (
-                <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full border-2 border-ink bg-paper">
-                  <div
-                    className="h-full bg-moss"
-                    style={{ width: `${Math.min(100, Math.round((c.progresso / c.alvo) * 100))}%` }}
-                  />
-                </div>
-              )}
-            </div>
-            <span className="shrink-0 text-[10px] font-bold uppercase text-ink-soft">
-              {c.desbloqueada ? "✓" : `${c.progresso}/${c.alvo}`}
-            </span>
-          </li>
-        ))}
-      </ul>
     </DialogShell>
   );
 }

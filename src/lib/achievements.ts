@@ -1,10 +1,13 @@
 export type AchievementTier = "bronze" | "prata" | "ouro";
 
+/**
+ * Número "da vida" que uma conquista acompanha. Todos saem de
+ * `loadAchievementData` — critério novo que precise de outro dado entra lá.
+ */
+export type Metrica = Exclude<keyof AchievementContext, "finishedTitles">;
+
 export type AchievementCriteria =
-  | { type: "sessions_count"; target: number }
-  | { type: "books_finished"; target: number }
-  | { type: "streak_record"; target: number }
-  | { type: "max_session_pages"; target: number }
+  | { type: "metric"; metric: Metrica; target: number }
   /**
    * Terminar um livro específico — `titles` são os começos de título aceitos;
    * `exactTitles` só valem como título inteiro (quando o começo sozinho
@@ -18,6 +21,10 @@ export type Achievement = {
   description: string;
   tier: AchievementTier;
   criteria: AchievementCriteria;
+  /** Arte da conquista em /public. Quem dá foto de perfil mostra a foto. */
+  icon?: string;
+  /** Como o progresso aparece ("5/7 dias"). */
+  unit?: string;
   /**
    * Foto de perfil que a conquista libera: nome do arquivo na pasta
    * `avatares/` do bucket `artes`. Enquanto bloqueada, ela aparece no seletor
@@ -67,83 +74,229 @@ export function tituloEhLivro(titulo: string, aceitos: string[], exatos: string[
   return !volume || volume[1] === "1";
 }
 
-/**
- * Ícone da conquista — escolhido pelo CRITÉRIO, não pelo nível.
- * Assim a arte diz o que a pessoa fez: caneca = tempo de sessão,
- * livro = livros terminados, mochila = sequência (a jornada),
- * símbolo = façanha de leitura numa sessão só.
- */
-export const ACHIEVEMENT_ICON: Record<AchievementCriteria["type"], string> = {
-  sessions_count: "/img/conquistas/caneca.webp",
-  books_finished: "/img/conquistas/livro.webp",
-  streak_record: "/img/conquistas/mochila.webp",
-  max_session_pages: "/img/conquistas/simbolo.webp",
-  specific_book: "/img/conquistas/livro.webp",
-};
+/** Arte da conquista — recortada da coleção em assets-src/conquistas. */
+const icone = (key: string) => `/img/conquistas/${key}.webp`;
 
+/**
+ * As chaves antigas continuam as mesmas (`streak_7`, `books_10`…) mesmo
+ * quando o nome mudou: é por elas que `user_achievements` guarda a data.
+ */
 export const ACHIEVEMENTS: Achievement[] = [
   {
     key: "first_session",
     name: "Primeira sessão",
     description: "Registre sua primeira sessão de leitura.",
     tier: "bronze",
-    criteria: { type: "sessions_count", target: 1 },
+    criteria: { type: "metric", metric: "sessionsCount", target: 1 },
+    icon: icone("first_session"),
+    unit: "sessão",
   },
   {
     key: "first_book",
     name: "Primeiro livro terminado",
     description: "Termine seu primeiro livro.",
     tier: "bronze",
-    criteria: { type: "books_finished", target: 1 },
+    criteria: { type: "metric", metric: "booksFinished", target: 1 },
+    icon: icone("first_book"),
+    unit: "livro",
   },
   {
     key: "streak_3",
     name: "3 dias seguidos",
     description: "Leia 3 dias seguidos.",
     tier: "bronze",
-    criteria: { type: "streak_record", target: 3 },
+    criteria: { type: "metric", metric: "streakRecord", target: 3 },
+    icon: icone("streak_3"),
+    unit: "dias",
+  },
+  {
+    key: "min_5",
+    name: "Sempre há tempo",
+    description: "Faça uma sessão de pelo menos 5 minutos.",
+    tier: "bronze",
+    criteria: { type: "metric", metric: "longestSessionMinutes", target: 5 },
+    icon: icone("min_5"),
+    unit: "min",
+  },
+  {
+    key: "total_60",
+    name: "Hora encantada",
+    description: "Some 60 minutos de leitura.",
+    tier: "bronze",
+    criteria: { type: "metric", metric: "totalMinutes", target: 60 },
+    icon: icone("total_60"),
+    unit: "min",
+  },
+  {
+    key: "pages_50",
+    name: "Além da primeira página",
+    description: "Leia 50 páginas no total.",
+    tier: "bronze",
+    criteria: { type: "metric", metric: "totalPages", target: 50 },
+    icon: icone("pages_50"),
+    unit: "págs",
+  },
+  {
+    key: "morning",
+    name: "Leitor matinal",
+    description: "Leia antes das 8h da manhã.",
+    tier: "bronze",
+    criteria: { type: "metric", metric: "morningSessions", target: 1 },
+    icon: icone("morning"),
+    unit: "sessão",
+  },
+  {
+    key: "night_owl",
+    name: "Coruja literária",
+    description: "Leia depois das 23h.",
+    tier: "bronze",
+    criteria: { type: "metric", metric: "lateSessions", target: 1 },
+    icon: icone("night_owl"),
+    unit: "sessão",
+  },
+  {
+    key: "new_author",
+    name: "Uma nova voz",
+    description: "Termine livros de 2 autores diferentes.",
+    tier: "bronze",
+    criteria: { type: "metric", metric: "distinctAuthors", target: 2 },
+    icon: icone("new_author"),
+    unit: "autores",
+  },
+  {
+    key: "new_genre",
+    name: "Fora da zona de conforto",
+    description: "Termine livros de 2 gêneros diferentes.",
+    tier: "bronze",
+    criteria: { type: "metric", metric: "distinctGenres", target: 2 },
+    icon: icone("new_genre"),
+    unit: "gêneros",
+  },
+  {
+    key: "five_stars",
+    name: "Coração quentinho",
+    description: "Dê 5 estrelas para um livro.",
+    tier: "bronze",
+    criteria: { type: "metric", metric: "fiveStarRatings", target: 1 },
+    icon: icone("five_stars"),
+    unit: "livro",
+  },
+  {
+    key: "one_more",
+    name: "Só mais um capítulo",
+    description: "Leia 30 minutos ou mais numa sessão começada depois das 22h.",
+    tier: "bronze",
+    criteria: { type: "metric", metric: "lateLongSessions", target: 1 },
+    icon: icone("one_more"),
+    unit: "sessão",
   },
   {
     key: "streak_7",
-    name: "7 dias seguidos",
+    name: "Ritual de leitura",
     description: "Leia 7 dias seguidos.",
     tier: "prata",
-    criteria: { type: "streak_record", target: 7 },
+    criteria: { type: "metric", metric: "streakRecord", target: 7 },
+    icon: icone("streak_7"),
+    unit: "dias",
+  },
+  {
+    key: "week_5",
+    name: "Uma semana de histórias",
+    description: "Leia em 5 dias diferentes da mesma semana.",
+    tier: "prata",
+    criteria: { type: "metric", metric: "maxDaysInWeek", target: 5 },
+    icon: icone("week_5"),
+    unit: "dias",
   },
   {
     key: "books_5",
     name: "5 livros terminados",
     description: "Termine 5 livros.",
     tier: "prata",
-    criteria: { type: "books_finished", target: 5 },
+    criteria: { type: "metric", metric: "booksFinished", target: 5 },
+    icon: icone("books_5"),
+    unit: "livros",
   },
   {
     key: "session_100_pages",
     name: "Maratona de 100 páginas",
     description: "Leia 100 ou mais páginas numa única sessão.",
     tier: "prata",
-    criteria: { type: "max_session_pages", target: 100 },
+    criteria: { type: "metric", metric: "maxSessionPages", target: 100 },
+    icon: icone("session_100_pages"),
+    unit: "págs",
   },
   {
-    key: "streak_30",
-    name: "30 dias seguidos",
-    description: "Leia 30 dias seguidos.",
-    tier: "ouro",
-    criteria: { type: "streak_record", target: 30 },
+    key: "hours_10",
+    name: "Imersão literária",
+    description: "Some 10 horas de leitura.",
+    tier: "prata",
+    criteria: { type: "metric", metric: "totalHours", target: 10 },
+    icon: icone("hours_10"),
+    unit: "h",
   },
   {
-    key: "books_10",
-    name: "10 livros terminados",
-    description: "Termine 10 livros.",
-    tier: "ouro",
-    criteria: { type: "books_finished", target: 10 },
+    key: "pages_1000",
+    name: "Mar de palavras",
+    description: "Leia 1.000 páginas no total.",
+    tier: "prata",
+    criteria: { type: "metric", metric: "totalPages", target: 1000 },
+    icon: icone("pages_1000"),
+    unit: "págs",
   },
   {
-    key: "sessions_50",
-    name: "Leitor assíduo",
-    description: "Registre 50 sessões de leitura.",
-    tier: "ouro",
-    criteria: { type: "sessions_count", target: 50 },
+    key: "genres_3",
+    name: "Novos mundos",
+    description: "Termine livros de 3 gêneros diferentes.",
+    tier: "prata",
+    criteria: { type: "metric", metric: "distinctGenres", target: 3 },
+    icon: icone("genres_3"),
+    unit: "gêneros",
+  },
+  {
+    key: "authors_5",
+    name: "Colecionador de histórias",
+    description: "Termine livros de 5 autores diferentes.",
+    tier: "prata",
+    criteria: { type: "metric", metric: "distinctAuthors", target: 5 },
+    icon: icone("authors_5"),
+    unit: "autores",
+  },
+  {
+    key: "day_2h",
+    name: "Noite em claro",
+    description: "Leia 2 horas ou mais num mesmo dia.",
+    tier: "prata",
+    criteria: { type: "metric", metric: "maxDayMinutes", target: 120 },
+    icon: icone("day_2h"),
+    unit: "min",
+  },
+  {
+    key: "small_10",
+    name: "Pequenos progressos",
+    description: "Faça 10 sessões de 10 minutos ou mais.",
+    tier: "prata",
+    criteria: { type: "metric", metric: "sessions10min", target: 10 },
+    icon: icone("small_10"),
+    unit: "sessões",
+  },
+  {
+    key: "started_5",
+    name: "O colecionador de começos",
+    description: "Comece 5 livros.",
+    tier: "prata",
+    criteria: { type: "metric", metric: "booksStarted", target: 5 },
+    icon: icone("started_5"),
+    unit: "livros",
+  },
+  {
+    key: "between",
+    name: "Entre mundos",
+    description: "Termine um livro e comece outro no mesmo dia.",
+    tier: "prata",
+    criteria: { type: "metric", metric: "finishThenStart", target: 1 },
+    icon: icone("between"),
+    unit: "vez",
   },
   {
     key: "trono_de_vidro",
@@ -176,6 +329,87 @@ export const ACHIEVEMENTS: Achievement[] = [
       dica: "Termine Mistborn",
     },
   },
+  {
+    key: "streak_30",
+    name: "30 dias seguidos",
+    description: "Leia 30 dias seguidos.",
+    tier: "ouro",
+    criteria: { type: "metric", metric: "streakRecord", target: 30 },
+    icon: icone("streak_30"),
+    unit: "dias",
+  },
+  {
+    key: "month_20",
+    name: "Um mês de histórias",
+    description: "Leia em 20 dias diferentes do mesmo mês.",
+    tier: "ouro",
+    criteria: { type: "metric", metric: "maxDaysInMonth", target: 20 },
+    icon: icone("month_20"),
+    unit: "dias",
+  },
+  {
+    key: "days_100",
+    name: "Constância silenciosa",
+    description: "Leia em 100 dias diferentes.",
+    tier: "ouro",
+    criteria: { type: "metric", metric: "daysRead", target: 100 },
+    icon: icone("days_100"),
+    unit: "dias",
+  },
+  {
+    key: "books_10",
+    name: "Biblioteca particular",
+    description: "Termine 10 livros.",
+    tier: "ouro",
+    criteria: { type: "metric", metric: "booksFinished", target: 10 },
+    icon: icone("books_10"),
+    unit: "livros",
+  },
+  {
+    key: "sessions_50",
+    name: "Leitor assíduo",
+    description: "Registre 50 sessões de leitura.",
+    tier: "ouro",
+    criteria: { type: "metric", metric: "sessionsCount", target: 50 },
+    icon: icone("sessions_50"),
+    unit: "sessões",
+  },
+  {
+    key: "big_book",
+    name: "Devagar também é longe",
+    description: "Termine um livro com mais de 500 páginas.",
+    tier: "ouro",
+    criteria: { type: "metric", metric: "bigBooksFinished", target: 1 },
+    icon: icone("big_book"),
+    unit: "livro",
+  },
+  {
+    key: "month_3",
+    name: "Uma pilha de histórias",
+    description: "Termine 3 livros no mesmo mês.",
+    tier: "ouro",
+    criteria: { type: "metric", metric: "maxFinishedInMonth", target: 3 },
+    icon: icone("month_3"),
+    unit: "livros",
+  },
+  {
+    key: "genres_10",
+    name: "Pequeno explorador",
+    description: "Termine livros de 10 gêneros diferentes.",
+    tier: "ouro",
+    criteria: { type: "metric", metric: "distinctGenres", target: 10 },
+    icon: icone("genres_10"),
+    unit: "gêneros",
+  },
+  {
+    key: "marathon_2h",
+    name: "Não consegui parar",
+    description: "Leia 2 horas ou mais numa única sessão.",
+    tier: "ouro",
+    criteria: { type: "metric", metric: "longestSessionMinutes", target: 120 },
+    icon: icone("marathon_2h"),
+    unit: "min",
+  },
 ];
 
 /** As conquistas que liberam foto de perfil. */
@@ -197,8 +431,58 @@ export type AchievementContext = {
   booksFinished: number;
   streakRecord: number;
   maxSessionPages: number;
+  totalMinutes: number;
+  totalHours: number;
+  totalPages: number;
+  /** Sessões começadas entre 4h e 8h. */
+  morningSessions: number;
+  /** Sessões começadas das 23h às 4h. */
+  lateSessions: number;
+  /** Sessões de 30+ min começadas das 22h às 4h. */
+  lateLongSessions: number;
+  longestSessionMinutes: number;
+  maxDayMinutes: number;
+  sessions10min: number;
+  maxDaysInWeek: number;
+  maxDaysInMonth: number;
+  daysRead: number;
+  maxFinishedInMonth: number;
+  booksStarted: number;
+  finishThenStart: number;
+  distinctGenres: number;
+  distinctAuthors: number;
+  bigBooksFinished: number;
+  fiveStarRatings: number;
   /** Títulos de tudo que está como "terminei" — para `specific_book`. */
   finishedTitles: string[];
+};
+
+/** Contexto zerado — quem só precisa de um pedaço preenche o resto com isto. */
+export const CONTEXTO_VAZIO: AchievementContext = {
+  sessionsCount: 0,
+  booksFinished: 0,
+  streakRecord: 0,
+  maxSessionPages: 0,
+  totalMinutes: 0,
+  totalHours: 0,
+  totalPages: 0,
+  morningSessions: 0,
+  lateSessions: 0,
+  lateLongSessions: 0,
+  longestSessionMinutes: 0,
+  maxDayMinutes: 0,
+  sessions10min: 0,
+  maxDaysInWeek: 0,
+  maxDaysInMonth: 0,
+  daysRead: 0,
+  maxFinishedInMonth: 0,
+  booksStarted: 0,
+  finishThenStart: 0,
+  distinctGenres: 0,
+  distinctAuthors: 0,
+  bigBooksFinished: 0,
+  fiveStarRatings: 0,
+  finishedTitles: [],
 };
 
 export function currentProgress(
@@ -206,14 +490,8 @@ export function currentProgress(
   ctx: AchievementContext,
 ): number {
   switch (criteria.type) {
-    case "sessions_count":
-      return ctx.sessionsCount;
-    case "books_finished":
-      return ctx.booksFinished;
-    case "streak_record":
-      return ctx.streakRecord;
-    case "max_session_pages":
-      return ctx.maxSessionPages;
+    case "metric":
+      return ctx[criteria.metric];
     case "specific_book": {
       const { titles, exactTitles } = criteria;
       return ctx.finishedTitles.some((t) => tituloEhLivro(t, titles, exactTitles)) ? 1 : 0;

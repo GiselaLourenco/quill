@@ -6,8 +6,9 @@ import { updateAvatar } from "@/app/actions/profile";
 import { logout, deleteAccount } from "@/app/actions/auth";
 import { toggleCompete } from "@/app/actions/groups";
 import { quillPhase } from "@/lib/gamification";
-import { evaluateAchievements, ACHIEVEMENT_ICON } from "@/lib/achievements";
-import { loadAchievementData } from "@/lib/achievement-context";
+import { evaluateAchievements } from "@/lib/achievements";
+import { datasDeDesbloqueio, loadAchievementData } from "@/lib/achievement-context";
+import { montarConquistas } from "@/lib/conquistas-view";
 import { listarAvataresEnviados } from "@/lib/artes";
 import {
   SRCS_AVATAR_DE_CONQUISTA,
@@ -15,18 +16,12 @@ import {
   type AvatarDeConquista,
 } from "@/lib/avatares";
 import { getFriends, getFriendsShelf, getPedidosRecebidos } from "@/lib/friends";
-import { PerfilClient, type BadgeView, type DesafioRanking } from "./perfil-client";
+import { PerfilClient, type DesafioRanking } from "./perfil-client";
 
 const MESES_CURTOS = [
   "jan", "fev", "mar", "abr", "mai", "jun",
   "jul", "ago", "set", "out", "nov", "dez",
 ];
-
-const BADGE_COR: Record<string, string> = {
-  bronze: "bg-mustard",
-  prata: "bg-moss",
-  ouro: "bg-coral",
-};
 
 export default async function ProfilePage() {
   const userId = await requireUserId();
@@ -95,19 +90,12 @@ export default async function ProfilePage() {
   // Conquistas reais, calculadas a partir das sessões e da estante.
   const avaliadas = evaluateAchievements(ctxConquistas);
 
-  const badges: BadgeView[] = avaliadas.map(({ achievement, progress, met }) => ({
-    id: achievement.key,
-    titulo: achievement.name,
-    descricao: achievement.description,
-    // Conquista que dá foto mostra a própria foto: o prêmio é o chamariz.
-    icone: achievement.avatar
-      ? srcDoAvatarDeConquista(achievement.avatar.arquivo)
-      : ACHIEVEMENT_ICON[achievement.criteria.type],
-    cor: BADGE_COR[achievement.tier] ?? "bg-mustard",
-    desbloqueada: met,
-    progresso: progress,
-    alvo: achievement.criteria.target,
-  }));
+  const datas = await datasDeDesbloqueio(
+    supabase,
+    userId,
+    avaliadas.filter((e) => e.met).map((e) => e.achievement.key),
+  );
+  const conquistasView = montarConquistas(ctxConquistas, datas);
 
   // Fotos de conquista: liberadas pra quem fez a conquista — e pra quem já
   // usava a foto antes dela virar prêmio.
@@ -163,7 +151,7 @@ export default async function ProfilePage() {
       pedidos={pedidos}
       notificacoes={notificacoes.novas}
       estantes={estantes}
-      badges={badges}
+      conquistas={conquistasView}
       desafios={desafios}
       totalFinished={totalFinished}
       annualTarget={annualTarget}
