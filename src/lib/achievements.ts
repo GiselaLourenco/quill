@@ -12,8 +12,16 @@ export type AchievementCriteria =
    * Terminar um livro específico — `titles` são os começos de título aceitos;
    * `exactTitles` só valem como título inteiro (quando o começo sozinho
    * também abre as continuações, como "Mistborn: O Poço da Ascensão").
+   * `volume` é o número do livro na série (padrão 1) — um volume explícito
+   * diferente dele no título fica de fora.
    */
-  | { type: "specific_book"; titles: string[]; exactTitles?: string[]; target: 1 };
+  | {
+      type: "specific_book";
+      titles: string[];
+      exactTitles?: string[];
+      volume?: number;
+      target: 1;
+    };
 
 export type Achievement = {
   key: string;
@@ -53,9 +61,14 @@ function normalizarTitulo(t: string): string {
  * então vale o título: precisa COMEÇAR com um dos aceitos — assim
  * "Coroa da meia-noite - Trono de vidro - vol. 2" (continuação) fica de fora
  * e "Trono de vidro - Trono de vidro - vol. 1 (Portuguese Edition)" (import do
- * Kindle) entra. Um volume explícito diferente de 1 também fica de fora.
+ * Kindle) entra. Um volume explícito diferente de `volume` também fica de fora.
  */
-export function tituloEhLivro(titulo: string, aceitos: string[], exatos: string[] = []): boolean {
+export function tituloEhLivro(
+  titulo: string,
+  aceitos: string[],
+  exatos: string[] = [],
+  volume = 1,
+): boolean {
   const t = normalizarTitulo(titulo);
   // Título inteiro, tirando um "(Portuguese Edition)" do fim.
   const semEdicao = t.replace(/\s*\([^)]*\)$/, "");
@@ -67,11 +80,12 @@ export function tituloEhLivro(titulo: string, aceitos: string[], exatos: string[
     if (!t.startsWith(prefixo)) return false;
     const resto = t.slice(prefixo.length);
     // "Trono de vidro 2" é continuação, não o livro.
-    return !/^[a-z0-9]/.test(resto) && !/^[\s:\-–—#]*[2-9]/.test(resto);
+    const numero = resto.match(/^[\s:\-–—#]*(\d+)/);
+    return !/^[a-z0-9]/.test(resto) && (!numero || numero[1] === String(volume));
   });
   if (!casou) return false;
-  const volume = t.match(/\bvol(?:ume)?\.?\s*(\d+(?:[.,]\d+)?)/);
-  return !volume || volume[1] === "1";
+  const vol = t.match(/\bvol(?:ume)?\.?\s*(\d+(?:[.,]\d+)?)/);
+  return !vol || vol[1] === String(volume);
 }
 
 /** Arte da conquista — recortada da coleção em assets-src/conquistas. */
@@ -326,9 +340,39 @@ export const ACHIEVEMENTS: Achievement[] = [
     },
     unit: "livro",
     avatar: {
-      arquivo: "quill-nascido-da-bruma.png",
+      arquivo: "quill-nascido-da-bruma-v2.png",
       nome: "Nascido da Bruma",
       dica: "Termine Mistborn",
+    },
+  },
+  {
+    key: "calice_de_fogo",
+    name: "Cálice de Fogo",
+    description: "Termine Harry Potter e o Cálice de Fogo e ganhe a foto da Luna Lovegood.",
+    tier: "prata",
+    criteria: {
+      type: "specific_book",
+      // Qualquer edição, em qualquer idioma — é o 4º livro da série.
+      titles: [
+        "Harry Potter e o Cálice de Fogo",
+        "Harry Potter and the Goblet of Fire",
+        "Harry Potter y el Cáliz de Fuego",
+        "Harry Potter et la Coupe de Feu",
+        "Harry Potter e il Calice di Fuoco",
+        "Harry Potter und der Feuerkelch",
+        "Harry Potter en de Vuurbeker",
+        "Harry Potter i Czara Ognia",
+        "O Cálice de Fogo",
+        "The Goblet of Fire",
+      ],
+      volume: 4,
+      target: 1,
+    },
+    unit: "livro",
+    avatar: {
+      arquivo: "quill-luna-lovegood.png",
+      nome: "Luna Lovegood",
+      dica: "Termine Harry Potter e o Cálice de Fogo",
     },
   },
   {
@@ -424,7 +468,7 @@ export function conquistasDoTitulo(titulo: string): Achievement[] {
   return ACHIEVEMENTS.filter(
     (a) =>
       a.criteria.type === "specific_book" &&
-      tituloEhLivro(titulo, a.criteria.titles, a.criteria.exactTitles),
+      tituloEhLivro(titulo, a.criteria.titles, a.criteria.exactTitles, a.criteria.volume),
   );
 }
 
@@ -495,8 +539,8 @@ export function currentProgress(
     case "metric":
       return ctx[criteria.metric];
     case "specific_book": {
-      const { titles, exactTitles } = criteria;
-      return ctx.finishedTitles.some((t) => tituloEhLivro(t, titles, exactTitles)) ? 1 : 0;
+      const { titles, exactTitles, volume } = criteria;
+      return ctx.finishedTitles.some((t) => tituloEhLivro(t, titles, exactTitles, volume)) ? 1 : 0;
     }
   }
 }
