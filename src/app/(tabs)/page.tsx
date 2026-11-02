@@ -4,9 +4,9 @@ import { getActiveChallenges } from "@/lib/challenges";
 import {
   computeStreak,
   computeChaptersPerWeek,
-  computeMaxSessionPages,
   type SessionRow,
 } from "@/lib/gamification";
+import { loadAchievementData } from "@/lib/achievement-context";
 import { pillsEscolhidas, pillDisplay, type PillStats } from "@/lib/pills";
 import { getNotificacoes } from "@/lib/notificacoes";
 import { nomeExibicao } from "@/lib/nome-exibicao";
@@ -36,7 +36,8 @@ function domingoDa(d: Date): Date {
 }
 
 // A home lê as mesmas colunas que `SessionRow` de gamification.ts — é o que
-// `computeChaptersPerWeek` e `computeMaxSessionPages` esperam.
+// `computeChaptersPerWeek` espera. Recordes e sequência vêm do histórico
+// inteiro (`loadAchievementData`), não desta janela de datas.
 type SessionLite = SessionRow;
 
 function paginasDa(s: SessionLite): number {
@@ -73,6 +74,7 @@ export default async function HomePage() {
     { data: goals },
     { count: livrosTerminados },
     { count: livrosNoMes },
+    historico,
   ] = await Promise.all([
       supabase
         .from("profiles")
@@ -104,9 +106,13 @@ export default async function HomePage() {
           "finished_at",
           iso(new Date(anoAtual, agora.getMonth() + 1, 0)),
         ),
+      loadAchievementData(supabase, userId),
     ]);
 
   const todas = (sessionRows ?? []) as SessionLite[];
+  // Sequência atual/recorde precisam do histórico inteiro: uma sequência que
+  // atravessa o início da janela (ex.: virada do ano) seria cortada.
+  const streakCompleto = computeStreak(historico.sessions);
 
   // ---- Semanas navegáveis ---------------------------------------------
   const semanas: SemanaDados[] = [];
@@ -181,7 +187,7 @@ export default async function HomePage() {
       id: "sequencia",
       tipo: "sequencia",
       label: "Dias seguidos",
-      atual: computeStreak(todas).current,
+      atual: streakCompleto.current,
       total: alvoPorTipo.get("streak_days") ?? 0,
       unidade: "dias",
       periodo: "hoje",
@@ -249,7 +255,6 @@ export default async function HomePage() {
   }
 
   const mesCurto = agora.toLocaleString("pt-BR", { month: "short" }).replace(".", "");
-  const streakCompleto = computeStreak(todas);
 
   const stats: PillStats = {
     streak: streakCompleto.current,
@@ -262,7 +267,7 @@ export default async function HomePage() {
     booksPerYear: livrosTerminados ?? 0,
     hoursPerMonth: horasNoMes,
     chaptersPerWeek: computeChaptersPerWeek(todas),
-    maxSessionPages: computeMaxSessionPages(todas),
+    maxSessionPages: historico.ctx.maxSessionPages,
     longestStreakEver: streakCompleto.record,
   };
   const pilulas = pillsEscolhidas(profile?.metrics_prefs).map((chave) =>

@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
-import { computeStreak, computeMaxSessionPages, type SessionRow } from "@/lib/gamification";
 import { evaluateAchievements, type AchievementTier } from "@/lib/achievements";
+import { loadAchievementData } from "@/lib/achievement-context";
 
 const TIER_LABEL: Record<AchievementTier, string> = {
   bronze: "bronze",
@@ -20,30 +20,7 @@ export default async function ConquistasPage() {
   const userId = await requireUserId();
   const supabase = await createClient();
 
-  const [{ count: sessionsCount }, { count: booksFinished }, { data: sessions }] =
-    await Promise.all([
-      supabase
-        .from("sessions")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", userId),
-      supabase
-        .from("media_items")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", userId)
-        .eq("status", "finished"),
-      supabase
-        .from("sessions")
-        .select("started_at, duration_seconds, unit_start, unit_end, item_id")
-        .eq("user_id", userId),
-    ]);
-
-  const sessionRows = (sessions ?? []) as SessionRow[];
-  const ctx = {
-    sessionsCount: sessionsCount ?? 0,
-    booksFinished: booksFinished ?? 0,
-    streakRecord: computeStreak(sessionRows).record,
-    maxSessionPages: computeMaxSessionPages(sessionRows),
-  };
+  const { ctx } = await loadAchievementData(supabase, userId);
 
   const evaluated = evaluateAchievements(ctx);
   const metKeys = evaluated.filter((e) => e.met).map((e) => e.achievement.key);

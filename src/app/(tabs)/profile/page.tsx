@@ -5,8 +5,9 @@ import { requireUserId } from "@/lib/supabase/auth";
 import { updateAvatar } from "@/app/actions/profile";
 import { logout, deleteAccount } from "@/app/actions/auth";
 import { toggleCompete } from "@/app/actions/groups";
-import { computeStreak, quillPhase, computeMaxSessionPages, type SessionRow } from "@/lib/gamification";
+import { quillPhase } from "@/lib/gamification";
 import { evaluateAchievements, ACHIEVEMENT_ICON } from "@/lib/achievements";
+import { loadAchievementData } from "@/lib/achievement-context";
 import { getFriends, getFriendsShelf, getPedidosRecebidos } from "@/lib/friends";
 import { PerfilClient, type BadgeView, type DesafioRanking } from "./perfil-client";
 
@@ -32,8 +33,7 @@ export default async function ProfilePage() {
     { data: annualGoal },
     { count: finishedThisYear },
     { count: totalBooks },
-    { count: booksFinishedAll },
-    { data: sessionRows },
+    conquistas,
     { data: memberships },
     friends,
     estantes,
@@ -60,15 +60,7 @@ export default async function ProfilePage() {
       .gte("finished_at", `${year}-01-01`)
       .lte("finished_at", `${year}-12-31`),
     supabase.from("media_items").select("id", { count: "exact", head: true }).eq("user_id", userId),
-    supabase
-      .from("media_items")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .eq("status", "finished"),
-    supabase
-      .from("sessions")
-      .select("started_at, duration_seconds, unit_start, unit_end")
-      .eq("user_id", userId),
+    loadAchievementData(supabase, userId),
     supabase
       .from("group_members")
       .select("competes, groups!inner(id, name, format)")
@@ -87,18 +79,13 @@ export default async function ProfilePage() {
       ? quillPhase(Math.min(100, Math.round((totalFinished / annualTarget) * 100)))
       : null;
 
-  const sessions = (sessionRows ?? []) as SessionRow[];
+  const { ctx: ctxConquistas, sessions } = conquistas;
   const totalSeconds = sessions.reduce((acc, s) => acc + (s.duration_seconds ?? 0), 0);
   const totalHours = Math.round(totalSeconds / 3600);
-  const recordeStreak = computeStreak(sessions).record;
+  const recordeStreak = ctxConquistas.streakRecord;
 
   // Conquistas reais, calculadas a partir das sessões e da estante.
-  const avaliadas = evaluateAchievements({
-    sessionsCount: sessions.length,
-    booksFinished: booksFinishedAll ?? 0,
-    streakRecord: recordeStreak,
-    maxSessionPages: computeMaxSessionPages(sessions),
-  });
+  const avaliadas = evaluateAchievements(ctxConquistas);
 
   const badges: BadgeView[] = avaliadas.map(({ achievement, progress, met }) => ({
     id: achievement.key,
