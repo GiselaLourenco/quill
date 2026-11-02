@@ -239,7 +239,9 @@ export async function loadAchievementData(
   }
   for (const c of cincoEstrelas) anos.add(Number(localDateKey(c).slice(0, 4)));
   const anosComConquista = [...anos]
-    .filter((ano) => evaluateAchievements(doAno(ano)).some((e) => e.met))
+    .filter((ano) =>
+      evaluateAchievements(doAno(ano)).some((e) => e.met && e.achievement.criteria.type === "metric"),
+    )
     .sort((a, b) => b - a);
 
   return {

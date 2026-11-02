@@ -31,7 +31,7 @@ export default async function ConquistasPage({
     dados.anosComConquista.length > 1
       ? anos.map((a) => ({
           ano: a,
-          feitas: evaluateAchievements(dados.doAno(a)).filter((e) => e.met).length,
+          feitas: montarConquistas(dados.doAno(a), {}).filter((c) => c.desbloqueada).length,
         }))
       : null;
 
