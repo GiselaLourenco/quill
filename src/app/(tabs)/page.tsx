@@ -291,6 +291,7 @@ export default async function HomePage() {
   const conquistas = montarConquistas(
     ctxDoAno,
     await datasDeDesbloqueio(supabase, userId, conquistasFeitas, ano),
+    historico.ctx,
   );
 
   return (

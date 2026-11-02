@@ -397,19 +397,16 @@ export function ColecaoConquistas({
                 <span className="flex min-h-[2.5em] items-start text-[11px] font-bold leading-[1.25] [text-wrap:balance]">
                   {c.nome}
                 </span>
-                {!c.desbloqueada &&
-                  (c.alvo > 1 ? (
-                    <>
-                      <span className="w-[70px]">
-                        <Barra valor={pct(c)} fina />
-                      </span>
-                      <span className="text-[9.5px] font-bold tabular-nums text-ink-soft">
-                        {c.progresso}/{c.alvo} {c.unidade}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-[9.5px] font-bold text-ink-soft">ainda não</span>
-                  ))}
+                {!c.desbloqueada && c.alvo > 1 && (
+                  <>
+                    <span className="w-[70px]">
+                      <Barra valor={pct(c)} fina />
+                    </span>
+                    <span className="text-[9.5px] font-bold tabular-nums text-ink-soft">
+                      {c.progresso}/{c.alvo} {c.unidade}
+                    </span>
+                  </>
+                )}
               </button>
             ))}
           </div>

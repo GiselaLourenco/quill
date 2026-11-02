@@ -1,4 +1,5 @@
 import { evaluateAchievements, type AchievementContext, type AchievementTier } from "@/lib/achievements";
+import { srcDoAvatarDeConquista } from "@/lib/avatares";
 import { localDateKey } from "@/lib/date-br";
 
 /** O que as telas de conquista (perfil e /conquistas) recebem do servidor. */
@@ -26,14 +27,20 @@ function dataCurta(iso: string): string {
   return `${dia} ${MESES[mes - 1]}${ano === atual ? "" : ` ${ano}`}`;
 }
 
+/**
+ * A coleção do ano. As de livro específico (as que liberam foto de perfil)
+ * valem pra vida toda — a foto não volta a bloquear — então são avaliadas no
+ * `ctxVida` e aparecem feitas em qualquer ano.
+ */
 export function montarConquistas(
   ctx: AchievementContext,
   datas: Record<string, string>,
+  ctxVida: AchievementContext,
 ): ConquistaView[] {
-  // Só as da coleção (as 33 da arte). As de livro específico existem pra
-  // liberar foto de perfil e ficam fora da contagem.
-  return evaluateAchievements(ctx)
-    .filter(({ achievement }) => achievement.criteria.type === "metric")
+  const doAno = evaluateAchievements(ctx);
+  const daVida = evaluateAchievements(ctxVida);
+  return doAno
+    .map((e, i) => (e.achievement.criteria.type === "specific_book" ? daVida[i] : e))
     .map(({ achievement: a, progress, met }) => {
       const iso = met ? (datas[a.key] ?? null) : null;
       return {
@@ -41,7 +48,10 @@ export function montarConquistas(
         nome: a.name,
         descricao: a.description,
         nivel: a.tier,
-        icone: a.icon ?? "/img/conquistas/livro.webp",
+        // Conquista que dá foto mostra a própria foto: o prêmio é o chamariz.
+        icone: a.avatar
+          ? srcDoAvatarDeConquista(a.avatar.arquivo)
+          : (a.icon ?? "/img/conquistas/livro.webp"),
         progresso: Math.min(progress, a.criteria.target),
         alvo: a.criteria.target,
         unidade: a.unit ?? "",

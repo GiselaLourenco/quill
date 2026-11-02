@@ -31,13 +31,13 @@ export default async function ConquistasPage({
     dados.anosComConquista.length > 1
       ? anos.map((a) => ({
           ano: a,
-          feitas: montarConquistas(dados.doAno(a), {}).filter((c) => c.desbloqueada).length,
+          feitas: montarConquistas(dados.doAno(a), {}, dados.ctx).filter((c) => c.desbloqueada).length,
         }))
       : null;
 
   return (
     <ColecaoConquistas
-      conquistas={montarConquistas(ctx, datas)}
+      conquistas={montarConquistas(ctx, datas, dados.ctx)}
       ano={ano}
       opcoesDeAno={opcoesDeAno}
     />

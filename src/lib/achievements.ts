@@ -304,6 +304,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: "Termine Trono de Vidro e ganhe a foto do guardião.",
     tier: "prata",
     criteria: { type: "specific_book", titles: ["Trono de Vidro", "Throne of Glass"], target: 1 },
+    unit: "livro",
     avatar: {
       arquivo: "chibi-guardiao-botanico-com-capa-dourada-mvzlfgii.png",
       nome: "Guardião de Trono de Vidro",
@@ -323,8 +324,9 @@ export const ACHIEVEMENTS: Achievement[] = [
       exactTitles: ["Mistborn"],
       target: 1,
     },
+    unit: "livro",
     avatar: {
-      arquivo: "quill-nascido-da-bruma-v2.png",
+      arquivo: "quill-nascido-da-bruma.png",
       nome: "Nascido da Bruma",
       dica: "Termine Mistborn",
     },

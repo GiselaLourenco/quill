@@ -282,7 +282,12 @@ export async function datasDeDesbloqueio(
     const [key, anoDaChave] = (r.achievement_key as string).split(":");
     const quando = r.unlocked_at as string;
     const anoDaLinha = anoDaChave ? Number(anoDaChave) : Number(localDateKey(quando).slice(0, 4));
-    if (anoDaLinha === ano && !(key in datas && anoDaChave === undefined)) datas[key] = quando;
+    // As de livro específico valem pra vida toda: a data vale em qualquer ano.
+    const daVida =
+      ACHIEVEMENTS.find((a) => a.key === key)?.criteria.type === "specific_book";
+    if ((daVida || anoDaLinha === ano) && !(key in datas && anoDaChave === undefined)) {
+      datas[key] = quando;
+    }
   }
 
   const novas = ano === anoAtual() ? gravar.filter((k) => !(k in datas)) : [];
