@@ -44,13 +44,15 @@ export type Achievement = {
 /**
  * Minúsculas e sem acento — "Trono de Vídro" e "trono de vidro" são o mesmo.
  * Dois-pontos e travessões viram um separador só: "Mistborn - O Império
- * Final" e "Mistborn: O Império Final" também.
+ * Final" e "Mistborn: O Império Final" também. Apóstrofo curvo vira reto
+ * ("Philosopher’s Stone").
  */
 function normalizarTitulo(t: string): string {
   return t
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
+    .replace(/[‘’]/g, "'")
     .replace(/\s*[:–—]\s*|\s+-\s+/g, ": ")
     .replace(/\s+/g, " ")
     .trim();
@@ -373,6 +375,47 @@ export const ACHIEVEMENTS: Achievement[] = [
       arquivo: "quill-luna-lovegood.png",
       nome: "Luna Lovegood",
       dica: "Termine Harry Potter e o Cálice de Fogo",
+    },
+  },
+  {
+    key: "pedra_filosofal",
+    name: "Pedra Filosofal",
+    description: "Termine Harry Potter e a Pedra Filosofal e ganhe a foto do Harry.",
+    tier: "bronze",
+    criteria: {
+      type: "specific_book",
+      // Qualquer edição, em qualquer idioma — e também "Harry Potter 1".
+      titles: [
+        "Harry Potter e a Pedra Filosofal",
+        "Harry Potter and the Philosopher's Stone",
+        "Harry Potter and the Sorcerer's Stone",
+        "Harry Potter y la Piedra Filosofal",
+        "Harry Potter à l'École des Sorciers",
+        "Harry Potter e la Pietra Filosofale",
+        "Harry Potter und der Stein der Weisen",
+        "Harry Potter en de Steen der Wijzen",
+        "Harry Potter i Kamień Filozoficzny",
+        "A Pedra Filosofal",
+        "The Philosopher's Stone",
+        "The Sorcerer's Stone",
+        "Harry Potter 1",
+        "Harry Potter #1",
+        "Harry Potter vol. 1",
+        "Harry Potter, vol. 1",
+        "Harry Potter volume 1",
+        "Harry Potter: Livro 1",
+        "Harry Potter Livro 1",
+        "Harry Potter: Book 1",
+        "Harry Potter Book 1",
+      ],
+      volume: 1,
+      target: 1,
+    },
+    unit: "livro",
+    avatar: {
+      arquivo: "quill-harry-e-a-pedra.png",
+      nome: "Harry e a pedra",
+      dica: "Termine Harry Potter e a Pedra Filosofal",
     },
   },
   {
