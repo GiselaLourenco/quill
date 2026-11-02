@@ -5,6 +5,8 @@ import Image from "next/image";
 import { AppImage } from "@/components/app-image";
 import { avatarDeExibicao, AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
 import { useMemo, useState } from "react";
+import { DiaLeituraSheet } from "@/components/dia-leitura-sheet";
+import { todayLocalDateKey } from "@/lib/date-br";
 
 type MetaTipo = "sequencia" | "horas" | "livros";
 type PilulaTone = "coral" | "paper" | "mustard" | "moss" | "navy" | "ink";
@@ -21,11 +23,13 @@ export type Meta = {
 };
 export type Pilula = { id: string; label: string; valor: string; unidade: string; tone: PilulaTone };
 export type Desafio = { id: string; nome: string; tone: DesafioTone };
-export type DiaSemana = { d: string; min: number; hoje?: boolean };
+export type DiaSemana = { d: string; chave: string; min: number; hoje?: boolean; futuro?: boolean };
 export type SemanaDados = { inicio: string; fim: string; dias: DiaSemana[] };
 export type MesCalendario = {
   nome: string;
   ano: number;
+  /** "YYYY-MM" — junta com o dia pra virar a chave que o painel do dia busca. */
+  prefixo: string;
   diasNoMes: number;
   primeiroDiaSemana: number;
   hoje: number | null;
@@ -433,6 +437,8 @@ function CalendarioCard({
   const [vista, setVista] = useState<"semana" | "mes">("semana");
   const [semanaIdx, setSemanaIdx] = useState(semanas.length - 1);
   const [mesIdx, setMesIdx] = useState(mesInicial);
+  // Dia aberto no painel (chave YYYY-MM-DD) — vale pra semana e pro mês.
+  const [diaAberto, setDiaAberto] = useState<string | null>(null);
 
   const semana = semanas[semanaIdx]!;
   const mes = meses[mesIdx]!;
@@ -441,6 +447,7 @@ function CalendarioCard({
   const totalMin = useMemo(() => semana.dias.reduce((s, x) => s + x.min, 0), [semana]);
   const temHoje = semana.dias.some((d) => d.hoje);
 
+  const hojeChave = useMemo(() => todayLocalDateKey(), []);
   const lidos = useMemo(() => new Set(mes.lidos), [mes]);
   const destaques = useMemo(() => new Set(mes.destaques), [mes]);
 
@@ -502,14 +509,18 @@ function CalendarioCard({
             <div className="flex h-24 items-end justify-between gap-2">
               {semana.dias.map((s, i) => {
                 const h = Math.max(6, Math.round((s.min / max) * 96));
+                const aberto = diaAberto === s.chave;
                 return (
                   <div key={i} className="flex flex-1 flex-col items-center gap-1.5">
-                    <div
-                      className={`w-full border-2 border-ink ${
+                    <button
+                      type="button"
+                      onClick={() => setDiaAberto(s.chave)}
+                      disabled={s.futuro}
+                      className={`w-full border-2 border-ink transition-transform enabled:active:translate-x-[1px] enabled:active:translate-y-[1px] ${
                         s.hoje ? "bg-coral" : s.min > 0 ? "bg-moss/70" : "bg-ink/10"
-                      }`}
+                      } ${aberto ? "shadow-hard-sm -translate-x-[2px] -translate-y-[2px]" : ""}`}
                       style={{ height: `${h}px` }}
-                      aria-label={`${s.d}: ${s.min} minutos`}
+                      aria-label={`${s.d}: ${s.min} minutos — ver sessões`}
                     />
                   </div>
                 );
@@ -554,11 +565,15 @@ function CalendarioCard({
                 const leu = lidos.has(d);
                 const destaque = destaques.has(d);
                 const eHoje = d === mes.hoje;
+                const chave = `${mes.prefixo}-${String(d).padStart(2, "0")}`;
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={i}
+                    onClick={() => setDiaAberto(chave)}
+                    disabled={chave > hojeChave}
                     className={[
-                      "relative flex aspect-square items-center justify-center border-2 border-ink font-display text-[11px]",
+                      "relative flex aspect-square items-center justify-center border-2 border-ink font-display text-[11px] enabled:active:translate-x-[1px] enabled:active:translate-y-[1px]",
                       destaque
                         ? "bg-moss text-paper"
                         : leu
@@ -566,10 +581,10 @@ function CalendarioCard({
                           : "bg-paper text-ink/60",
                       eHoje ? "shadow-[0_0_0_2px_var(--color-coral)]" : "",
                     ].join(" ")}
-                    aria-label={`Dia ${d}${leu ? ", com leitura" : ""}`}
+                    aria-label={`Dia ${d}${leu ? ", com leitura" : ""} — ver sessões`}
                   >
                     {d}
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -586,6 +601,14 @@ function CalendarioCard({
               : `nenhum dia lido em ${mes.nome}`}
         </p>
       </div>
+      {diaAberto && (
+        <DiaLeituraSheet
+          key={diaAberto}
+          chave={diaAberto}
+          hoje={diaAberto === hojeChave}
+          onClose={() => setDiaAberto(null)}
+        />
+      )}
     </section>
   );
 }

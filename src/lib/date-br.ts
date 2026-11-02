@@ -55,3 +55,16 @@ export function addDaysToKey(key: string, days: number): string {
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
+
+const timeFormatter = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: TIMEZONE,
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+/** Hora e minuto ("21:05") de um timestamp, no fuso do Brasil. */
+export function localTime(input: string | Date): string {
+  const d = typeof input === "string" ? new Date(input) : input;
+  return timeFormatter.format(d);
+}

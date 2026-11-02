@@ -131,7 +131,7 @@ export default async function HomePage() {
           .filter((s) => s.started_at && localDateKey(s.started_at) === chave)
           .reduce((soma, s) => soma + (s.duration_seconds ?? 0), 0) / 60,
       );
-      return { d: DIA_LABEL[dia.getDay()]!, min, hoje: chave === hoje };
+      return { d: DIA_LABEL[dia.getDay()]!, chave, min, hoje: chave === hoje, futuro: chave > hoje };
     });
 
     semanas.push({ inicio: ddmm(inicio), fim: ddmm(fim), dias });
@@ -155,6 +155,7 @@ export default async function HomePage() {
     meses.push({
       nome: ref.toLocaleString("pt-BR", { month: "long" }),
       ano: ref.getFullYear(),
+      prefixo,
       diasNoMes: new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate(),
       primeiroDiaSemana: ref.getDay(),
       hoje: ehMesAtual ? agora.getDate() : null,

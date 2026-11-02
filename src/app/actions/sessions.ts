@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 import { updateItemStatus } from "@/app/actions/media-items";
+import { addDaysToKey, localDateKey, localTime } from "@/lib/date-br";
 
 export type SessionUnit = "chapters" | "pages";
 
@@ -313,4 +314,61 @@ export async function saveSessionMemory(input: {
   });
 
   revalidatePath(`/books/${input.itemId}`);
+}
+
+export type SessaoDoDia = {
+  id: string;
+  inicio: string;
+  fim: string | null;
+  minutos: number;
+  paginaInicio: number | null;
+  paginaFim: number | null;
+  capituloInicio: number | null;
+  capituloFim: number | null;
+  tags: string[];
+  livro: {
+    id: string;
+    title: string;
+    creator: string | null;
+    cover_kind: string;
+    cover_url: string | null;
+    cover_palette: number;
+  } | null;
+};
+
+// Sessões de um dia (chave YYYY-MM-DD no fuso do Brasil), pro painel que abre
+// ao tocar num dia do calendário da home. Busca uma janela UTC folgada e filtra
+// pelo dia local — a mesma régua que o gráfico usa pra somar os minutos.
+export async function sessoesDoDia(chave: string): Promise<SessaoDoDia[]> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(chave)) return [];
+  const userId = await requireUserId();
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("sessions")
+    .select(
+      "id, started_at, ended_at, duration_seconds, unit_start, unit_end, chapter_start, chapter_end, quality_tags, media_items(id, title, creator, cover_kind, cover_url, cover_palette)",
+    )
+    .eq("user_id", userId)
+    .gte("started_at", `${addDaysToKey(chave, -1)}T00:00:00Z`)
+    .lt("started_at", `${addDaysToKey(chave, 2)}T00:00:00Z`)
+    .order("started_at", { ascending: true });
+
+  return (data ?? [])
+    .filter((s) => localDateKey(s.started_at) === chave)
+    .map((s) => {
+      const livro = Array.isArray(s.media_items) ? s.media_items[0] : s.media_items;
+      return {
+        id: s.id,
+        inicio: localTime(s.started_at),
+        fim: s.ended_at ? localTime(s.ended_at) : null,
+        minutos: Math.round((s.duration_seconds ?? 0) / 60),
+        paginaInicio: s.unit_start,
+        paginaFim: s.unit_end,
+        capituloInicio: s.chapter_start,
+        capituloFim: s.chapter_end,
+        tags: s.quality_tags ?? [],
+        livro: livro ?? null,
+      };
+    });
 }
