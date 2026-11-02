@@ -10,6 +10,8 @@ import {
   arteEnviadaValida,
   arteValida,
   ehArteEnviada,
+  nomeDoAvatarEnviado,
+  PASTA_AVATARES,
 } from "@/lib/artes";
 
 /**
@@ -178,9 +180,59 @@ const TAMANHO_MAXIMO = 4 * 1024 * 1024;
 export async function enviarArte(
   formData: FormData,
 ): Promise<{ url: string | null; error: string | null }> {
-  await requireUserId();
-  if (!(await ehAdmin())) return { url: null, error: "Só o admin envia artes." };
+  const r = await subirImagem(formData, "");
+  if (r.url) {
+    updateTag(TAG_ARTES);
+    revalidatePath("/", "layout");
+  }
+  return r;
+}
 
+/**
+ * Adiciona uma foto às opções de avatar de TODO mundo. Vai para a pasta
+ * `avatares/` do mesmo bucket — fora da galeria de artes do /admin.
+ */
+export async function enviarAvatar(
+  formData: FormData,
+): Promise<{ url: string | null; error: string | null }> {
+  const r = await subirImagem(formData, `${PASTA_AVATARES}/`);
+  if (r.url) revalidatePath("/profile");
+  return r;
+}
+
+/**
+ * Tira uma foto das opções de avatar e apaga o arquivo. Recusa se alguém
+ * ainda usa a foto: apagar deixaria o círculo dessa pessoa vazio.
+ */
+export async function removerAvatar(src: string): Promise<{ error: string | null }> {
+  await requireUserId();
+  if (!(await ehAdmin())) return { error: "Só o admin remove fotos." };
+  const nome = nomeDoAvatarEnviado(src);
+  if (!nome) return { error: "Foto inválida." };
+
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("avatar_url", src);
+  if (count) {
+    return { error: count === 1 ? "1 pessoa usa essa foto." : `${count} pessoas usam essa foto.` };
+  }
+
+  const { error } = await supabase.storage.from(BUCKET_ARTES).remove([`${PASTA_AVATARES}/${nome}`]);
+  if (error) return { error: "Não foi possível remover a foto." };
+
+  revalidatePath("/profile");
+  return { error: null };
+}
+
+/** Envio comum às artes e às fotos de perfil: só admin, tipo e tamanho checados. */
+async function subirImagem(
+  formData: FormData,
+  pasta: string,
+): Promise<{ url: string | null; error: string | null }> {
+  await requireUserId();
+  if (!(await ehAdmin())) return { url: null, error: "Só o admin envia imagens." };
   const arquivo = formData.get("arquivo");
   if (!(arquivo instanceof File) || arquivo.size === 0) {
     return { url: null, error: "Escolha um arquivo." };
@@ -204,13 +256,11 @@ export async function enviarArte(
   const supabase = await createClient();
   const { error } = await supabase.storage
     .from(BUCKET_ARTES)
-    .upload(nome, arquivo, { contentType: arquivo.type, upsert: false });
+    .upload(`${pasta}${nome}`, arquivo, { contentType: arquivo.type, upsert: false });
 
   if (error) return { url: null, error: "Não foi possível enviar a imagem." };
 
-  updateTag(TAG_ARTES);
-  revalidatePath("/", "layout");
-  return { url: `${PREFIXO_ARTES_ENVIADAS}${nome}`, error: null };
+  return { url: `${PREFIXO_ARTES_ENVIADAS}${pasta}${nome}`, error: null };
 }
 
 /**

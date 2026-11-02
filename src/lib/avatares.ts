@@ -6,8 +6,9 @@
  * A lista também é a lista de permissão do servidor: só um `src` daqui entra
  * no banco, então o cliente não consegue gravar uma URL arbitrária.
  *
- * Exceção: o admin pode enviar uma foto própria (bucket `artes`). O servidor
- * confere que é admin e que o arquivo existe no bucket antes de gravar.
+ * Além delas, o admin adiciona fotos que viram opção para todo mundo (pasta
+ * `avatares/` do bucket `artes`, ver `lib/artes.ts`). O servidor confere que
+ * o arquivo existe lá antes de gravar.
  */
 export const AVATARES = [
   { id: "ok", nome: "Quill ok", src: "/img/perfil/quill-ok.webp" },
@@ -22,12 +23,9 @@ export type AvatarOpcao = {
   id: string;
   nome: string;
   src: string;
-  /** Foto enviada (só o admin pode): preenche o círculo em vez de caber nele. */
+  /** Foto adicionada pelo admin: preenche o círculo em vez de caber nele. */
   foto?: boolean;
 };
-
-/** `id` da foto enviada no editor de perfil — não é uma arte do catálogo. */
-export const AVATAR_FOTO_ID = "foto";
 
 /**
  * Início da URL de uma imagem no bucket `artes`. Repete o prefixo de
@@ -48,7 +46,7 @@ export function ehFotoEnviada(src: string | null): src is string {
 }
 
 export function avatarDeFoto(src: string): AvatarOpcao {
-  return { id: AVATAR_FOTO_ID, nome: "Foto do perfil", src, foto: true };
+  return { id: src, nome: "Foto do perfil", src, foto: true };
 }
 
 /** Fundo padrão do círculo quando há avatar. */

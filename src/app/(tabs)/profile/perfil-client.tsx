@@ -16,7 +16,6 @@ import { useActionState, useState, useTransition } from "react";
 import type { Friend, FriendShelf } from "@/lib/friends";
 import {
   AVATARES,
-  AVATAR_FOTO_ID,
   AVATAR_FUNDOS,
   AVATAR_FUNDO_PADRAO,
   avatarDeExibicao,
@@ -25,7 +24,7 @@ import {
   type AvatarOpcao,
   ehFotoEnviada,
 } from "@/lib/avatares";
-import { enviarArte } from "@/app/actions/admin";
+import { enviarAvatar, removerAvatar } from "@/app/actions/admin";
 import { nomeExibicao } from "@/lib/nome-exibicao";
 import { faseDaImagem } from "@/lib/gamification";
 import { BookThumb } from "@/components/book-thumb";
@@ -64,10 +63,12 @@ type Props = {
   avatarUrl: string | null;
   avatarZoom: number;
   avatarBg: string;
+  /** Fotos que o admin adicionou às opções de avatar — valem pra todo mundo. */
+  avataresExtras: string[];
   updateAvatarAction: (input: {
     nome: string;
     username: string;
-    avatarId: string;
+    avatarSrc: string;
     zoom: number;
     fundo: string;
   }) => Promise<{ error: string | null }>;
@@ -97,6 +98,7 @@ export function PerfilClient({
   avatarUrl,
   avatarZoom,
   avatarBg,
+  avataresExtras,
   updateAvatarAction,
   membroDesde,
   totalLivros,
@@ -121,10 +123,9 @@ export function PerfilClient({
   // padrão entra pra quem nunca escolheu.
   const avatarAtual = avatarPorSrc(avatarUrl);
   const avatarExibido = avatarDeExibicao(avatarUrl);
-  const [rascunhoAvatar, setRascunhoAvatar] = useState<string>(avatarAtual?.id ?? AVATARES[0].id);
+  const [rascunhoAvatar, setRascunhoAvatar] = useState<string>(avatarAtual?.src ?? AVATARES[0].src);
   const [rascunhoZoom, setRascunhoZoom] = useState(avatarZoom);
   const [rascunhoFundo, setRascunhoFundo] = useState(avatarBg || AVATAR_FUNDO_PADRAO);
-  const [rascunhoFoto, setRascunhoFoto] = useState<string | null>(ehFotoEnviada(avatarUrl) ? avatarUrl : null);
   const [rascunhoNome, setRascunhoNome] = useState(nomeExibicao(displayName, username));
   const [rascunhoUsername, setRascunhoUsername] = useState(username ?? "");
 
@@ -160,10 +161,9 @@ export function PerfilClient({
           <button
             type="button"
             onClick={() => {
-              setRascunhoAvatar(avatarAtual?.id ?? AVATARES[0].id);
+              setRascunhoAvatar(avatarAtual?.src ?? AVATARES[0].src);
               setRascunhoZoom(avatarZoom);
               setRascunhoFundo(avatarBg || AVATAR_FUNDO_PADRAO);
-              setRascunhoFoto(ehFotoEnviada(avatarUrl) ? avatarUrl : null);
               setRascunhoNome(nomeExibicao(displayName, username));
               setRascunhoUsername(username ?? "");
               setAberto("foto");
@@ -389,10 +389,9 @@ export function PerfilClient({
           <button
             type="button"
             onClick={() => {
-              setRascunhoAvatar(avatarAtual?.id ?? AVATARES[0].id);
+              setRascunhoAvatar(avatarAtual?.src ?? AVATARES[0].src);
               setRascunhoZoom(avatarZoom);
               setRascunhoFundo(avatarBg || AVATAR_FUNDO_PADRAO);
-              setRascunhoFoto(ehFotoEnviada(avatarUrl) ? avatarUrl : null);
               setRascunhoNome(nomeExibicao(displayName, username));
               setRascunhoUsername(username ?? "");
               setAberto("foto");
@@ -453,8 +452,7 @@ export function PerfilClient({
                 zoom={rascunhoZoom}
                 fundo={rascunhoFundo}
                 admin={admin}
-                foto={rascunhoFoto}
-                onFoto={setRascunhoFoto}
+                extras={avataresExtras}
                 onNome={setRascunhoNome}
                 onEscolher={setRascunhoAvatar}
                 onZoom={setRascunhoZoom}
@@ -890,8 +888,7 @@ function EditarPerfilDialog({
   zoom,
   fundo,
   admin,
-  foto,
-  onFoto,
+  extras,
   onNome,
   onEscolher,
   onZoom,
@@ -905,19 +902,18 @@ function EditarPerfilDialog({
   escolhido: string;
   zoom: number;
   fundo: string;
-  /** Admin pode enviar uma foto própria além das artes do Quill. */
+  /** Admin adiciona (e tira) fotos das opções de avatar de todo mundo. */
   admin: boolean;
-  foto: string | null;
-  onFoto: (url: string) => void;
+  extras: string[];
   onNome: (v: string) => void;
-  onEscolher: (id: string) => void;
+  /** Recebe o `src` da opção — é ele que vai pro banco. */
+  onEscolher: (src: string) => void;
   onZoom: (z: number) => void;
   onFundo: (c: string) => void;
   onSalvar: (input: {
     nome: string;
     username: string;
-    avatarId: string;
-    fotoUrl?: string | null;
+    avatarSrc: string;
     zoom: number;
     fundo: string;
   }) => Promise<{ error: string | null }>;
@@ -926,11 +922,22 @@ function EditarPerfilDialog({
   const router = useRouter();
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, startSave] = useTransition();
-  const [enviando, startEnvio] = useTransition();
-  const arte: AvatarOpcao =
-    escolhido === AVATAR_FOTO_ID && foto
-      ? avatarDeFoto(foto)
-      : (AVATARES.find((a) => a.id === escolhido) ?? AVATARES[0]);
+  // O admin mexe nas opções só como rascunho: fotos novas ficam no navegador
+  // (prévia local) e as tiradas só somem de verdade no "Salvar" — é aí que a
+  // mudança chega pra todo mundo. Cancelar descarta tudo.
+  const [novas, setNovas] = useState<{ previa: string; arquivo: File }[]>([]);
+  const [removidas, setRemovidas] = useState<string[]>([]);
+  const fotos = extras.filter((f) => !removidas.includes(f));
+  const opcoes: AvatarOpcao[] = [
+    ...AVATARES,
+    ...fotos.map(avatarDeFoto),
+    ...novas.map((n) => avatarDeFoto(n.previa)),
+  ];
+  // Foto que já saiu das opções (ou a antiga do admin, da raiz do bucket)
+  // continua aparecendo pra quem está com ela.
+  if (ehFotoEnviada(escolhido) && !extras.includes(escolhido)) opcoes.push(avatarDeFoto(escolhido));
+  const arte: AvatarOpcao = opcoes.find((o) => o.src === escolhido) ?? AVATARES[0];
+  const ehNova = (src: string) => novas.some((n) => n.previa === src);
 
   return (
     <DialogShell title="Editar perfil" onClose={onClose}>
@@ -1005,70 +1012,76 @@ function EditarPerfilDialog({
       </div>
 
       <div className="mt-3 grid grid-cols-4 gap-2">
-        {AVATARES.map((op) => {
-          const ativo = op.id === escolhido;
+        {opcoes.map((op) => {
+          const ativo = op.src === escolhido;
           return (
-            <button
-              key={op.id}
-              type="button"
-              aria-label={op.nome}
-              aria-pressed={ativo}
-              onClick={() => onEscolher(op.id)}
-              style={{ backgroundColor: fundo }}
-              className={`flex aspect-square items-center justify-center overflow-hidden rounded-full border-2 border-ink ${
-                ativo ? "shadow-hard" : "opacity-70"
-              }`}
-            >
-              <Image src={op.src} alt="" width={72} height={72} className="h-full w-full object-contain" />
-            </button>
+            <div key={op.src} className="relative">
+              <button
+                type="button"
+                aria-label={op.nome}
+                aria-pressed={ativo}
+                onClick={() => onEscolher(op.src)}
+                style={{ backgroundColor: fundo }}
+                className={`flex aspect-square w-full items-center justify-center overflow-hidden rounded-full border-2 border-ink ${
+                  ativo ? "shadow-hard" : "opacity-70"
+                }`}
+              >
+                <Image
+                  src={op.src}
+                  alt=""
+                  width={72}
+                  height={72}
+                  unoptimized={ehNova(op.src)}
+                  className={`h-full w-full ${op.foto ? "object-cover" : "object-contain"}`}
+                />
+              </button>
+              {admin && (fotos.includes(op.src) || ehNova(op.src)) && (
+                <button
+                  type="button"
+                  aria-label="Tirar foto das opções"
+                  disabled={salvando}
+                  onClick={() => {
+                    setErro(null);
+                    if (ehNova(op.src)) {
+                      URL.revokeObjectURL(op.src);
+                      setNovas((atual) => atual.filter((n) => n.previa !== op.src));
+                    } else {
+                      setRemovidas((atual) => [...atual, op.src]);
+                    }
+                    if (op.src === escolhido) onEscolher(AVATARES[0].src);
+                  }}
+                  className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-ink bg-card text-xs font-bold leading-none"
+                >
+                  ×
+                </button>
+              )}
+            </div>
           );
         })}
-        {admin && foto && (
-          <button
-            type="button"
-            aria-label="Foto enviada"
-            aria-pressed={escolhido === AVATAR_FOTO_ID}
-            onClick={() => onEscolher(AVATAR_FOTO_ID)}
-            style={{ backgroundColor: fundo }}
-            className={`flex aspect-square items-center justify-center overflow-hidden rounded-full border-2 border-ink ${
-              escolhido === AVATAR_FOTO_ID ? "shadow-hard" : "opacity-70"
-            }`}
-          >
-            <Image src={foto} alt="" width={72} height={72} className="h-full w-full object-cover" />
-          </button>
-        )}
         {admin && (
-          // Mesmo envio do /admin: a imagem vai para o bucket `artes` e o
-          // servidor só aceita no perfil uma URL que exista lá.
+          // Só prévia por enquanto: o envio pra pasta `avatares/` (que é o que
+          // põe a foto na grade de todo mundo) acontece no "Salvar".
           <label
             aria-label="Adicionar imagem"
             className={`flex aspect-square cursor-pointer flex-col items-center justify-center rounded-full border-2 border-dashed border-ink bg-card text-center font-display text-[9px] uppercase leading-tight tracking-tight ${
-              enviando ? "opacity-60" : ""
+              salvando ? "opacity-60" : ""
             }`}
           >
-            <span className="text-lg leading-none">{enviando ? "…" : "+"}</span>
-            {enviando ? "enviando" : "imagem"}
+            <span className="text-lg leading-none">+</span>
+            imagem
             <input
               type="file"
               accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
-              disabled={enviando}
+              disabled={salvando}
               className="sr-only"
               onChange={(e) => {
                 const arquivo = e.target.files?.[0];
                 e.target.value = "";
                 if (!arquivo) return;
                 setErro(null);
-                const dados = new FormData();
-                dados.append("arquivo", arquivo);
-                startEnvio(async () => {
-                  const r = await enviarArte(dados);
-                  if (r.error || !r.url) {
-                    setErro(r.error ?? "Não foi possível enviar a imagem.");
-                    return;
-                  }
-                  onFoto(r.url);
-                  onEscolher(AVATAR_FOTO_ID);
-                });
+                const previa = URL.createObjectURL(arquivo);
+                setNovas((atual) => [...atual, { previa, arquivo }]);
+                onEscolher(previa);
               }}
             />
           </label>
@@ -1109,11 +1122,49 @@ function EditarPerfilDialog({
         </button>
         <button
           type="button"
-          disabled={salvando || enviando}
+          disabled={salvando}
           onClick={() =>
             startSave(async () => {
-              const r = await onSalvar({ nome, username, avatarId: escolhido, fotoUrl: foto, zoom, fundo });
+              setErro(null);
+              // 1) Fotos novas sobem uma por vez (cada envio tem teto de 4 MB).
+              let avatarSrc = arte.src;
+              const enviadas: string[] = [];
+              for (const n of novas) {
+                const dados = new FormData();
+                dados.append("arquivo", n.arquivo);
+                const r = await enviarAvatar(dados);
+                if (r.error || !r.url) {
+                  // As que já subiram saem do rascunho: viram opção normal.
+                  setNovas((atual) => atual.filter((x) => !enviadas.includes(x.previa)));
+                  if (enviadas.includes(arte.src)) onEscolher(avatarSrc);
+                  setErro(r.error ?? "Não foi possível enviar a imagem.");
+                  router.refresh();
+                  return;
+                }
+                enviadas.push(n.previa);
+                if (n.previa === avatarSrc) avatarSrc = r.url;
+              }
+              // Já no bucket: um novo "Salvar" não pode mandar de novo.
+              if (novas.length) {
+                setNovas([]);
+                onEscolher(avatarSrc);
+                router.refresh();
+              }
+              // 2) O perfil, antes de tirar fotos: se a pessoa largou uma foto
+              //    que estava usando, a remoção não pode contar o perfil dela.
+              const r = await onSalvar({ nome, username, avatarSrc, zoom, fundo });
               if (r.error) { setErro(r.error); return; }
+              // 3) Fotos tiradas — recusa a que alguém ainda usa.
+              for (const src of removidas) {
+                const rr = await removerAvatar(src);
+                if (rr.error) {
+                  setRemovidas([]);
+                  setErro(rr.error);
+                  router.refresh();
+                  return;
+                }
+              }
+              novas.forEach((n) => URL.revokeObjectURL(n.previa));
               router.refresh();
               onClose();
             })

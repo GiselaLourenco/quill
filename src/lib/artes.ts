@@ -69,6 +69,45 @@ export async function listarArtesEnviadas(supabase: SupabaseClient): Promise<str
     .map((arquivo) => `${PREFIXO_ARTES_ENVIADAS}${arquivo.name}`);
 }
 
+/**
+ * Pasta do bucket `artes` com as fotos de perfil que o admin adicionou. Fica
+ * à parte das artes da raiz: lá é catálogo de pontos do app, aqui é opção de
+ * avatar para qualquer pessoa — e a galeria do /admin só lista a raiz.
+ */
+export const PASTA_AVATARES = "avatares";
+const PREFIXO_AVATARES = `${PREFIXO_ARTES_ENVIADAS}${PASTA_AVATARES}/`;
+
+/** As fotos de perfil adicionadas pelo admin, na ordem em que entraram. */
+export async function listarAvataresEnviados(supabase: SupabaseClient): Promise<string[]> {
+  const { data, error } = await supabase.storage.from(BUCKET_ARTES).list(PASTA_AVATARES, {
+    limit: 200,
+    sortBy: { column: "created_at", order: "asc" },
+  });
+  if (error || !data) return [];
+  return data
+    .filter((arquivo) => EXTENSOES.test(arquivo.name))
+    .map((arquivo) => `${PREFIXO_AVATARES}${arquivo.name}`);
+}
+
+/** O nome do arquivo de uma foto de perfil enviada, ou null se não for uma. */
+export function nomeDoAvatarEnviado(src: string): string | null {
+  if (PREFIXO_ARTES_ENVIADAS.length <= "/storage/v1/object/public/artes/".length) return null;
+  if (!src.startsWith(PREFIXO_AVATARES)) return null;
+  const nome = decodeURIComponent(src.slice(PREFIXO_AVATARES.length));
+  if (!nome || nome.includes("/") || nome.includes("..")) return null;
+  return nome;
+}
+
+/** A foto de perfil existe mesmo na pasta? (o cliente não grava URL arbitrária) */
+export async function avatarEnviadoValido(supabase: SupabaseClient, src: string): Promise<boolean> {
+  const nome = nomeDoAvatarEnviado(src);
+  if (!nome) return false;
+  const { data } = await supabase.storage
+    .from(BUCKET_ARTES)
+    .list(PASTA_AVATARES, { limit: 1, search: nome });
+  return Boolean(data?.some((arquivo) => arquivo.name === nome));
+}
+
 /** A arte existe em /public? É a lista de permissão do servidor. */
 export function arteValida(src: string): boolean {
   return listarArtes().includes(src);

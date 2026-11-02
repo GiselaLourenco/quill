@@ -8,6 +8,7 @@ import { toggleCompete } from "@/app/actions/groups";
 import { quillPhase } from "@/lib/gamification";
 import { evaluateAchievements, ACHIEVEMENT_ICON } from "@/lib/achievements";
 import { loadAchievementData } from "@/lib/achievement-context";
+import { listarAvataresEnviados } from "@/lib/artes";
 import { getFriends, getFriendsShelf, getPedidosRecebidos } from "@/lib/friends";
 import { PerfilClient, type BadgeView, type DesafioRanking } from "./perfil-client";
 
@@ -39,6 +40,7 @@ export default async function ProfilePage() {
     estantes,
     pedidos,
     notificacoes,
+    avataresExtras,
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -69,6 +71,7 @@ export default async function ProfilePage() {
     getFriendsShelf(supabase, userId),
     getPedidosRecebidos(supabase, userId),
     getNotificacoes(supabase, userId),
+    listarAvataresEnviados(supabase),
   ]);
 
   const totalFinished = finishedThisYear ?? 0;
@@ -125,6 +128,7 @@ export default async function ProfilePage() {
       avatarUrl={(profile?.avatar_url as string | null) ?? null}
       avatarZoom={(profile?.avatar_zoom as number | null) ?? 100}
       avatarBg={(profile?.avatar_bg as string | null) ?? "#6D6885"}
+      avataresExtras={avataresExtras}
       updateAvatarAction={updateAvatar}
       membroDesde={membroDesde}
       totalLivros={totalBooks ?? 0}

@@ -4,8 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
-import { AVATARES, AVATAR_FOTO_ID, AVATAR_FUNDOS } from "@/lib/avatares";
-import { arteEnviadaValida } from "@/lib/artes";
+import { AVATARES, AVATAR_FUNDOS } from "@/lib/avatares";
+import { arteEnviadaValida, avatarEnviadoValido } from "@/lib/artes";
 import { ehAdmin } from "@/app/actions/admin";
 
 export async function updateProfile(formData: FormData) {
@@ -41,9 +41,8 @@ export async function updateProfile(formData: FormData) {
 export async function updateAvatar(input: {
   nome: string;
   username: string;
-  avatarId: string;
-  /** URL da foto enviada — só vale com `avatarId` "foto", e só para o admin. */
-  fotoUrl?: string | null;
+  /** `src` da opção escolhida: arte do Quill ou foto adicionada pelo admin. */
+  avatarSrc: string;
   zoom: number;
   fundo: string;
 }): Promise<{ error: string | null }> {
@@ -61,21 +60,16 @@ export async function updateAvatar(input: {
 
   const supabase = await createClient();
 
-  // Listas de permissão: o cliente não grava caminho nem cor arbitrária.
-  // A exceção é a foto enviada, que só o admin tem — e a URL precisa apontar
-  // para um arquivo que existe mesmo no bucket.
-  let avatarSrc: string;
-  if (input.avatarId === AVATAR_FOTO_ID) {
-    if (!(await ehAdmin())) return { error: "Só o admin usa foto enviada." };
-    if (!input.fotoUrl || !(await arteEnviadaValida(supabase, input.fotoUrl))) {
-      return { error: "Foto inválida." };
-    }
-    avatarSrc = input.fotoUrl;
-  } else {
-    const escolhido = AVATARES.find((a) => a.id === input.avatarId);
-    if (!escolhido) return { error: "Avatar inválido." };
-    avatarSrc = escolhido.src;
-  }
+  // Listas de permissão: o cliente não grava caminho nem cor arbitrária. Vale
+  // arte do Quill ou foto da pasta de avatares (que só o admin abastece). A
+  // foto antiga do admin, da raiz do bucket, segue valendo pra ele não perder
+  // o avatar ao salvar só o nome.
+  const valido =
+    AVATARES.some((a) => a.src === input.avatarSrc) ||
+    (await avatarEnviadoValido(supabase, input.avatarSrc)) ||
+    ((await arteEnviadaValida(supabase, input.avatarSrc)) && (await ehAdmin()));
+  if (!valido) return { error: "Avatar inválido." };
+  const avatarSrc = input.avatarSrc;
 
   const fundo = (AVATAR_FUNDOS as readonly string[]).includes(input.fundo)
     ? input.fundo
