@@ -413,7 +413,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     },
     unit: "livro",
     avatar: {
-      arquivo: "quill-harry-e-a-pedra.png",
+      arquivo: "quill-harry-e-a-pedra-v2.png",
       nome: "Harry e a pedra",
       dica: "Termine Harry Potter e a Pedra Filosofal",
     },
@@ -452,7 +452,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     },
     unit: "livro",
     avatar: {
-      arquivo: "quill-harry-e-a-camara.png",
+      arquivo: "quill-harry-e-a-camara-v2.png",
       nome: "Harry e a câmara",
       dica: "Termine Harry Potter e a Câmara Secreta",
     },
