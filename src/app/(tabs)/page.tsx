@@ -6,7 +6,7 @@ import {
   computeChaptersPerWeek,
   type SessionRow,
 } from "@/lib/gamification";
-import { datasDeDesbloqueio, loadAchievementData } from "@/lib/achievement-context";
+import { anoAtual as anoDasConquistas, datasDeDesbloqueio, loadAchievementData } from "@/lib/achievement-context";
 import { evaluateAchievements } from "@/lib/achievements";
 import { montarConquistas } from "@/lib/conquistas-view";
 import { pillsEscolhidas, pillDisplay, type PillStats } from "@/lib/pills";
@@ -282,12 +282,15 @@ export default async function HomePage() {
     getNotificacoes(supabase, userId),
   ]);
 
-  const conquistasFeitas = evaluateAchievements(historico.ctx)
+  // A coleção do ano — zera em janeiro.
+  const ano = anoDasConquistas();
+  const ctxDoAno = historico.doAno(ano);
+  const conquistasFeitas = evaluateAchievements(ctxDoAno)
     .filter((e) => e.met)
     .map((e) => e.achievement.key);
   const conquistas = montarConquistas(
-    historico.ctx,
-    await datasDeDesbloqueio(supabase, userId, conquistasFeitas),
+    ctxDoAno,
+    await datasDeDesbloqueio(supabase, userId, conquistasFeitas, ano),
   );
 
   return (

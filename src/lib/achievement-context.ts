@@ -6,7 +6,7 @@ import {
   type SessionRow,
 } from "@/lib/gamification";
 import { localDateKey, localHour } from "@/lib/date-br";
-import { ACHIEVEMENTS, type AchievementContext } from "@/lib/achievements";
+import { ACHIEVEMENTS, evaluateAchievements, type AchievementContext } from "@/lib/achievements";
 
 // Fonte única do que as conquistas (e os recordes "da vida") leem. Antes cada
 // tela montava a própria query, e o perfil esqueceu o `item_id` — sem ele
@@ -97,25 +97,30 @@ function maxDiasPorGrupo(dias: string[], grupo: (dia: string) => string): number
   return Math.max(0, ...porGrupo.values());
 }
 
+/** Ano (fuso do Brasil) em que estamos. */
+export function anoAtual(): number {
+  return Number(localDateKey(new Date()).slice(0, 4));
+}
+
+const anoDeData = (data: string | null) => (data ? Number(data.slice(0, 4)) : null);
+
 /**
- * Histórico completo de sessões (sem janela de data) + o contexto pronto pra
- * `evaluateAchievements`. Ajustes manuais de posição (duração 0) contam como
- * sessão — decisão de produto. Hora e dia sempre no fuso do Brasil.
+ * O contexto das conquistas a partir dos dados crus. Com `ano`, só entra o
+ * que aconteceu naquele ano — a coleção zera em janeiro. Livro sem data de
+ * término (ou de início) não conta em ano nenhum, e sequência não atravessa
+ * a virada (decisões da Gisela, 2026-11-02).
  */
-export async function loadAchievementData(
-  supabase: SupabaseClient,
-  userId: string,
-): Promise<{ ctx: AchievementContext; sessions: SessionRow[] }> {
-  const [sessions, itens, { count: cincoEstrelas, error }] = await Promise.all([
-    todasAsSessoes(supabase, userId),
-    todosOsItens(supabase, userId),
-    supabase
-      .from("ratings")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .eq("stars", 5),
-  ]);
-  if (error) throw error;
+function calcularContexto(
+  todasSessoes: SessionRow[],
+  itens: ItemConquista[],
+  cincoEstrelas: string[],
+  ano: number | null,
+): AchievementContext {
+  const noAno = (data: string | null) => ano === null || anoDeData(data) === ano;
+  const sessions =
+    ano === null
+      ? todasSessoes
+      : todasSessoes.filter((s) => anoDeData(localDateKey(s.started_at)) === ano);
 
   // ---- Sessões ----------------------------------------------------------
   let totalSegundos = 0;
@@ -145,8 +150,9 @@ export async function loadAchievementData(
   const dias = [...minutosPorDia.keys()];
 
   // ---- Estante ----------------------------------------------------------
-  const terminados = itens.filter((i) => i.status === "finished");
-  const finishedTitles = terminados.map((i) => i.title);
+  const terminados = itens.filter(
+    (i) => i.status === "finished" && (ano === null || (i.finished_at && noAno(i.finished_at))),
+  );
   const generos = new Set(terminados.map((i) => chave(i.genre)).filter(Boolean));
   const autores = new Set(terminados.map((i) => chave(i.creator)).filter(Boolean));
   const terminadosPorMes = new Map<string, number>();
@@ -163,40 +169,95 @@ export async function loadAchievementData(
   ).length;
 
   return {
+    sessionsCount: sessions.length,
+    booksFinished: terminados.length,
+    streakRecord: computeStreak(sessions).record,
+    maxSessionPages: computeMaxSessionPages(sessions),
+    totalMinutes: Math.floor(totalSegundos / 60),
+    totalHours: Math.floor(totalSegundos / 3600),
+    totalPages,
+    morningSessions,
+    lateSessions,
+    lateLongSessions,
+    longestSessionMinutes,
+    maxDayMinutes: Math.floor(Math.max(0, ...minutosPorDia.values())),
+    sessions10min,
+    maxDaysInWeek: maxDiasPorGrupo(dias, (d) => weekKey(`${d}T12:00:00Z`)),
+    maxDaysInMonth: maxDiasPorGrupo(dias, (d) => d.slice(0, 7)),
+    daysRead: dias.length,
+    maxFinishedInMonth: Math.max(0, ...terminadosPorMes.values()),
+    booksStarted: itens.filter(
+      (i) => i.status !== "want" && (ano === null || (i.started_at && noAno(i.started_at))),
+    ).length,
+    finishThenStart,
+    distinctGenres: generos.size,
+    distinctAuthors: autores.size,
+    bigBooksFinished: terminados.filter((i) => (i.total_units ?? 0) > 500).length,
+    fiveStarRatings: cincoEstrelas.filter((c) => ano === null || anoDeData(localDateKey(c)) === ano)
+      .length,
+    finishedTitles: terminados.map((i) => i.title),
+  };
+}
+
+export type DadosConquistas = {
+  /** O histórico inteiro — recordes "da vida" e fotos de perfil liberadas. */
+  ctx: AchievementContext;
+  sessions: SessionRow[];
+  /** A coleção daquele ano (a que zera em janeiro). */
+  doAno: (ano: number) => AchievementContext;
+  /** Anos em que algo foi conquistado, do mais recente pro mais antigo. */
+  anosComConquista: number[];
+};
+
+/**
+ * Histórico completo de sessões e da estante + os contextos prontos pra
+ * `evaluateAchievements`. Ajustes manuais de posição (duração 0) contam como
+ * sessão — decisão de produto. Hora e dia sempre no fuso do Brasil.
+ */
+export async function loadAchievementData(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<DadosConquistas> {
+  const [sessions, itens, { data: notas, error }] = await Promise.all([
+    todasAsSessoes(supabase, userId),
+    todosOsItens(supabase, userId),
+    supabase.from("ratings").select("created_at").eq("user_id", userId).eq("stars", 5),
+  ]);
+  if (error) throw error;
+  const cincoEstrelas = (notas ?? []).map((n) => n.created_at as string);
+
+  const cache = new Map<number, AchievementContext>();
+  const doAno = (ano: number) => {
+    if (!cache.has(ano)) cache.set(ano, calcularContexto(sessions, itens, cincoEstrelas, ano));
+    return cache.get(ano)!;
+  };
+
+  const anos = new Set<number>();
+  for (const s of sessions) anos.add(Number(localDateKey(s.started_at).slice(0, 4)));
+  for (const i of itens) {
+    for (const d of [i.finished_at, i.started_at]) if (d) anos.add(Number(d.slice(0, 4)));
+  }
+  for (const c of cincoEstrelas) anos.add(Number(localDateKey(c).slice(0, 4)));
+  const anosComConquista = [...anos]
+    .filter((ano) => evaluateAchievements(doAno(ano)).some((e) => e.met))
+    .sort((a, b) => b - a);
+
+  return {
     sessions,
-    ctx: {
-      sessionsCount: sessions.length,
-      booksFinished: terminados.length,
-      streakRecord: computeStreak(sessions).record,
-      maxSessionPages: computeMaxSessionPages(sessions),
-      totalMinutes: Math.floor(totalSegundos / 60),
-      totalHours: Math.floor(totalSegundos / 3600),
-      totalPages,
-      morningSessions,
-      lateSessions,
-      lateLongSessions,
-      longestSessionMinutes,
-      maxDayMinutes: Math.floor(Math.max(0, ...minutosPorDia.values())),
-      sessions10min,
-      maxDaysInWeek: maxDiasPorGrupo(dias, (d) => weekKey(`${d}T12:00:00Z`)),
-      maxDaysInMonth: maxDiasPorGrupo(dias, (d) => d.slice(0, 7)),
-      daysRead: dias.length,
-      maxFinishedInMonth: Math.max(0, ...terminadosPorMes.values()),
-      booksStarted: itens.filter((i) => i.status !== "want").length,
-      finishThenStart,
-      distinctGenres: generos.size,
-      distinctAuthors: autores.size,
-      bigBooksFinished: terminados.filter((i) => (i.total_units ?? 0) > 500).length,
-      fiveStarRatings: cincoEstrelas ?? 0,
-      finishedTitles,
-    },
+    ctx: calcularContexto(sessions, itens, cincoEstrelas, null),
+    doAno,
+    anosComConquista,
   };
 }
 
 /**
- * Grava o momento em que cada conquista foi vista feita pela primeira vez e
- * devolve as datas (chave → unlocked_at). Quem fez antes desta tela existir
- * ganha a data do primeiro acesso.
+ * Datas de desbloqueio das conquistas do `ano` (chave → unlocked_at).
+ *
+ * No ano corrente, grava o momento em que cada conquista foi vista feita pela
+ * primeira vez — com o ano na chave (`streak_3:2027`), já que a coleção zera
+ * em janeiro e a mesma conquista volta a ser feita. Linhas antigas, sem ano,
+ * valem pro ano da própria data. Anos passados só leem: gravar agora daria a
+ * data de hoje a algo feito lá atrás.
  *
  * As de livro específico ficam de fora: a linha delas vira notificação, e
  * só é gravada ao terminar o livro (`registrarConquistaDeLivro`).
@@ -205,21 +266,31 @@ export async function datasDeDesbloqueio(
   supabase: SupabaseClient,
   userId: string,
   feitas: string[],
+  ano: number,
 ): Promise<Record<string, string>> {
   const gravar = feitas.filter(
     (k) => ACHIEVEMENTS.find((a) => a.key === k)?.criteria.type === "metric",
   );
-  if (gravar.length > 0) {
-    await supabase.from("user_achievements").upsert(
-      gravar.map((achievement_key) => ({ user_id: userId, achievement_key })),
-      { onConflict: "user_id,achievement_key", ignoreDuplicates: true },
-    );
-  }
   const { data } = await supabase
     .from("user_achievements")
     .select("achievement_key, unlocked_at")
     .eq("user_id", userId);
-  return Object.fromEntries(
-    (data ?? []).map((r) => [r.achievement_key as string, r.unlocked_at as string]),
-  );
+  const datas: Record<string, string> = {};
+  for (const r of data ?? []) {
+    const [key, anoDaChave] = (r.achievement_key as string).split(":");
+    const quando = r.unlocked_at as string;
+    const anoDaLinha = anoDaChave ? Number(anoDaChave) : Number(localDateKey(quando).slice(0, 4));
+    if (anoDaLinha === ano && !(key in datas && anoDaChave === undefined)) datas[key] = quando;
+  }
+
+  const novas = ano === anoAtual() ? gravar.filter((k) => !(k in datas)) : [];
+  if (novas.length > 0) {
+    const agora = new Date().toISOString();
+    await supabase.from("user_achievements").upsert(
+      novas.map((k) => ({ user_id: userId, achievement_key: `${k}:${ano}` })),
+      { onConflict: "user_id,achievement_key", ignoreDuplicates: true },
+    );
+    for (const k of novas) datas[k] = agora;
+  }
+  return datas;
 }

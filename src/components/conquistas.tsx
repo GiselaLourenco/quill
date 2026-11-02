@@ -241,7 +241,73 @@ const FILTROS: { id: Filtro; rotulo: string }[] = [
   { id: "faltam", rotulo: "Faltam" },
 ];
 
-export function ColecaoConquistas({ conquistas }: { conquistas: ConquistaView[] }) {
+export type OpcaoDeAno = { ano: number; feitas: number };
+
+/**
+ * Pílula de ano no cabeçalho. Só existe pra quem tem conquistas em mais de um
+ * ano — com um ano só, não há o que escolher.
+ */
+function PilulaDeAno({ ano, opcoes, total }: { ano: number; opcoes: OpcaoDeAno[]; total: number }) {
+  const [aberto, setAberto] = useState(false);
+  useEffect(() => {
+    if (!aberto) return;
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setAberto(false);
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, [aberto]);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={aberto}
+        onClick={() => setAberto((v) => !v)}
+        className="shadow-hard-sm flex items-center gap-1.5 rounded-full border-2 border-ink bg-mustard py-1 pl-3 pr-2.5 text-[13px] font-bold tabular-nums active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+      >
+        {ano}
+        <span className={`text-[10px] transition-transform ${aberto ? "rotate-180" : ""}`}>▼</span>
+      </button>
+      {aberto && (
+        <>
+          {/* Toque fora fecha. */}
+          <div className="fixed inset-0 z-30" onClick={() => setAberto(false)} />
+          <div
+            role="menu"
+            className="shadow-hard absolute right-0 top-[calc(100%+8px)] z-40 grid min-w-[150px] rounded-[10px] border-2 border-ink bg-card p-1.5"
+          >
+            {opcoes.map((o) => (
+              <Link
+                key={o.ano}
+                role="menuitemradio"
+                aria-checked={o.ano === ano}
+                href={`/conquistas?ano=${o.ano}`}
+                onClick={() => setAberto(false)}
+                className={`flex justify-between gap-3 rounded-md px-2.5 py-2 text-[13px] font-bold tabular-nums ${o.ano === ano ? "bg-paper" : ""}`}
+              >
+                {o.ano}
+                <span className="text-[11px] font-semibold text-ink-soft">
+                  {o.feitas}/{total}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+export function ColecaoConquistas({
+  conquistas,
+  ano,
+  opcoesDeAno,
+}: {
+  conquistas: ConquistaView[];
+  ano: number;
+  /** null = um ano só; a pílula não aparece. */
+  opcoesDeAno: OpcaoDeAno[] | null;
+}) {
   const [filtro, setFiltro] = useState<Filtro>("todas");
   const [aberta, setAberta] = useState<ConquistaView | null>(null);
   const feitas = conquistas.filter((c) => c.desbloqueada).length;
@@ -268,6 +334,7 @@ export function ColecaoConquistas({ conquistas }: { conquistas: ConquistaView[] 
         <span className="ml-auto text-[13px] font-bold tabular-nums">
           {feitas}/{conquistas.length}
         </span>
+        {opcoesDeAno && <PilulaDeAno ano={ano} opcoes={opcoesDeAno} total={conquistas.length} />}
       </div>
 
       <div className="mb-1 mt-4 flex flex-wrap gap-2" role="group" aria-label="Filtrar">
