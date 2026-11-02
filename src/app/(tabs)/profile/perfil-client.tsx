@@ -10,6 +10,8 @@ import { AdicionarAmigo, Avatar } from "@/components/adicionar-amigo";
 import { aceitarPedido, recusarPedido } from "@/app/actions/friends";
 import type { PedidoRecebido } from "@/lib/friends";
 import { AppImage } from "@/components/app-image";
+import { ConquistaIcone, ConquistaSheet, BarraProgresso } from "@/components/conquista-sheet";
+import { maisPerto, ultimasDesbloqueadas, type ConquistaView } from "@/lib/conquistas";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useActionState, useState, useTransition } from "react";
@@ -33,24 +35,13 @@ import { EstanteShelf, type DbStatus, type ShelfBook } from "@/components/estant
 import { EmptyState } from "@/components/empty-state";
 import { Portal } from "@/components/portal";
 
-export type BadgeView = {
-  id: string;
-  titulo: string;
-  descricao: string;
-  icone: string;
-  cor: string;
-  desbloqueada: boolean;
-  progresso: number;
-  alvo: number;
-};
-
 export type DesafioRanking = {
   id: string;
   nome: string;
   competes: boolean;
 };
 
-type DialogId = "amigos" | "metas" | "badges" | "pilulas" | "ranking" | "senha" | "excluir" | "foto" | "importar" | null;
+type DialogId = "amigos" | "metas" | "pilulas" | "ranking" | "senha" | "excluir" | "foto" | "importar" | null;
 
 type Props = {
   /** Rótulos das pílulas que a pessoa escolheu, na ordem em que aparecem. */
@@ -80,7 +71,7 @@ type Props = {
   recordeStreak: number;
   amigos: Friend[];
   estantes: FriendShelf[];
-  badges: BadgeView[];
+  conquistas: ConquistaView[];
   desafios: DesafioRanking[];
   totalFinished: number;
   annualTarget: number;
@@ -109,7 +100,7 @@ export function PerfilClient({
   recordeStreak,
   amigos,
   estantes,
-  badges,
+  conquistas,
   desafios,
   totalFinished,
   annualTarget,
@@ -136,12 +127,12 @@ export function PerfilClient({
   const metaPercent =
     annualTarget > 0 ? Math.min(100, Math.round((totalFinished / annualTarget) * 100)) : 0;
 
-  const desbloqueadas = badges.filter((b) => b.desbloqueada);
-  // Sem nenhuma conquista ainda, mostra as três mais próximas de sair.
-  const destaques =
-    desbloqueadas.length > 0
-      ? desbloqueadas.slice(-3)
-      : [...badges].sort((a, b) => b.progresso / b.alvo - a.progresso / a.alvo).slice(0, 3);
+  const [conquistaAberta, setConquistaAberta] = useState<string | null>(null);
+  const ultimas = ultimasDesbloqueadas(conquistas);
+  const pilha = ultimas.slice(0, 4);
+  const restantes = conquistas.length - pilha.length;
+  const quaseLa = maisPerto(conquistas);
+  const conquistaDetalhe = conquistas.find((c) => c.id === conquistaAberta) ?? null;
 
   return (
     <div className="flex-1 bg-paper px-6 pb-24 pt-8 text-ink">
@@ -266,46 +257,81 @@ export function PerfilClient({
         </div>
       </Link>
 
-      {/* Badges em destaque */}
-      <div className="mt-8 space-y-3">
-        <div className="flex items-end justify-between">
-          <h2 className="font-display text-sm uppercase tracking-tight">Badges em destaque</h2>
-          <button
-            type="button"
-            onClick={() => setAberto("badges")}
-            className="text-xs font-bold underline underline-offset-2"
-          >
-            ver todas
-          </button>
-        </div>
-        <div className="shadow-hard-sm flex gap-4 rounded-md border-2 border-ink bg-card p-3">
-          {destaques.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => setAberto("badges")}
-              aria-label={c.titulo}
-              className={`shadow-hard-sm flex h-14 w-14 items-center justify-center rounded-full border-2 border-ink ${c.cor} transition-all active:translate-x-[1px] active:translate-y-[1px] active:shadow-none`}
-            >
-              <AppImage slot={`conquista.${c.id}`} src={c.icone} alt="" aria-hidden width={34} height={34} className="h-[34px] w-[34px] object-contain" />
-            </button>
-          ))}
-          <div className="flex flex-1 items-center justify-end">
-            <AppImage
-              slot="perfil.badges"
-              src="/img/perfil/quill-rindo.webp"
-              alt=""
-              aria-hidden
-              width={56}
-              height={56}
-              className="h-14 w-14 object-contain"
-            />
+      {/* Conquistas: as últimas, a mais perto de sair e a entrada pra coleção.
+          Ícone e "Quase lá" abrem o detalhe aqui mesmo; o resto leva a /conquistas. */}
+      <section className="shadow-hard mt-8 overflow-hidden rounded-md border-2 border-ink bg-card">
+        <div className="grid gap-3 p-3.5">
+          <div className="flex items-baseline gap-2">
+            <h2 className="font-display text-sm uppercase tracking-tight">Conquistas</h2>
+            <span className="ml-auto font-display text-[22px] leading-none">
+              {ultimas.length}
+              <small className="font-sans text-xs font-semibold text-ink-soft"> /{conquistas.length}</small>
+            </span>
           </div>
+
+          {pilha.length > 0 ? (
+            <div className="flex items-center">
+              {pilha.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setConquistaAberta(c.id)}
+                  aria-label={c.titulo}
+                  className="-mr-2.5 transition-transform hover:-translate-y-0.5"
+                >
+                  <ConquistaIcone c={c} tamanho={50} className="!rounded-[11px]" />
+                </button>
+              ))}
+              {restantes > 0 && (
+                <Link
+                  href="/conquistas"
+                  aria-label={`Ver as outras ${restantes} conquistas`}
+                  className="flex h-[50px] w-[50px] items-center justify-center rounded-[11px] border-2 border-ink bg-paper text-[13px] font-bold"
+                >
+                  +{restantes}
+                </Link>
+              )}
+            </div>
+          ) : (
+            <p className="font-serif text-xs italic text-ink-soft">
+              Nenhuma ainda — a primeira sessão de leitura já destrava uma.
+            </p>
+          )}
+
+          {quaseLa && (
+            <button
+              type="button"
+              onClick={() => setConquistaAberta(quaseLa.id)}
+              className="flex w-full items-center gap-2.5 border-t-[1.5px] border-dashed border-[#d9cdb0] pt-3 text-left"
+            >
+              <ConquistaIcone c={quaseLa} tamanho={36} className="!rounded-lg" />
+              <span className="grid min-w-0 flex-1 gap-1">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-ink-soft">Quase lá</span>
+                <span className="truncate text-xs font-bold">{quaseLa.titulo}</span>
+                <BarraProgresso c={quaseLa} fina />
+              </span>
+              <span className="shrink-0 text-[11px] font-bold tabular-nums text-ink-soft">
+                {quaseLa.progresso}/{quaseLa.alvo} {quaseLa.unidade}
+              </span>
+            </button>
+          )}
         </div>
-      </div>
+        <Link
+          href="/conquistas"
+          className="flex items-center justify-between border-t-2 border-ink bg-mustard px-3.5 py-3 text-xs font-bold uppercase tracking-wide active:brightness-95"
+        >
+          Ver coleção completa
+          <span className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-ink text-sm text-paper" aria-hidden>
+            →
+          </span>
+        </Link>
+      </section>
+      {conquistaDetalhe && (
+        <ConquistaSheet c={conquistaDetalhe} onClose={() => setConquistaAberta(null)} />
+      )}
 
       {/* A história do Quill — fora de Preferências e de Conta de propósito:
-          não é ajuste nem dado, é leitura. Fica logo depois das badges, que é
+          não é ajuste nem dado, é leitura. Fica logo depois das conquistas, que é
           onde o perfil deixa de falar de números. */}
       <Link
         href="/lore"
@@ -479,9 +505,6 @@ export function PerfilClient({
                 onToggle={toggleCompeteAction}
                 onClose={() => setAberto(null)}
               />
-            )}
-            {aberto === "badges" && (
-              <BadgesDialog badges={badges} onClose={() => setAberto(null)} />
             )}
             {aberto === "senha" && <SenhaDialog onClose={() => setAberto(null)} />}
             {aberto === "excluir" && (
@@ -1324,44 +1347,6 @@ function RankingDialog({
           salvando…
         </p>
       )}
-    </DialogShell>
-  );
-}
-
-function BadgesDialog({ badges, onClose }: { badges: BadgeView[]; onClose: () => void }) {
-  return (
-    <DialogShell title="Conquistas" onClose={onClose}>
-      <ul className="space-y-3">
-        {badges.map((c) => (
-          <li
-            key={c.id}
-            className={`flex items-center gap-3 rounded-md border-2 border-ink p-3 ${
-              c.desbloqueada ? "bg-card" : "bg-card opacity-50"
-            }`}
-          >
-            <div
-              className={`flex h-12 w-12 items-center justify-center rounded-md border-2 border-ink ${c.cor}`}
-            >
-              <AppImage slot={`conquista.${c.id}`} src={c.icone} alt="" aria-hidden width={30} height={30} className="h-[30px] w-[30px] object-contain" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold uppercase">{c.titulo}</p>
-              <p className="font-serif text-xs italic">{c.descricao}</p>
-              {!c.desbloqueada && (
-                <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full border-2 border-ink bg-paper">
-                  <div
-                    className="h-full bg-moss"
-                    style={{ width: `${Math.min(100, Math.round((c.progresso / c.alvo) * 100))}%` }}
-                  />
-                </div>
-              )}
-            </div>
-            <span className="shrink-0 text-[10px] font-bold uppercase text-ink-soft">
-              {c.desbloqueada ? "✓" : `${c.progresso}/${c.alvo}`}
-            </span>
-          </li>
-        ))}
-      </ul>
     </DialogShell>
   );
 }
