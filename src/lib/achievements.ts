@@ -633,11 +633,11 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     key: "month_3",
     name: "Uma pilha de histórias",
-    description: "Termine pelo menos um livro por mês, 3 meses seguidos.",
+    description: "Termine 3 livros no mesmo mês.",
     tier: "ouro",
-    criteria: { type: "metric", metric: "finishedMonthsStreak", target: 3 },
+    criteria: { type: "metric", metric: "maxFinishedInMonth", target: 3 },
     icon: icone("month_3"),
-    unit: "meses",
+    unit: "livros",
   },
   {
     key: "genres_10",
@@ -693,8 +693,7 @@ export type AchievementContext = {
   maxDaysInWeek: number;
   maxDaysInMonth: number;
   daysRead: number;
-  /** Maior sequência de meses seguidos com pelo menos um livro terminado. */
-  finishedMonthsStreak: number;
+  maxFinishedInMonth: number;
   booksStarted: number;
   finishThenStart: number;
   distinctGenres: number;
@@ -723,7 +722,7 @@ export const CONTEXTO_VAZIO: AchievementContext = {
   maxDaysInWeek: 0,
   maxDaysInMonth: 0,
   daysRead: 0,
-  finishedMonthsStreak: 0,
+  maxFinishedInMonth: 0,
   booksStarted: 0,
   finishThenStart: 0,
   distinctGenres: 0,
