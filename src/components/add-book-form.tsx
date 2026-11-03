@@ -6,6 +6,7 @@ import { createMediaItem } from "@/app/actions/media-items";
 import { BuscaLivro } from "@/components/busca-livro";
 import { IllustratedCover } from "@/components/illustrated-cover";
 import { paletteIndexForTitle } from "@/lib/covers";
+import { todayLocalDateKey } from "@/lib/date-br";
 import type { LivroEncontrado } from "@/lib/open-library";
 
 const STATUS_OPTIONS = [
@@ -47,6 +48,12 @@ export function AddBookForm({
     initial?.cover_kind === "real" ? "real" : "illustrated",
   );
   const [coverUrl, setCoverUrl] = useState<string | null>(initial?.cover_url ?? null);
+  const [status, setStatus] = useState("reading");
+  // Datas de quem já leu: vêm vazias — livro antigo não deve ganhar "hoje"
+  // sem querer. Sem fim, o livro fica fora da meta e da retrospectiva.
+  const [comecei, setComecei] = useState("");
+  const [terminei, setTerminei] = useState("");
+  const hoje = todayLocalDateKey();
   // Qual campo tem a lista de sugestões aberta agora — só um por vez, Título
   // ou Autor. Editando aquele campo (ou o outro) sempre reabre a busca dele;
   // escolher um resultado sempre fecha a lista, não importa qual campo abriu.
@@ -255,7 +262,8 @@ export function AddBookForm({
                   type="radio"
                   name="status"
                   value={opt.value}
-                  defaultChecked={opt.value === "reading"}
+                  checked={status === opt.value}
+                  onChange={() => setStatus(opt.value)}
                   className="peer sr-only"
                 />
                 <span className="block cursor-pointer rounded-full border-2 border-ink bg-white px-3 py-1.5 text-xs font-medium peer-checked:bg-mustard">
@@ -265,6 +273,45 @@ export function AddBookForm({
             ))}
           </div>
         </fieldset>
+      )}
+
+      {!initial && status === "finished" && (
+        <div className="flex flex-col gap-1.5 rounded-md border-2 border-ink bg-white p-3 shadow-hard-sm">
+          <div className="grid grid-cols-2 gap-2.5">
+            <label className="flex min-w-0 flex-col gap-1 text-sm font-medium">
+              <span>
+                Comecei em <span className="font-normal text-ink/60">(opcional)</span>
+              </span>
+              <input
+                type="date"
+                name="started_at"
+                value={comecei}
+                max={terminei || hoje}
+                onChange={(e) => setComecei(e.target.value)}
+                className="min-h-11 w-full rounded border-2 border-ink bg-white px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-moss-dark"
+              />
+            </label>
+            <label className="flex min-w-0 flex-col gap-1 text-sm font-medium">
+              <span>
+                Terminei em <span className="font-normal text-ink/60">(opcional)</span>
+              </span>
+              <input
+                type="date"
+                name="finished_at"
+                value={terminei}
+                min={comecei || undefined}
+                max={hoje}
+                onChange={(e) => setTerminei(e.target.value)}
+                className="min-h-11 w-full rounded border-2 border-ink bg-white px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-moss-dark"
+              />
+            </label>
+          </div>
+          <p className="text-xs text-ink/60">
+            {terminei
+              ? `Conta pra meta e retrospectiva de ${terminei.slice(0, 4)}.`
+              : "Sem data de término, o livro não entra na meta nem na retrospectiva."}
+          </p>
+        </div>
       )}
 
       <button

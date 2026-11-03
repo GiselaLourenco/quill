@@ -92,11 +92,15 @@ export default async function HomePage() {
         .from("goals")
         .select("id, type, target_value")
         .eq("user_id", userId),
+      // Livros terminados no ano corrente — mesma conta da tela de Metas.
+      // Livro sem finished_at não entra (não dá pra saber o ano).
       supabase
         .from("media_items")
         .select("id", { count: "exact", head: true })
         .eq("user_id", userId)
-        .eq("status", "finished"),
+        .eq("status", "finished")
+        .gte("finished_at", `${anoAtual}-01-01`)
+        .lte("finished_at", `${anoAtual}-12-31`),
       // Livros terminados dentro do mês corrente — a pílula "Livros/mês".
       supabase
         .from("media_items")
@@ -180,7 +184,7 @@ export default async function HomePage() {
   const prefixoMes = `${anoAtual}-${String(agora.getMonth() + 1).padStart(2, "0")}`;
   const horasNoMes = Math.round(
     todas
-      .filter((s) => s.started_at?.startsWith(prefixoMes))
+      .filter((s) => s.started_at && localDateKey(s.started_at).startsWith(prefixoMes))
       .reduce((soma, s) => soma + (s.duration_seconds ?? 0), 0) / 3600,
   );
   const mesNome = agora.toLocaleString("pt-BR", { month: "long" });

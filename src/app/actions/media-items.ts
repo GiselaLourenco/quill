@@ -8,6 +8,12 @@ import { conquistasDoTitulo } from "@/lib/achievements";
 import { paletteIndexForTitle } from "@/lib/covers";
 import { todayLocalDateKey } from "@/lib/date-br";
 
+/** Campo `<input type="date">` → YYYY-MM-DD, ou null se vazio/inválido. */
+function dataDoForm(valor: FormDataEntryValue | null): string | null {
+  const s = String(valor ?? "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s)) ? s : null;
+}
+
 export async function createMediaItem(formData: FormData) {
   const userId = await requireUserId();
 
@@ -33,6 +39,22 @@ export async function createMediaItem(formData: FormData) {
       ? String(formData.get("cover_url") ?? "").trim() || null
       : null;
 
+  // Datas de quem já leu (só valem com "terminei"): vêm vazias do formulário
+  // e assim ficam — livro antigo cadastrado hoje não deve contar em 2026.
+  const hoje = todayLocalDateKey();
+  let finishedAt: string | null = null;
+  let startedAt: string | null = status === "reading" ? hoje : null;
+  if (status === "finished") {
+    finishedAt = dataDoForm(formData.get("finished_at"));
+    startedAt = dataDoForm(formData.get("started_at"));
+    if ((finishedAt && finishedAt > hoje) || (startedAt && startedAt > hoje)) {
+      redirect("/books/new?error=A data não pode ser no futuro.");
+    }
+    if (startedAt && finishedAt && startedAt > finishedAt) {
+      redirect("/books/new?error=O início não pode ser depois do término.");
+    }
+  }
+
   const supabase = await createClient();
   const { data: criado, error } = await supabase.from("media_items").insert({
     user_id: userId,
@@ -44,8 +66,8 @@ export async function createMediaItem(formData: FormData) {
     total_chapters: totalChapters,
     status,
     // Sem data o livro não entra na meta nem nas conquistas de nenhum ano.
-    finished_at: status === "finished" ? todayLocalDateKey() : null,
-    started_at: status === "reading" ? todayLocalDateKey() : null,
+    finished_at: finishedAt,
+    started_at: startedAt,
     cover_kind: coverKind === "real" && coverUrl ? "real" : "illustrated",
     cover_url: coverUrl,
     cover_palette: paletteIndexForTitle(title),
