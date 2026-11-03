@@ -348,36 +348,6 @@ export const ACHIEVEMENTS: Achievement[] = [
     },
   },
   {
-    key: "calice_de_fogo",
-    name: "Cálice de Fogo",
-    description: "Termine Harry Potter e o Cálice de Fogo e ganhe a foto da Luna Lovegood.",
-    tier: "prata",
-    criteria: {
-      type: "specific_book",
-      // Qualquer edição, em qualquer idioma — é o 4º livro da série.
-      titles: [
-        "Harry Potter e o Cálice de Fogo",
-        "Harry Potter and the Goblet of Fire",
-        "Harry Potter y el Cáliz de Fuego",
-        "Harry Potter et la Coupe de Feu",
-        "Harry Potter e il Calice di Fuoco",
-        "Harry Potter und der Feuerkelch",
-        "Harry Potter en de Vuurbeker",
-        "Harry Potter i Czara Ognia",
-        "O Cálice de Fogo",
-        "The Goblet of Fire",
-      ],
-      volume: 4,
-      target: 1,
-    },
-    unit: "livro",
-    avatar: {
-      arquivo: "quill-luna-lovegood.png",
-      nome: "Luna Lovegood",
-      dica: "Termine Harry Potter e o Cálice de Fogo",
-    },
-  },
-  {
     key: "pedra_filosofal",
     name: "Pedra Filosofal",
     description: "Termine Harry Potter e a Pedra Filosofal e ganhe a foto do Harry.",
@@ -494,6 +464,36 @@ export const ACHIEVEMENTS: Achievement[] = [
       arquivo: "quill-sirius-v2.png",
       nome: "Sirius",
       dica: "Termine Harry Potter e o Prisioneiro de Azkaban",
+    },
+  },
+  {
+    key: "calice_de_fogo",
+    name: "Cálice de Fogo",
+    description: "Termine Harry Potter e o Cálice de Fogo e ganhe a foto da Luna Lovegood.",
+    tier: "prata",
+    criteria: {
+      type: "specific_book",
+      // Qualquer edição, em qualquer idioma — é o 4º livro da série.
+      titles: [
+        "Harry Potter e o Cálice de Fogo",
+        "Harry Potter and the Goblet of Fire",
+        "Harry Potter y el Cáliz de Fuego",
+        "Harry Potter et la Coupe de Feu",
+        "Harry Potter e il Calice di Fuoco",
+        "Harry Potter und der Feuerkelch",
+        "Harry Potter en de Vuurbeker",
+        "Harry Potter i Czara Ognia",
+        "O Cálice de Fogo",
+        "The Goblet of Fire",
+      ],
+      volume: 4,
+      target: 1,
+    },
+    unit: "livro",
+    avatar: {
+      arquivo: "quill-luna-lovegood.png",
+      nome: "Luna Lovegood",
+      dica: "Termine Harry Potter e o Cálice de Fogo",
     },
   },
   {
