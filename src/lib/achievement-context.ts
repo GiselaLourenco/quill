@@ -149,6 +149,17 @@ function calcularContexto(
   }
   const dias = [...minutosPorDia.keys()];
 
+  // Quando começou cada livro: o "lendo" gravado ou, sem ele, a primeira
+  // sessão nele — quase ninguém tem `started_at` (livro criado direto como
+  // lendo não gravava), e sem isso "começar" quase nunca contava.
+  const primeiraSessao = new Map<string, string>();
+  for (const s of todasSessoes) {
+    if (s.item_id && !primeiraSessao.has(s.item_id)) {
+      primeiraSessao.set(s.item_id, localDateKey(s.started_at));
+    }
+  }
+  const comecouEm = (i: ItemConquista) => i.started_at ?? primeiraSessao.get(i.id) ?? null;
+
   // ---- Estante ----------------------------------------------------------
   const terminados = itens.filter(
     (i) => i.status === "finished" && (ano === null || (i.finished_at && noAno(i.finished_at))),
@@ -165,7 +176,7 @@ function calcularContexto(
   const finishThenStart = terminados.filter(
     (t) =>
       t.finished_at &&
-      itens.some((o) => o.id !== t.id && o.started_at === t.finished_at),
+      itens.some((o) => o.id !== t.id && comecouEm(o) === t.finished_at),
   ).length;
 
   return {
@@ -186,9 +197,11 @@ function calcularContexto(
     maxDaysInMonth: maxDiasPorGrupo(dias, (d) => d.slice(0, 7)),
     daysRead: dias.length,
     maxFinishedInMonth: Math.max(0, ...terminadosPorMes.values()),
-    booksStarted: itens.filter(
-      (i) => i.status !== "want" && (ano === null || (i.started_at && noAno(i.started_at))),
-    ).length,
+    booksStarted: itens.filter((i) => {
+      const inicio = comecouEm(i);
+      if (ano !== null) return inicio !== null && noAno(inicio);
+      return inicio !== null || ["reading", "finished", "abandoned"].includes(i.status);
+    }).length,
     finishThenStart,
     distinctGenres: generos.size,
     distinctAuthors: autores.size,

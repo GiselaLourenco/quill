@@ -7,7 +7,7 @@ import { logout, deleteAccount } from "@/app/actions/auth";
 import { toggleCompete } from "@/app/actions/groups";
 import { quillPhase } from "@/lib/gamification";
 import { evaluateAchievements } from "@/lib/achievements";
-import { loadAchievementData } from "@/lib/achievement-context";
+import { anoAtual, loadAchievementData } from "@/lib/achievement-context";
 import { listarAvataresEnviados } from "@/lib/artes";
 import {
   SRCS_AVATAR_DE_CONQUISTA,
@@ -26,7 +26,7 @@ export default async function ProfilePage() {
   const userId = await requireUserId();
 
   const supabase = await createClient();
-  const year = new Date().getFullYear();
+  const year = anoAtual();
 
   const [
     { data: profile },

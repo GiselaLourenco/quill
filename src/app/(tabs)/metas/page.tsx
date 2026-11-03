@@ -6,6 +6,7 @@ import { requireUserId } from "@/lib/supabase/auth";
 import { ConfigurarMetas, type MetaConfiguravel } from "@/components/configurar-metas";
 import { ExcluirMeta } from "@/components/excluir-meta";
 import { computeStreak } from "@/lib/gamification";
+import { localDateKey, todayLocalDateKey } from "@/lib/date-br";
 import {
   goalProgress,
   computePagesPerDay,
@@ -22,7 +23,9 @@ export default async function MetasPage({
 }) {
   const userId = await requireUserId();
   const { error } = await searchParams;
-  const year = new Date().getFullYear();
+  // Ano e mês no fuso do Brasil — o servidor roda em UTC.
+  const hoje = todayLocalDateKey();
+  const year = Number(hoje.slice(0, 4));
 
   const supabase = await createClient();
   const [{ data: sessions }, { count: finishedThisYear }, { data: goals }] =
@@ -48,11 +51,10 @@ export default async function MetasPage({
   const sessionRows = (sessions ?? []) as SessionRow[];
 
   // ---- Valores atuais das três metas configuráveis --------------------
-  const agora = new Date();
-  const prefixoMes = `${year}-${String(agora.getMonth() + 1).padStart(2, "0")}`;
+  const prefixoMes = hoje.slice(0, 7);
   const horasNoMes = Math.round(
     sessionRows
-      .filter((s) => s.started_at?.startsWith(prefixoMes))
+      .filter((s) => s.started_at && localDateKey(s.started_at).startsWith(prefixoMes))
       .reduce((soma, s) => soma + (s.duration_seconds ?? 0), 0) / 3600,
   );
   const streakAtual = computeStreak(sessionRows).current;

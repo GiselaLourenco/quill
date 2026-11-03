@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 import { conquistasDoTitulo } from "@/lib/achievements";
 import { paletteIndexForTitle } from "@/lib/covers";
+import { todayLocalDateKey } from "@/lib/date-br";
 
 export async function createMediaItem(formData: FormData) {
   const userId = await requireUserId();
@@ -33,7 +34,7 @@ export async function createMediaItem(formData: FormData) {
       : null;
 
   const supabase = await createClient();
-  const { error } = await supabase.from("media_items").insert({
+  const { data: criado, error } = await supabase.from("media_items").insert({
     user_id: userId,
     title,
     creator,
@@ -42,14 +43,21 @@ export async function createMediaItem(formData: FormData) {
     total_units: totalUnits,
     total_chapters: totalChapters,
     status,
+    // Sem data o livro não entra na meta nem nas conquistas de nenhum ano.
+    finished_at: status === "finished" ? todayLocalDateKey() : null,
+    started_at: status === "reading" ? todayLocalDateKey() : null,
     cover_kind: coverKind === "real" && coverUrl ? "real" : "illustrated",
     cover_url: coverUrl,
     cover_palette: paletteIndexForTitle(title),
-  });
+  })
+    .select("id")
+    .single();
 
-  if (error) {
+  if (error || !criado) {
     redirect("/books/new?error=Não foi possível salvar o livro.");
   }
+
+  if (status === "finished") await registrarConquistaDeLivro(supabase, userId, criado.id);
 
   redirect("/estante");
 }
@@ -147,6 +155,14 @@ export async function updateItemStatus(itemId: string, status: string) {
 
   const supabase = await createClient();
 
+  const { data: atual } = await supabase
+    .from("media_items")
+    .select("status, started_at, finished_at")
+    .eq("id", itemId)
+    .maybeSingle();
+  // Dia no fuso do Brasil: em UTC, terminar às 22h de 31/dez contava pro ano
+  // seguinte. Marcar "terminei" de novo num livro já terminado mantém a data.
+  const hoje = todayLocalDateKey();
   const updates: {
     status: string;
     finished_at: string | null;
@@ -154,7 +170,12 @@ export async function updateItemStatus(itemId: string, status: string) {
     is_recommended?: boolean;
   } = {
     status,
-    finished_at: status === "finished" ? new Date().toISOString().slice(0, 10) : null,
+    finished_at:
+      status !== "finished"
+        ? null
+        : atual?.status === "finished" && atual.finished_at
+          ? atual.finished_at
+          : hoje,
   };
   // Escolher "recomendado" aqui é o caso "ainda não decidi": a marca vem junto.
   if (status === "recomendado") updates.is_recommended = true;
@@ -162,15 +183,8 @@ export async function updateItemStatus(itemId: string, status: string) {
   // "Dias lidos" conta do primeiro "lendo" até o "terminei" — grava só na
   // primeira vez que entra como lendo; abandonar e retomar depois não
   // reinicia essa data.
-  if (status === "reading") {
-    const { data: atual } = await supabase
-      .from("media_items")
-      .select("started_at")
-      .eq("id", itemId)
-      .maybeSingle();
-    if (!atual?.started_at) {
-      updates.started_at = new Date().toISOString().slice(0, 10);
-    }
+  if (status === "reading" && !atual?.started_at) {
+    updates.started_at = hoje;
   }
 
   await supabase.from("media_items").update(updates).eq("id", itemId);
