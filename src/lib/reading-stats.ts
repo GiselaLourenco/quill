@@ -106,6 +106,29 @@ export function paginasLidas(
   return 0;
 }
 
+/**
+ * Páginas de livros terminados que nenhuma sessão da aba Ler cobriu — quem
+ * cadastra um livro já lido (com data de conclusão) leu aquelas páginas, só
+ * não cronometrou. Vale o total do livro menos o que as sessões reais (sem as
+ * de cadastro) já somaram nele, pra não contar em dobro. Entra só em totais
+ * de páginas por período, atribuído à data de conclusão — nunca em ritmo
+ * (média/dia, sequência), que depende de saber o dia da leitura.
+ */
+export function paginasDeLivrosTerminados(
+  livros: { id: string; total_units: number | null }[],
+  sessoesReais: { item_id: string | null; unit_start: number | null; unit_end: number | null }[],
+): number {
+  const lidasNoApp = new Map<string, number>();
+  for (const s of sessoesReais) {
+    if (!s.item_id || s.unit_start == null || s.unit_end == null) continue;
+    lidasNoApp.set(s.item_id, (lidasNoApp.get(s.item_id) ?? 0) + Math.max(0, s.unit_end - s.unit_start));
+  }
+  return livros.reduce(
+    (soma, l) => soma + Math.max(0, (l.total_units ?? 0) - (lidasNoApp.get(l.id) ?? 0)),
+    0,
+  );
+}
+
 export function computeReadingStats(sessions: SessionForStats[]): ReadingStats {
   const totalSeconds = sessions.reduce(
     (sum, s) => sum + (s.duration_seconds ?? 0),

@@ -8,7 +8,7 @@ import {
   TAG_LABELS,
   type SessionRow,
 } from "@/lib/gamification";
-import { formatDuration } from "@/lib/reading-stats";
+import { formatDuration, paginasDeLivrosTerminados } from "@/lib/reading-stats";
 import { localDateKey, todayLocalDateKey } from "@/lib/date-br";
 
 const MONTH_NAMES = [
@@ -95,7 +95,7 @@ export default async function RetrospectivaPage({
   })();
 
   const supabase = await createClient();
-  const [{ data: sessions }, { count: booksFinished }] = await Promise.all([
+  const [{ data: sessions }, { count: booksFinished }, { data: terminadosJanela }] = await Promise.all([
     supabase
       .from("sessions")
       .select("started_at, duration_seconds, unit_start, unit_end, chapter_start, chapter_end, quality_tags, item_id")
@@ -110,11 +110,36 @@ export default async function RetrospectivaPage({
       .eq("status", "finished")
       .gte("finished_at", start)
       .lte("finished_at", end),
+    // Terminados nos dois períodos (atual e anterior), pras páginas que
+    // nenhuma sessão cobriu — ex.: livro cadastrado já lido, com data.
+    supabase
+      .from("media_items")
+      .select("id, total_units, finished_at")
+      .eq("user_id", userId)
+      .eq("status", "finished")
+      .gte("finished_at", prevStart)
+      .lte("finished_at", end),
   ]);
+
+  const terminados = terminadosJanela ?? [];
+  const { data: sessoesDosTerminados } = terminados.length
+    ? await supabase
+        .from("sessions")
+        .select("item_id, unit_start, unit_end")
+        .in("item_id", terminados.map((t) => t.id))
+        .eq("cadastro", false)
+    : { data: [] };
+  const paginasDosTerminados = (de: string, ate: string) =>
+    paginasDeLivrosTerminados(
+      terminados.filter((t) => t.finished_at! >= de && t.finished_at! <= ate),
+      sessoesDosTerminados ?? [],
+    );
 
   const sessionRows = (sessions ?? []) as SessionRow[];
   const current = summarize(sessionRows, start, end);
   const previous = summarize(sessionRows, prevStart, prevEnd);
+  current.pagesRead += paginasDosTerminados(start, end);
+  previous.pagesRead += paginasDosTerminados(prevStart, prevEnd);
   const longestStreak = computeStreak(current.inRange).record;
   const topTag = mostCommonTag(current.inRange);
 

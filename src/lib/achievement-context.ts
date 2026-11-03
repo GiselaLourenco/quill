@@ -6,6 +6,7 @@ import {
   type SessionRow,
 } from "@/lib/gamification";
 import { localDateKey, localHour } from "@/lib/date-br";
+import { paginasDeLivrosTerminados } from "@/lib/reading-stats";
 import { ACHIEVEMENTS, evaluateAchievements, type AchievementContext } from "@/lib/achievements";
 
 // Fonte única do que as conquistas (e os recordes "da vida") leem. Antes cada
@@ -181,6 +182,10 @@ function calcularContexto(
   const terminados = itens.filter(
     (i) => i.status === "finished" && (ano === null || (i.finished_at && noAno(i.finished_at))),
   );
+  // Livro terminado no período soma as páginas que as sessões não cobriram
+  // (ex.: cadastrado já lido, com data). As sessões são do histórico todo,
+  // pra descontar o que já foi lido no app em qualquer ano.
+  totalPages += paginasDeLivrosTerminados(terminados, todasSessoes);
   const generos = new Set(terminados.map((i) => chave(i.genre)).filter(Boolean));
   const autores = new Set(terminados.map((i) => chave(i.creator)).filter(Boolean));
   const terminadosPorMes = new Map<string, number>();
