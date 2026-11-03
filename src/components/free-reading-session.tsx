@@ -56,6 +56,45 @@ function metricLabel(metric: string): string {
 
 type Fase = "idle" | "rodando" | "registro" | "salvo";
 
+const CHAVE_SESSAO = "quill.sessao-em-andamento";
+
+type SessaoSalva = {
+  fase: "rodando" | "registro";
+  startedAt: string | null;
+  runStartMs: number | null;
+  accSeconds: number;
+  pausado: boolean;
+  minutosSessao: number;
+  notaRascunho: string;
+  notaRascunhoPublica: boolean;
+};
+
+function lerSessaoSalva(): SessaoSalva | null {
+  try {
+    const bruto = window.localStorage.getItem(CHAVE_SESSAO);
+    if (!bruto) return null;
+    const s = JSON.parse(bruto) as SessaoSalva;
+    if (s.fase !== "rodando" && s.fase !== "registro") return null;
+    return s;
+  } catch {
+    return null;
+  }
+}
+
+function gravarSessao(s: SessaoSalva) {
+  try {
+    window.localStorage.setItem(CHAVE_SESSAO, JSON.stringify(s));
+  } catch {
+    // sem storage (aba anônima etc.): o timer só não sobrevive à troca de aba
+  }
+}
+
+function limparSessao() {
+  try {
+    window.localStorage.removeItem(CHAVE_SESSAO);
+  } catch {}
+}
+
 export function FreeReadingSession({
   books,
   activeChallenges,
@@ -82,6 +121,64 @@ export function FreeReadingSession({
   const [notaRascunhoPublica, setNotaRascunhoPublica] = useState(false);
 
   const rodando = fase === "rodando" && !pausado;
+
+  // A sessão em andamento fica no localStorage: trocar de aba desmonta este
+  // componente, e sem isso o timer voltava pro play. Só restaura no cliente
+  // (depois do mount) pra não brigar com o HTML do servidor.
+  const [restaurado, setRestaurado] = useState(false);
+  useEffect(() => {
+    const salva = lerSessaoSalva();
+    if (salva) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setStartedAt(salva.startedAt);
+      setAccSeconds(salva.accSeconds);
+      setRunStartMs(salva.runStartMs);
+      setPausado(salva.pausado);
+      setElapsed(
+        salva.accSeconds +
+          (salva.runStartMs != null && !salva.pausado
+            ? Math.floor((Date.now() - salva.runStartMs) / 1000)
+            : 0),
+      );
+      setNotaRascunho(salva.notaRascunho);
+      setNotaRascunhoPublica(salva.notaRascunhoPublica);
+      if (salva.fase === "registro") {
+        setMinutosSessao(salva.minutosSessao);
+        setOrigem("timer");
+      }
+      setFase(salva.fase);
+    }
+    setRestaurado(true);
+  }, []);
+
+  useEffect(() => {
+    if (!restaurado) return;
+    if (fase === "rodando" || (fase === "registro" && origem === "timer")) {
+      gravarSessao({
+        fase,
+        startedAt,
+        runStartMs,
+        accSeconds,
+        pausado,
+        minutosSessao,
+        notaRascunho,
+        notaRascunhoPublica,
+      });
+    } else {
+      limparSessao();
+    }
+  }, [
+    restaurado,
+    fase,
+    origem,
+    startedAt,
+    runStartMs,
+    accSeconds,
+    pausado,
+    minutosSessao,
+    notaRascunho,
+    notaRascunhoPublica,
+  ]);
 
   // O tempo decorrido NUNCA é contado somando ticks: ele é sempre recalculado a
   // partir do timestamp de início. Assim o timer continua certo mesmo quando o
