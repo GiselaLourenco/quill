@@ -5,6 +5,8 @@ export type SessionForStats = {
   duration_seconds: number | null;
   unit_end: number | null;
   created_at: string;
+  /** Posição informada ao cadastrar o livro na estante — não é leitura. */
+  cadastro?: boolean;
 };
 
 export type ReadingStats = {
@@ -91,16 +93,25 @@ export function computeReadingStats(sessions: SessionForStats[]): ReadingStats {
     0,
   );
 
+  // A página atual leva em conta tudo, inclusive o cadastro. Já o ritmo só
+  // olha o que foi lido no app: dias e páginas da sessão de cadastro (ex.:
+  // "já estava na 288 quando adicionei") não contam como leitura.
+  const lidas = sessions.filter((s) => !s.cadastro);
   const days = new Set(
-    sessions.map((s) => localDateKey(s.started_at)), // YYYY-MM-DD, fuso do Brasil
+    lidas.map((s) => localDateKey(s.started_at)), // YYYY-MM-DD, fuso do Brasil
   );
 
   const currentPage = posicaoAtual(sessions).paginas;
+  const paginaDoCadastro = Math.max(
+    0,
+    ...sessions.filter((s) => s.cadastro).map((s) => s.unit_end ?? 0),
+  );
+  const paginasNoApp = Math.max(0, currentPage - paginaDoCadastro);
 
   const daysRead = days.size;
-  const pagesPerDay = daysRead > 0 ? Math.round(currentPage / daysRead) : 0;
+  const pagesPerDay = daysRead > 0 ? Math.round(paginasNoApp / daysRead) : 0;
   const pagesPerHour =
-    totalSeconds > 0 ? Math.round((currentPage / totalSeconds) * 3600) : 0;
+    totalSeconds > 0 ? Math.round((paginasNoApp / totalSeconds) * 3600) : 0;
 
   return { totalSeconds, daysRead, currentPage, pagesPerDay, pagesPerHour };
 }

@@ -73,6 +73,7 @@ export default async function CompartilharPage() {
       .from("sessions")
       .select("started_at, duration_seconds, unit_start, unit_end, item_id")
       .eq("user_id", userId)
+      .eq("cadastro", false)
       .gte("started_at", `${inicio}T00:00:00`),
     // Estante inteira — alimenta tanto o "livro do período" quanto a busca.
     supabase

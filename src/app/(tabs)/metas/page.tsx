@@ -33,7 +33,8 @@ export default async function MetasPage({
       supabase
         .from("sessions")
         .select("started_at, duration_seconds, unit_start, unit_end, chapter_start, chapter_end, quality_tags, item_id")
-        .eq("user_id", userId),
+        .eq("user_id", userId)
+        .eq("cadastro", false),
       supabase
         .from("media_items")
         .select("id", { count: "exact", head: true })

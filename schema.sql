@@ -73,6 +73,7 @@ create table public.sessions (
   chapter_start     int,                      -- capítulo anterior (p/ pílula capítulos/semana)
   chapter_end       int,                      -- capítulo informado nesta sessão (valor absoluto)
   quality_tags     text[] not null default '{}', -- {'no_distractions','flowed','phone','hard'}
+  cadastro         boolean not null default false, -- posição informada ao montar a estante (0 → X, sem leitura antes): vale pra página atual, não pras métricas
   created_at       timestamptz not null default now()
 );
 create index on public.sessions (user_id, started_at);

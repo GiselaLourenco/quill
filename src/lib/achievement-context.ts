@@ -26,6 +26,9 @@ async function todasAsSessoes(supabase: SupabaseClient, userId: string): Promise
       .from("sessions")
       .select(COLUNAS_SESSAO)
       .eq("user_id", userId)
+      // Cadastro da estante não é leitura: não conta pra sequência, contagem
+      // de sessões nem recorde de páginas.
+      .eq("cadastro", false)
       .order("started_at", { ascending: true })
       .range(de, de + PAGINA - 1);
     if (error) throw error;

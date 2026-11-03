@@ -45,7 +45,8 @@ export default async function CalendarioPage({
   const { data: sessions } = await supabase
     .from("sessions")
     .select("started_at, duration_seconds, unit_start, unit_end, chapter_start, chapter_end, quality_tags, item_id")
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .eq("cadastro", false);
 
   const sessionRows = (sessions ?? []) as SessionRow[];
   const streak = computeStreak(sessionRows);

@@ -118,6 +118,25 @@ export async function createSession(input: {
   return { sessionId: newSession.id, error: null };
 }
 
+// Sessão de "cadastro": a posição informada ao montar a estante (0 → X) num
+// livro que ainda não tem nenhuma leitura cronometrada. Ela continua valendo
+// pra página atual, mas fica fora das métricas de leitura (média/dia,
+// sequência, dia preferido, conquistas...) — senão cadastrar dez livros já
+// lidos vira "2.571 páginas lidas hoje".
+async function ehCadastro(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  itemId: string,
+  anterior: number,
+): Promise<boolean> {
+  if (anterior > 0) return false;
+  const { count } = await supabase
+    .from("sessions")
+    .select("id", { count: "exact", head: true })
+    .eq("item_id", itemId)
+    .gt("duration_seconds", 0);
+  return (count ?? 0) === 0;
+}
+
 // Corrige a posição atual direto na página do livro (sem passar pela tela de
 // Ler) — grava como uma sessão de duração zero, pra continuar valendo pro
 // mesmo cálculo de "página/capítulo atual" (maior unit_end/chapter_end) que
@@ -162,6 +181,7 @@ export async function atualizarPosicaoLeitura(input: {
       ? { unit_start: anterior, unit_end: valor }
       : { chapter_start: anterior, chapter_end: valor };
 
+  const cadastro = await ehCadastro(supabase, input.itemId, anterior);
   const agora = new Date().toISOString();
   const { error } = await supabase.from("sessions").insert({
     item_id: input.itemId,
@@ -169,6 +189,7 @@ export async function atualizarPosicaoLeitura(input: {
     started_at: agora,
     ended_at: agora,
     duration_seconds: 0,
+    cadastro,
     ...posicao,
   });
 
@@ -224,6 +245,7 @@ export async function definirTotalEPosicao(input: {
       input.unidade === "pages"
         ? { unit_start: 0, unit_end: atual }
         : { chapter_start: 0, chapter_end: atual };
+    const cadastro = await ehCadastro(supabase, input.itemId, 0);
     const agora = new Date().toISOString();
     await supabase.from("sessions").insert({
       item_id: input.itemId,
@@ -231,6 +253,7 @@ export async function definirTotalEPosicao(input: {
       started_at: agora,
       ended_at: agora,
       duration_seconds: 0,
+      cadastro,
       ...posicao,
     });
     if (atual >= totalNum) await updateItemStatus(input.itemId, "finished");
@@ -354,6 +377,7 @@ export async function sessoesDoDia(chave: string): Promise<SessaoDoDia[]> {
       "id, started_at, ended_at, duration_seconds, unit_start, unit_end, chapter_start, chapter_end, quality_tags, media_items(id, title, creator, cover_kind, cover_url, cover_palette)",
     )
     .eq("user_id", userId)
+    .eq("cadastro", false)
     .gte("started_at", `${addDaysToKey(chave, -1)}T00:00:00Z`)
     .lt("started_at", `${addDaysToKey(chave, 2)}T00:00:00Z`)
     .order("started_at", { ascending: true });

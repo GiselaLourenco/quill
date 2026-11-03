@@ -100,6 +100,7 @@ export default async function RetrospectivaPage({
       .from("sessions")
       .select("started_at, duration_seconds, unit_start, unit_end, chapter_start, chapter_end, quality_tags, item_id")
       .eq("user_id", userId)
+      .eq("cadastro", false)
       .gte("started_at", `${prevStart}T00:00:00`)
       .lte("started_at", `${end}T23:59:59`),
     supabase
