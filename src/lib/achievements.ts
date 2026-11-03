@@ -473,7 +473,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     tier: "prata",
     criteria: {
       type: "specific_book",
-      // Qualquer edição, em qualquer idioma — é o 4º livro da série.
+      // Qualquer edição, em qualquer idioma — e também "Harry Potter 4".
       titles: [
         "Harry Potter e o Cálice de Fogo",
         "Harry Potter and the Goblet of Fire",
@@ -485,6 +485,15 @@ export const ACHIEVEMENTS: Achievement[] = [
         "Harry Potter i Czara Ognia",
         "O Cálice de Fogo",
         "The Goblet of Fire",
+        "Harry Potter 4",
+        "Harry Potter #4",
+        "Harry Potter vol. 4",
+        "Harry Potter, vol. 4",
+        "Harry Potter volume 4",
+        "Harry Potter: Livro 4",
+        "Harry Potter Livro 4",
+        "Harry Potter: Book 4",
+        "Harry Potter Book 4",
       ],
       volume: 4,
       target: 1,

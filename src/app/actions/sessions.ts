@@ -118,29 +118,13 @@ export async function createSession(input: {
   return { sessionId: newSession.id, error: null };
 }
 
-// Sessão de "cadastro": a posição informada ao montar a estante (0 → X) num
-// livro que ainda não tem nenhuma leitura cronometrada. Ela continua valendo
-// pra página atual, mas fica fora das métricas de leitura (média/dia,
-// sequência, dia preferido, conquistas...) — senão cadastrar dez livros já
-// lidos vira "2.571 páginas lidas hoje".
-async function ehCadastro(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  itemId: string,
-  anterior: number,
-): Promise<boolean> {
-  if (anterior > 0) return false;
-  const { count } = await supabase
-    .from("sessions")
-    .select("id", { count: "exact", head: true })
-    .eq("item_id", itemId)
-    .gt("duration_seconds", 0);
-  return (count ?? 0) === 0;
-}
-
 // Corrige a posição atual direto na página do livro (sem passar pela tela de
 // Ler) — grava como uma sessão de duração zero, pra continuar valendo pro
 // mesmo cálculo de "página/capítulo atual" (maior unit_end/chapter_end) que
-// as estatísticas e a % da estante já usam.
+// as estatísticas e a % da estante já usam. Mudar a página não é leitura:
+// sai marcada `cadastro`, fora de todas as métricas (sessões, dias lidos,
+// sequência, recordes). As páginas voltam a contar quando o livro termina
+// (`paginasDeLivrosTerminados`).
 export async function atualizarPosicaoLeitura(input: {
   itemId: string;
   unidade: SessionUnit;
@@ -181,7 +165,6 @@ export async function atualizarPosicaoLeitura(input: {
       ? { unit_start: anterior, unit_end: valor }
       : { chapter_start: anterior, chapter_end: valor };
 
-  const cadastro = await ehCadastro(supabase, input.itemId, anterior);
   const agora = new Date().toISOString();
   const { error } = await supabase.from("sessions").insert({
     item_id: input.itemId,
@@ -189,7 +172,7 @@ export async function atualizarPosicaoLeitura(input: {
     started_at: agora,
     ended_at: agora,
     duration_seconds: 0,
-    cadastro,
+    cadastro: true,
     ...posicao,
   });
 
@@ -245,7 +228,6 @@ export async function definirTotalEPosicao(input: {
       input.unidade === "pages"
         ? { unit_start: 0, unit_end: atual }
         : { chapter_start: 0, chapter_end: atual };
-    const cadastro = await ehCadastro(supabase, input.itemId, 0);
     const agora = new Date().toISOString();
     await supabase.from("sessions").insert({
       item_id: input.itemId,
@@ -253,7 +235,7 @@ export async function definirTotalEPosicao(input: {
       started_at: agora,
       ended_at: agora,
       duration_seconds: 0,
-      cadastro,
+      cadastro: true,
       ...posicao,
     });
     if (atual >= totalNum) await updateItemStatus(input.itemId, "finished");

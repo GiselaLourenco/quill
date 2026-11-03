@@ -85,7 +85,7 @@ export default async function BookPage({
     await Promise.all([
       supabase
         .from("sessions")
-        .select("started_at, duration_seconds, unit_end, chapter_end, created_at, cadastro")
+        .select("started_at, duration_seconds, unit_start, unit_end, chapter_end, created_at, cadastro")
         .eq("item_id", id),
       supabase
         .from("comments")
