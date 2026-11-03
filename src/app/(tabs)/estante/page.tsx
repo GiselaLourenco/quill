@@ -8,7 +8,7 @@ import { getReceivedRecommendations } from "@/lib/recommendations";
 import { IndicarSheet, type LivroIndicavel } from "@/components/indicar-sheet";
 import { AmigosEstantes } from "@/components/amigos-estantes";
 import { EmptyState } from "@/components/empty-state";
-import { posicaoAtualPorItem } from "@/lib/reading-stats";
+import { paginasLidas, posicaoAtualPorItem } from "@/lib/reading-stats";
 
 
 
@@ -231,6 +231,7 @@ async function MyShelf({
       stars: starsByItem.get(item.id) ?? 0,
       total_units: item.total_units,
       percent_lido: percentLido,
+      paginas_lidas: paginasLidas(item, progressoPorItem.get(item.id)?.paginas),
     };
   });
 

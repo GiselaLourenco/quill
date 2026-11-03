@@ -71,6 +71,20 @@ export function posicaoAtualPorItem(
   return out;
 }
 
+/**
+ * Quanto do livro conta no "Páginas" da estante: terminado conta inteiro
+ * (sem total cadastrado, vale a última página registrada), "lendo" até a
+ * página atual. Quero ler/abandonei/recomendado ficam de fora.
+ */
+export function paginasLidas(
+  item: { status: string; total_units: number | null },
+  paginaAtual: number | undefined,
+): number {
+  if (item.status === "finished") return item.total_units ?? paginaAtual ?? 0;
+  if (item.status === "reading") return paginaAtual ?? 0;
+  return 0;
+}
+
 export function computeReadingStats(sessions: SessionForStats[]): ReadingStats {
   const totalSeconds = sessions.reduce(
     (sum, s) => sum + (s.duration_seconds ?? 0),

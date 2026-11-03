@@ -110,7 +110,11 @@ export async function createSession(input: {
   }
 
   revalidatePath("/");
-  if (itemId) revalidatePath(`/books/${itemId}`);
+  if (itemId) {
+    revalidatePath(`/books/${itemId}`);
+    // A posição nova (e o "terminei" automático) mudam o % e o "Páginas" da estante.
+    revalidatePath("/estante");
+  }
   return { sessionId: newSession.id, error: null };
 }
 

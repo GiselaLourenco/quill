@@ -632,6 +632,7 @@ function AmigosDialog({
         stars: l.stars ?? 0,
         total_units: l.total_units,
         percent_lido: l.percent_lido,
+        paginas_lidas: l.paginas_lidas,
       }));
       // Tela toda, não modal — a caixinha de 85vh do diálogo apertava demais
       // uma estante inteira (busca, filtros, grade). Portal pra escapar do

@@ -28,6 +28,8 @@ export type ShelfBook = {
   stars: number; // 0 = sem nota
   total_units: number | null; // páginas
   percent_lido: number | null; // posição atual ÷ total (páginas ou capítulos) — null sem dado
+  /** Páginas já lidas: o total nos terminados, a página atual nos "lendo", 0 no resto. */
+  paginas_lidas: number;
 };
 
 const STATUS_META: Record<DbStatus, { label: string; bg: string; text: string }> = {
@@ -183,13 +185,10 @@ export function EstanteShelf({
   const visiveis = filtrados.slice(0, visivel);
   const restantes = filtrados.length - visiveis.length;
 
-  // Só livros terminados contam — página de um livro "quero ler" ou "lendo"
-  // ainda não foi lida de verdade.
+  // Terminados contam inteiros e os "lendo" contam até a página atual — sem
+  // isso, quem está no meio de um livrão via o número parado até terminar.
   const paginasLidas = useMemo(
-    () =>
-      books
-        .filter((b) => b.status === "finished")
-        .reduce((soma, b) => soma + (b.total_units ?? 0), 0),
+    () => books.reduce((soma, b) => soma + b.paginas_lidas, 0),
     [books],
   );
 

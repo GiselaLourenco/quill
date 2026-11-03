@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { nomeExibicao } from "@/lib/nome-exibicao";
-import { posicaoAtualPorItem } from "@/lib/reading-stats";
+import { paginasLidas, posicaoAtualPorItem } from "@/lib/reading-stats";
 
 export type Friend = { id: string; name: string };
 
@@ -48,7 +48,8 @@ export type FriendItem = {
   stars: number | null;
   progressLabel: string | null;
   percent_lido: number | null; // posição atual ÷ total (páginas ou capítulos) — mesmo cálculo da estante
-  total_units: number | null; // páginas — pro somatório de "Páginas" quando a estante dele é exibida com EstanteShelf
+  total_units: number | null; // páginas
+  paginas_lidas: number; // pro somatório de "Páginas" quando a estante dele é exibida com EstanteShelf
   lastComment: { content: string; chapterRef: number | null } | null;
 };
 
@@ -187,6 +188,7 @@ export async function getFriendsShelf(
       progressLabel,
       percent_lido: percentLido,
       total_units: it.total_units,
+      paginas_lidas: paginasLidas(it, progress?.pages),
       lastComment: lastCommentByItem.get(it.id) ?? null,
     });
   }
