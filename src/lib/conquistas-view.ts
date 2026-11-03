@@ -8,6 +8,8 @@ export type ConquistaView = {
   nome: string;
   descricao: string;
   nivel: AchievementTier;
+  /** De livro específico (as que liberam foto) — têm seção própria na coleção. */
+  livro: boolean;
   icone: string;
   progresso: number;
   alvo: number;
@@ -48,6 +50,7 @@ export function montarConquistas(
         nome: a.name,
         descricao: a.description,
         nivel: a.tier,
+        livro: a.criteria.type === "specific_book",
         // Conquista que dá foto mostra a própria foto: o prêmio é o chamariz.
         icone: a.avatar
           ? srcDoAvatarDeConquista(a.avatar.arquivo)

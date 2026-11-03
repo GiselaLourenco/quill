@@ -42,6 +42,14 @@ function NivelChip({ nivel }: { nivel: AchievementTier }) {
   );
 }
 
+function LivrosChip() {
+  return (
+    <span className="rounded-full border-[1.5px] border-ink bg-paper px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+      Livros
+    </span>
+  );
+}
+
 function Barra({ valor, fina = false }: { valor: number; fina?: boolean }) {
   return (
     <div
@@ -317,13 +325,27 @@ export function ColecaoConquistas({
   const [aberta, setAberta] = useState<ConquistaView | null>(null);
   const feitas = conquistas.filter((c) => c.desbloqueada).length;
 
-  const grupos = NIVEIS.map((nivel) => {
-    const todos = conquistas.filter((c) => c.nivel === nivel);
-    const visiveis = todos.filter(
-      (c) => filtro === "todas" || (filtro === "feitas") === c.desbloqueada,
-    );
-    return { nivel, todos, visiveis };
-  }).filter((g) => g.visiveis.length > 0);
+  // As de livro (as que liberam foto) ficam juntas numa seção só, no fim,
+  // em vez de espalhadas pelos níveis.
+  const grupos = [
+    ...NIVEIS.map((nivel) => ({
+      id: nivel,
+      chip: <NivelChip nivel={nivel} />,
+      todos: conquistas.filter((c) => !c.livro && c.nivel === nivel),
+    })),
+    {
+      id: "livros",
+      chip: <LivrosChip />,
+      todos: conquistas.filter((c) => c.livro),
+    },
+  ]
+    .map((g) => ({
+      ...g,
+      visiveis: g.todos.filter(
+        (c) => filtro === "todas" || (filtro === "feitas") === c.desbloqueada,
+      ),
+    }))
+    .filter((g) => g.visiveis.length > 0);
 
   return (
     <div className="px-[18px] pb-8 pt-[18px]">
@@ -360,10 +382,10 @@ export function ColecaoConquistas({
         <p className="my-10 text-center font-serif italic text-ink-soft">Nada por aqui.</p>
       )}
 
-      {grupos.map(({ nivel, todos, visiveis }) => (
-        <section key={nivel}>
+      {grupos.map(({ id, chip, todos, visiveis }) => (
+        <section key={id}>
           <div className="mb-2.5 mt-[22px] flex items-center gap-2">
-            <NivelChip nivel={nivel} />
+            {chip}
             <span className="ml-auto text-[11px] font-bold tabular-nums text-ink-soft">
               {todos.filter((c) => c.desbloqueada).length}/{todos.length}
             </span>
