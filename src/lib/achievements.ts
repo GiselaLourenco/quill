@@ -530,7 +530,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     },
     unit: "livro",
     avatar: {
-      arquivo: "quill-mione.png",
+      arquivo: "quill-mione-v2.png",
       nome: "Mione",
       dica: "Termine Harry Potter e a Ordem da Fênix",
     },
