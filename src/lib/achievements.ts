@@ -536,6 +536,47 @@ export const ACHIEVEMENTS: Achievement[] = [
     },
   },
   {
+    key: "enigma_do_principe",
+    name: "Enigma do Príncipe",
+    description: "Termine Harry Potter e o Enigma do Príncipe e ganhe a foto da Mione.",
+    tier: "bronze",
+    criteria: {
+      type: "specific_book",
+      // Qualquer edição, em qualquer idioma — e também "Harry Potter 6".
+      titles: [
+        "Harry Potter e o Enigma do Príncipe",
+        "Harry Potter and the Half-Blood Prince",
+        "Harry Potter and the Half Blood Prince",
+        "Harry Potter y el Misterio del Príncipe",
+        "Harry Potter et le Prince de Sang-Mêlé",
+        "Harry Potter e il Principe Mezzosangue",
+        "Harry Potter und der Halbblutprinz",
+        "Harry Potter en de Halfbloed Prins",
+        "Harry Potter i Książę Półkrwi",
+        "O Enigma do Príncipe",
+        "The Half-Blood Prince",
+        "The Half Blood Prince",
+        "Harry Potter 6",
+        "Harry Potter #6",
+        "Harry Potter vol. 6",
+        "Harry Potter, vol. 6",
+        "Harry Potter volume 6",
+        "Harry Potter: Livro 6",
+        "Harry Potter Livro 6",
+        "Harry Potter: Book 6",
+        "Harry Potter Book 6",
+      ],
+      volume: 6,
+      target: 1,
+    },
+    unit: "livro",
+    avatar: {
+      arquivo: "quill-mione-hermione.png",
+      nome: "Mione",
+      dica: "Termine Harry Potter e o Enigma do Príncipe",
+    },
+  },
+  {
     key: "streak_30",
     name: "30 dias seguidos",
     description: "Leia 30 dias seguidos.",
@@ -592,11 +633,11 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     key: "month_3",
     name: "Uma pilha de histórias",
-    description: "Termine 3 livros no mesmo mês.",
+    description: "Termine pelo menos um livro por mês, 3 meses seguidos.",
     tier: "ouro",
-    criteria: { type: "metric", metric: "maxFinishedInMonth", target: 3 },
+    criteria: { type: "metric", metric: "finishedMonthsStreak", target: 3 },
     icon: icone("month_3"),
-    unit: "livros",
+    unit: "meses",
   },
   {
     key: "genres_10",
@@ -652,7 +693,8 @@ export type AchievementContext = {
   maxDaysInWeek: number;
   maxDaysInMonth: number;
   daysRead: number;
-  maxFinishedInMonth: number;
+  /** Maior sequência de meses seguidos com pelo menos um livro terminado. */
+  finishedMonthsStreak: number;
   booksStarted: number;
   finishThenStart: number;
   distinctGenres: number;
@@ -681,7 +723,7 @@ export const CONTEXTO_VAZIO: AchievementContext = {
   maxDaysInWeek: 0,
   maxDaysInMonth: 0,
   daysRead: 0,
-  maxFinishedInMonth: 0,
+  finishedMonthsStreak: 0,
   booksStarted: 0,
   finishThenStart: 0,
   distinctGenres: 0,
