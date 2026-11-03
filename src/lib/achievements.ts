@@ -499,7 +499,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     key: "ordem_da_fenix",
     name: "Ordem da Fênix",
-    description: "Termine Harry Potter e a Ordem da Fênix e ganhe a foto da Mione.",
+    description: "Termine Harry Potter e a Ordem da Fênix e ganhe a foto do Dumbledore.",
     tier: "ouro",
     criteria: {
       type: "specific_book",
@@ -531,7 +531,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     unit: "livro",
     avatar: {
       arquivo: "quill-mione-v2.png",
-      nome: "Mione",
+      nome: "Dumbledore",
       dica: "Termine Harry Potter e a Ordem da Fênix",
     },
   },
