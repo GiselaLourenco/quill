@@ -364,7 +364,6 @@ function TelaIdle({ onIniciar, onManual }: { onIniciar: () => void; onManual: ()
           </svg>
         </button>
         <p className="mt-3 font-display text-base tracking-wide">COMEÇAR</p>
-        <p className="mt-1 text-xs text-ink-soft">Vincular a um livro é opcional.</p>
 
         <button
           type="button"
