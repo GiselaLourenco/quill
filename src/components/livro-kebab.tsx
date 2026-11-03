@@ -1,13 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
 import { Portal } from "@/components/portal";
 import { deleteMediaItem } from "@/app/actions/media-items";
 
-// Kebab (3 pontos) do meu livro: editar (corrigir título, autor, páginas...)
-// e excluir, com confirmação — a exclusão leva junto sessões, notas e
-// comentários do livro.
+// Kebab (3 pontos) do meu livro: só excluir, com confirmação — a exclusão
+// leva junto sessões, notas e comentários do livro. Corrigir título, autor,
+// páginas etc. é na aba "Detalhes" da própria página (LivroDetalhes).
 export function LivroKebab({ itemId, titulo }: { itemId: string; titulo: string }) {
   const [menuAberto, setMenuAberto] = useState(false);
   const [confirmar, setConfirmar] = useState(false);
@@ -38,13 +37,6 @@ export function LivroKebab({ itemId, titulo }: { itemId: string; titulo: string 
             onClick={() => setMenuAberto(false)}
           />
           <div className="shadow-hard absolute right-0 top-full z-20 mt-2 w-44 border-2 border-ink bg-card p-1">
-            <Link
-              href={`/books/${itemId}/editar`}
-              onClick={() => setMenuAberto(false)}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left font-display text-xs uppercase tracking-wider text-ink hover:bg-mustard"
-            >
-              <span aria-hidden>✏️</span> Editar livro
-            </Link>
             <button
               type="button"
               onClick={() => {

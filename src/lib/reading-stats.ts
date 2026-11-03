@@ -74,6 +74,25 @@ export function posicaoAtualPorItem(
 }
 
 /**
+ * Livro terminado mostra o total cadastrado (páginas e capítulos), não a
+ * última posição registrada — quem marca "terminei" sem ter anotado cada
+ * sessão, ou importou a biblioteca do Kindle, não pode ver "pág. 0 de 320".
+ * Só mexe na exibição: as sessões (e o que metas/conquistas somam delas)
+ * continuam as reais.
+ */
+export function posicaoExibida(
+  pos: { paginas: number; capitulos: number } | undefined,
+  item: { status: string; total_units: number | null; total_chapters?: number | null },
+): { paginas: number; capitulos: number } {
+  const p = pos ?? { paginas: 0, capitulos: 0 };
+  if (item.status !== "finished") return p;
+  return {
+    paginas: item.total_units ?? p.paginas,
+    capitulos: item.total_chapters ?? p.capitulos,
+  };
+}
+
+/**
  * Quanto do livro conta no "Páginas" da estante: terminado conta inteiro
  * (sem total cadastrado, vale a última página registrada), "lendo" até a
  * página atual. Quero ler/abandonei/recomendado ficam de fora.

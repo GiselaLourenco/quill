@@ -8,6 +8,8 @@ import { StatusEditor } from "@/components/status-editor";
 import { RatingStars } from "@/components/rating-stars";
 import { LivroAmigoCtas } from "@/components/livro-amigo-ctas";
 import { LivroKebab } from "@/components/livro-kebab";
+import { LivroAbas } from "@/components/livro-abas";
+import { LivroDetalhes, dataBR } from "@/components/livro-detalhes";
 import { EmptyState } from "@/components/empty-state";
 import { CommentComposer } from "@/components/comment-composer";
 import { EditorPosicaoLinha, EditorPosicaoTile } from "@/components/editor-posicao";
@@ -16,6 +18,7 @@ import {
   computeReadingStats,
   formatDuration,
   posicaoAtual,
+  posicaoExibida,
   predictFinish,
 } from "@/lib/reading-stats";
 import { toSpotifyEmbedUrl } from "@/lib/spotify";
@@ -65,7 +68,7 @@ export default async function BookPage({
   const { data: item } = await supabase
     .from("media_items")
     .select(
-      "id, user_id, title, creator, status, is_recommended, recommendation_id, cover_kind, cover_url, cover_palette, spotify_url, total_units, total_chapters, started_at, finished_at",
+      "id, user_id, title, creator, genre, status, is_recommended, recommendation_id, cover_kind, cover_url, cover_palette, spotify_url, total_units, total_chapters, started_at, finished_at",
     )
     .eq("id", id)
     .single();
@@ -104,7 +107,10 @@ export default async function BookPage({
   const stats = computeReadingStats(sessions ?? []);
   const prediction = predictFinish(stats, item.total_units);
   // `computeReadingStats` só olha página (unit_end) — capítulo é só isso aqui.
-  const currentChapter = posicaoAtual(sessions ?? []).capitulos;
+  const posicao = posicaoExibida(
+    { paginas: stats.currentPage, capitulos: posicaoAtual(sessions ?? []).capitulos },
+    item,
+  );
   // Do primeiro "lendo" até o "terminei" (ou até hoje, se ainda estiver
   // lendo) — mantém a data mesmo se passar por "abandonei" no meio.
   const diasLidos = item.started_at
@@ -121,6 +127,19 @@ export default async function BookPage({
 
   const statusStyle = STATUS_STYLE[item.status] ?? "bg-paper text-ink";
   const statusLabel = STATUS_LABEL[item.status] ?? item.status;
+
+  // Uma linha no topo resume as datas — o detalhe (e a edição) fica na aba
+  // "Detalhes". Quero ler/recomendado não têm data de leitura.
+  const resumoDatas =
+    item.status === "finished"
+      ? item.finished_at
+        ? item.started_at
+          ? `Lido de ${dataBR(item.started_at)} a ${dataBR(item.finished_at)}`
+          : `Terminado em ${dataBR(item.finished_at)}`
+        : "Sem data de término"
+      : item.started_at && (item.status === "reading" || item.status === "abandoned")
+        ? `Comecei em ${dataBR(item.started_at)}`
+        : null;
 
   return (
     <div className="flex flex-1 flex-col bg-paper">
@@ -173,6 +192,7 @@ export default async function BookPage({
             <div className="mt-1">
               <RatingStars itemId={item.id} initialStars={myRating?.stars ?? 0} />
             </div>
+            {resumoDatas && <p className="text-xs text-ink-soft">{resumoDatas}</p>}
           </div>
         </section>
 
@@ -194,80 +214,99 @@ export default async function BookPage({
           </section>
         )}
 
-        {/* Status editor */}
-        <section className="border-2 border-ink bg-paper p-3 shadow-hard-sm">
-          <p className="mb-2 font-display text-[10px] uppercase tracking-widest text-ink-soft">
-            Mudar status
-          </p>
-          <StatusEditor itemId={item.id} status={item.status} isRecommended={recomendado} />
-        </section>
+        {/* Três abas pra não empilhar tudo numa rolagem só: o andamento da
+            leitura, a ficha do livro (edita no lugar — substitui a antiga
+            tela Editar) e as anotações. */}
+        <LivroAbas
+          leitura={
+            <>
+              {/* Status editor */}
+              <section className="border-2 border-ink bg-paper p-3 shadow-hard-sm">
+                <p className="mb-2 font-display text-[10px] uppercase tracking-widest text-ink-soft">
+                  Mudar status
+                </p>
+                <StatusEditor itemId={item.id} status={item.status} isRecommended={recomendado} />
+              </section>
 
-        {/* Páginas é o dado que a maioria dos livros tem (capítulo é a
-            exceção) — ganha a linha inteira, com botão de salvar explícito.
-            Sem total cadastrado, o próprio editor pede o total (ver
-            editor-posicao.tsx). */}
-        <EditorPosicaoLinha itemId={item.id} atual={stats.currentPage} total={item.total_units} unidade="pages" />
+              {/* Páginas é o dado que a maioria dos livros tem (capítulo é a
+                  exceção) — ganha a linha inteira, com botão de salvar explícito.
+                  Sem total cadastrado, o próprio editor pede o total (ver
+                  editor-posicao.tsx). */}
+              <EditorPosicaoLinha itemId={item.id} atual={posicao.paginas} total={item.total_units} unidade="pages" />
 
-        {/* Os outros quatro números, 2×2 — Capítulos aqui dobra como editor
-            de posição (mesmo cálculo que alimenta a % da estante). */}
-        <section className="grid grid-cols-2 gap-2">
-          <StatBox label="Tempo total" value={formatDuration(stats.totalSeconds)} />
-          <StatBox label="Pág. / dia" value={String(stats.pagesPerDay)} />
-          <EditorPosicaoTile itemId={item.id} atual={currentChapter} total={item.total_chapters} unidade="chapters" />
-          <StatBox
-            label="Dias lidos"
-            value={diasLidos != null ? String(diasLidos) : "—"}
-          />
-        </section>
+              {/* Os outros quatro números, 2×2 — Capítulos aqui dobra como editor
+                  de posição (mesmo cálculo que alimenta a % da estante). */}
+              <section className="grid grid-cols-2 gap-2">
+                <StatBox label="Tempo total" value={formatDuration(stats.totalSeconds)} />
+                <StatBox label="Pág. / dia" value={String(stats.pagesPerDay)} />
+                <EditorPosicaoTile itemId={item.id} atual={posicao.capitulos} total={item.total_chapters} unidade="chapters" />
+                <StatBox
+                  label="Dias lidos"
+                  value={diasLidos != null ? String(diasLidos) : "—"}
+                />
+              </section>
 
-        {prediction && (
-          <div className="border-2 border-moss bg-moss/10 px-3 py-2.5">
-            <p className="text-sm text-ink">
-              Nesse ritmo, você termina em{" "}
-              <strong>~{prediction.daysRemaining} dias</strong>{" "}
-              ({prediction.dateLabel}).
-            </p>
-          </div>
-        )}
+              {prediction && (
+                <div className="border-2 border-moss bg-moss/10 px-3 py-2.5">
+                  <p className="text-sm text-ink">
+                    Nesse ritmo, você termina em{" "}
+                    <strong>~{prediction.daysRemaining} dias</strong>{" "}
+                    ({prediction.dateLabel}).
+                  </p>
+                </div>
+              )}
 
-        {embedUrl && (
-          <iframe
-            src={embedUrl}
-            width="100%"
-            height="152"
-            style={{ borderRadius: 0, marginBottom: "0.5rem" }}
-            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-            loading="lazy"
-            className="border-2 border-ink"
-          />
-        )}
+              {embedUrl && (
+                <iframe
+                  src={embedUrl}
+                  width="100%"
+                  height="152"
+                  style={{ borderRadius: 0, marginBottom: "0.5rem" }}
+                  allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                  loading="lazy"
+                  className="border-2 border-ink"
+                />
+              )}
+            </>
+          }
+          detalhes={
+            <LivroDetalhes
+              itemId={item.id}
+              status={item.status}
+              title={item.title}
+              creator={item.creator}
+              genre={item.genre}
+              totalUnits={item.total_units}
+              totalChapters={item.total_chapters}
+              spotifyUrl={item.spotify_url}
+              coverKind={item.cover_kind}
+              startedAt={item.started_at}
+              finishedAt={item.finished_at}
+            />
+          }
+          notas={
+            <section className="space-y-3">
+              {(comments ?? []).length === 0 ? (
+                <div className="border-2 border-dashed border-ink/40">
+                  <EmptyState
+                    compacto
+                    mascote="escrevendo"
+                    titulo="Nenhuma nota ainda"
+                    texto="Anote uma frase, uma dúvida ou o que esse capítulo te fez sentir. Começa privado — você decide o que vira público."
+                  />
+                </div>
+              ) : (
+                <ul className="space-y-3">
+                  {(comments ?? []).map((c) => (
+                    <NotaItem key={c.id} nota={c} itemId={item.id} />
+                  ))}
+                </ul>
+              )}
 
-        {/* Comentários / diário */}
-        <section className="space-y-3">
-          <h3 className="flex items-center gap-2 font-display text-sm uppercase tracking-wider text-ink">
-            <span className="h-2 w-2 border border-ink bg-coral" />
-            Minhas anotações
-          </h3>
-
-          {(comments ?? []).length === 0 ? (
-            <div className="border-2 border-dashed border-ink/40">
-              <EmptyState
-                compacto
-                mascote="escrevendo"
-                titulo="Nenhuma nota ainda"
-                texto="Anote uma frase, uma dúvida ou o que esse capítulo te fez sentir. Começa privado — você decide o que vira público."
-              />
-            </div>
-          ) : (
-            <ul className="space-y-3">
-              {(comments ?? []).map((c) => (
-                <NotaItem key={c.id} nota={c} itemId={item.id} />
-              ))}
-            </ul>
-          )}
-
-          <CommentComposer itemId={item.id} />
-        </section>
+              <CommentComposer itemId={item.id} />
+            </section>
+          }
+        />
       </div>
     </div>
   );

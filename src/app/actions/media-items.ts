@@ -84,62 +84,6 @@ export async function createMediaItem(formData: FormData) {
   redirect("/estante");
 }
 
-/**
- * Corrige título, autor, capa, páginas, capítulos ou playlist de um livro já
- * na estante. Status fica de fora de propósito: já tem editor próprio
- * (`updateItemStatus` / `StatusEditor`) na página do livro.
- */
-export async function updateMediaItem(formData: FormData) {
-  const userId = await requireUserId();
-
-  const id = String(formData.get("id") ?? "");
-  if (!id) redirect("/estante");
-
-  const title = String(formData.get("title") ?? "").trim();
-  if (!title) {
-    redirect(`/books/${id}/editar?error=Título é obrigatório.`);
-  }
-
-  const creator = String(formData.get("creator") ?? "").trim() || null;
-  const genre = String(formData.get("genre") ?? "").trim() || null;
-  const spotifyUrl = String(formData.get("spotify_url") ?? "").trim() || null;
-  const totalUnitsRaw = String(formData.get("total_units") ?? "").trim();
-  const totalUnits = totalUnitsRaw ? Number(totalUnitsRaw) : null;
-  const totalChaptersRaw = String(formData.get("total_chapters") ?? "").trim();
-  const totalChapters =
-    totalChaptersRaw && Number(totalChaptersRaw) > 0 ? Number(totalChaptersRaw) : null;
-  const coverKind = String(formData.get("cover_kind") ?? "illustrated");
-  const coverUrl =
-    coverKind === "real"
-      ? String(formData.get("cover_url") ?? "").trim() || null
-      : null;
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("media_items")
-    .update({
-      title,
-      creator,
-      genre,
-      spotify_url: spotifyUrl,
-      total_units: totalUnits,
-      total_chapters: totalChapters,
-      cover_kind: coverKind === "real" && coverUrl ? "real" : "illustrated",
-      cover_url: coverUrl,
-      cover_palette: paletteIndexForTitle(title),
-    })
-    .eq("id", id)
-    .eq("user_id", userId);
-
-  if (error) {
-    redirect(`/books/${id}/editar?error=Não foi possível salvar as alterações.`);
-  }
-
-  revalidatePath(`/books/${id}`);
-  revalidatePath("/estante");
-  redirect(`/books/${id}`);
-}
-
 const VALID_STATUSES = ["want", "reading", "finished", "recomendado", "abandoned"];
 
 // "Recomendado" é uma marca que convive com o status de leitura: dá pra estar
@@ -340,4 +284,130 @@ async function marcarIndicacaoAceita(
 ) {
   // A RLS só deixa o destinatário atualizar — basta filtrar pelo id.
   await supabase.from("recommendations").update({ status: "accepted" }).eq("id", recommendationId);
+}
+
+// ---- Edição no lugar, na aba "Detalhes" do livro ---------------------------
+// Cada linha da ficha salva só o próprio campo — substitui a antiga tela
+// /books/[id]/editar. Devolvem `{ error }` em vez de redirecionar: o erro
+// aparece embaixo da linha que a pessoa estava editando.
+
+export type CampoLivro = "titulo" | "autor" | "genero" | "paginas" | "capitulos" | "spotify";
+
+export async function atualizarCampoLivro(
+  itemId: string,
+  campo: CampoLivro,
+  valor: string,
+): Promise<{ error: string | null }> {
+  const userId = await requireUserId();
+  const supabase = await createClient();
+  const texto = valor.trim();
+
+  let updates: Record<string, string | number | null>;
+  switch (campo) {
+    case "titulo":
+      if (!texto) return { error: "Título é obrigatório." };
+      updates = { title: texto, cover_palette: paletteIndexForTitle(texto) };
+      break;
+    case "autor":
+      updates = { creator: texto || null };
+      break;
+    case "genero":
+      updates = { genre: texto || null };
+      break;
+    case "paginas":
+    case "capitulos": {
+      const n = texto ? Number(texto) : null;
+      // 0 não é contagem — o check da coluna de capítulos recusa, então vira null.
+      if (n !== null && (!Number.isInteger(n) || n < 0)) return { error: "Use um número inteiro." };
+      updates = campo === "paginas" ? { total_units: n || null } : { total_chapters: n || null };
+      break;
+    }
+    case "spotify":
+      updates = { spotify_url: texto || null };
+      break;
+    default:
+      return { error: "Campo desconhecido." };
+  }
+
+  const { error } = await supabase
+    .from("media_items")
+    .update(updates)
+    .eq("id", itemId)
+    .eq("user_id", userId);
+  if (error) return { error: "Não foi possível salvar." };
+
+  revalidatePath(`/books/${itemId}`);
+  revalidatePath("/estante");
+  return { error: null };
+}
+
+/** Capa real (url vinda da busca) ou ilustração Quill. */
+export async function atualizarCapaLivro(
+  itemId: string,
+  coverUrl: string | null,
+): Promise<{ error: string | null }> {
+  const userId = await requireUserId();
+  const supabase = await createClient();
+  const url = coverUrl?.trim() || null;
+
+  const { error } = await supabase
+    .from("media_items")
+    .update({ cover_kind: url ? "real" : "illustrated", cover_url: url })
+    .eq("id", itemId)
+    .eq("user_id", userId);
+  if (error) return { error: "Não foi possível trocar a capa." };
+
+  revalidatePath(`/books/${itemId}`);
+  revalidatePath("/estante");
+  return { error: null };
+}
+
+/**
+ * "Comecei em" / "Terminei em" de um livro já na estante. Vazio apaga a data.
+ * Término só vale pra livro terminado — nos outros status ele é sempre null
+ * (ver `updateItemStatus`), então é ignorado aqui.
+ */
+export async function atualizarDatasLeitura(
+  itemId: string,
+  inicio: string,
+  fim: string,
+): Promise<{ error: string | null }> {
+  const userId = await requireUserId();
+  const supabase = await createClient();
+
+  const { data: atual } = await supabase
+    .from("media_items")
+    .select("status")
+    .eq("id", itemId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!atual) return { error: "Livro não encontrado." };
+
+  const hoje = todayLocalDateKey();
+  const startedAt = dataDoForm(inicio);
+  const finishedAt = atual.status === "finished" ? dataDoForm(fim) : null;
+  if ((startedAt && startedAt > hoje) || (finishedAt && finishedAt > hoje)) {
+    return { error: "A data não pode ser no futuro." };
+  }
+  if (startedAt && finishedAt && startedAt > finishedAt) {
+    return { error: "O início não pode ser depois do término." };
+  }
+
+  const updates: { started_at: string | null; finished_at?: string | null } = { started_at: startedAt };
+  if (atual.status === "finished") updates.finished_at = finishedAt;
+
+  const { error } = await supabase
+    .from("media_items")
+    .update(updates)
+    .eq("id", itemId)
+    .eq("user_id", userId);
+  if (error) return { error: "Não foi possível salvar as datas." };
+
+  // Término mexe em meta, perfil, retrospectiva e conquistas.
+  revalidatePath(`/books/${itemId}`);
+  revalidatePath("/estante");
+  revalidatePath("/");
+  revalidatePath("/metas");
+  revalidatePath("/profile");
+  return { error: null };
 }
