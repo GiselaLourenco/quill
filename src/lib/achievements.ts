@@ -342,7 +342,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     },
     unit: "livro",
     avatar: {
-      arquivo: "quill-nascido-da-bruma-v2.png",
+      arquivo: "quill-nascido-da-bruma-v3.png",
       nome: "Nascido da Bruma",
       dica: "Termine Mistborn",
     },
