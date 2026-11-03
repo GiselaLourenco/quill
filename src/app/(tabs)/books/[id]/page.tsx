@@ -9,7 +9,7 @@ import { RatingStars } from "@/components/rating-stars";
 import { LivroAmigoCtas } from "@/components/livro-amigo-ctas";
 import { LivroKebab } from "@/components/livro-kebab";
 import { LivroAbas } from "@/components/livro-abas";
-import { LivroDetalhes, dataBR } from "@/components/livro-detalhes";
+import { LivroDetalhes } from "@/components/livro-detalhes";
 import { EmptyState } from "@/components/empty-state";
 import { CommentComposer } from "@/components/comment-composer";
 import { EditorPosicaoLinha, EditorPosicaoTile } from "@/components/editor-posicao";
@@ -22,7 +22,7 @@ import {
   predictFinish,
 } from "@/lib/reading-stats";
 import { toSpotifyEmbedUrl } from "@/lib/spotify";
-import { todayLocalDateKey } from "@/lib/date-br";
+import { dataBR, todayLocalDateKey } from "@/lib/date-br";
 import { nomeExibicao } from "@/lib/nome-exibicao";
 
 const STATUS_LABEL: Record<string, string> = {

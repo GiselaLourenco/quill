@@ -8,7 +8,7 @@ import {
   type CampoLivro,
 } from "@/app/actions/media-items";
 import { BuscaLivro } from "@/components/busca-livro";
-import { todayLocalDateKey } from "@/lib/date-br";
+import { dataBR, todayLocalDateKey } from "@/lib/date-br";
 
 export type LivroDetalhesProps = {
   itemId: string;
@@ -25,11 +25,6 @@ export type LivroDetalhesProps = {
 };
 
 type Editando = CampoLivro | "capa" | "datas" | null;
-
-/** YYYY-MM-DD → dd/mm/aaaa (sem passar por Date: a chave já é o dia certo). */
-export function dataBR(chave: string): string {
-  return `${chave.slice(8, 10)}/${chave.slice(5, 7)}/${chave.slice(0, 4)}`;
-}
 
 function IconeLapis() {
   return (

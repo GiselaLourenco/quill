@@ -68,3 +68,8 @@ export function localTime(input: string | Date): string {
   const d = typeof input === "string" ? new Date(input) : input;
   return timeFormatter.format(d);
 }
+
+/** YYYY-MM-DD → dd/mm/aaaa (sem passar por Date: a chave já é o dia certo). */
+export function dataBR(chave: string): string {
+  return `${chave.slice(8, 10)}/${chave.slice(5, 7)}/${chave.slice(0, 4)}`;
+}
