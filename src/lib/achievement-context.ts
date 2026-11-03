@@ -97,6 +97,20 @@ function maxDiasPorGrupo(dias: string[], grupo: (dia: string) => string): number
   return Math.max(0, ...porGrupo.values());
 }
 
+/** Maior sequência de meses seguidos ("2026-03", "2026-04"...) na lista. */
+function maiorSequenciaDeMeses(meses: string[]): number {
+  const indices = [...new Set(meses)]
+    .map((m) => Number(m.slice(0, 4)) * 12 + Number(m.slice(5, 7)))
+    .sort((a, b) => a - b);
+  let maior = 0;
+  let atual = 0;
+  indices.forEach((n, i) => {
+    atual = i > 0 && n === indices[i - 1] + 1 ? atual + 1 : 1;
+    maior = Math.max(maior, atual);
+  });
+  return maior;
+}
+
 /** Ano (fuso do Brasil) em que estamos. */
 export function anoAtual(): number {
   return Number(localDateKey(new Date()).slice(0, 4));
@@ -196,7 +210,7 @@ function calcularContexto(
     maxDaysInWeek: maxDiasPorGrupo(dias, (d) => weekKey(`${d}T12:00:00Z`)),
     maxDaysInMonth: maxDiasPorGrupo(dias, (d) => d.slice(0, 7)),
     daysRead: dias.length,
-    maxFinishedInMonth: Math.max(0, ...terminadosPorMes.values()),
+    finishedMonthsStreak: maiorSequenciaDeMeses([...terminadosPorMes.keys()]),
     booksStarted: itens.filter((i) => {
       const inicio = comecouEm(i);
       if (ano !== null) return inicio !== null && noAno(inicio);
