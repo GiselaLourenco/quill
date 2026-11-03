@@ -491,7 +491,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     },
     unit: "livro",
     avatar: {
-      arquivo: "quill-sirius.png",
+      arquivo: "quill-sirius-v2.png",
       nome: "Sirius",
       dica: "Termine Harry Potter e o Prisioneiro de Azkaban",
     },
