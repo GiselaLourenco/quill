@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getFriends } from "@/lib/friends";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
-import { computeScores, daysRemaining, periodProgress, type ScoringMetric, SCORING_METRIC_UNIT } from "@/lib/challenges";
+import { computeScores, daysRemaining, periodProgress, type ScoringMetric, SCORING_METRIC_OPTIONS, SCORING_METRIC_UNIT } from "@/lib/challenges";
 import DesafioDetalheClient from "./detalhe-client";
 import { nomeExibicao } from "@/lib/nome-exibicao";
 import { AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
@@ -125,6 +125,33 @@ export default async function DesafioDetalhePage({
 
   const minhaPosicao = ranking.find((r) => r.ehVoce)?.posicao ?? 0;
 
+  // Uma cor por membro — a mesma nos pontos do calendário do grupo e no
+  // quadradinho do feed. Ordem do ranking, pra cor não pular entre visitas.
+  const CORES_MEMBRO = ["#1d9e75", "#d85a30", "#26215c", "#ef9f27", "#e28d6a", "#69b997", "#6e6887", "#f1ba65"];
+  const corPorMembro = new Map(
+    [...ranking.map((r) => r.userId), ...memberIds].map((uid, i, todos) => [uid, todos.indexOf(uid)]),
+  );
+  const corDe = (uid: string) => CORES_MEMBRO[(corPorMembro.get(uid) ?? 0) % CORES_MEMBRO.length];
+  const membros = Array.from(new Set([...ranking.map((r) => r.userId), ...memberIds])).map((uid) => ({
+    userId: uid,
+    nome: perfilDe(uid).nome,
+    cor: corDe(uid),
+    ehVoce: uid === userId,
+  }));
+
+  // Check-ins de todo mundo por dia (fuso do Brasil), pro "Check-ins do mês".
+  const checkinsGrupo = Array.from(
+    new Set(
+      (checkins ?? []).map((c) => {
+        const s = (c.session as unknown) as { started_at: string } | null;
+        return `${c.user_id as string}|${localDateKey(s?.started_at ?? (c.created_at as string))}`;
+      }),
+    ),
+  ).map((par) => {
+    const [uid, dia] = par.split("|");
+    return { userId: uid!, dia: dia! };
+  });
+
   // Check-ins da semana atual (do usuário) — dia calculado no fuso do
   // Brasil: uma sessão feita à noite local não pode cair no dia seguinte só
   // porque em UTC o relógio já virou.
@@ -186,6 +213,7 @@ export default async function DesafioDetalhePage({
       avatarUrl: perfil.avatarUrl,
       avatarZoom: perfil.avatarZoom,
       avatarBg: perfil.avatarBg,
+      cor: corDe(uid),
       texto,
       nota: (c.note as string | null) ?? null,
       quando,
@@ -229,7 +257,17 @@ export default async function DesafioDetalhePage({
         progresso,
         minhaPosicao,
         codigoConvite,
+        metricaLabel: SCORING_METRIC_OPTIONS.find((o) => o.value === metric)?.label ?? metric,
+        duracaoDias:
+          group.starts_at && group.ends_at
+            ? Math.round(
+                (Date.parse(`${group.ends_at}T12:00:00Z`) - Date.parse(`${group.starts_at}T12:00:00Z`)) /
+                  86_400_000,
+              ) + 1
+            : null,
       }}
+      membros={membros}
+      checkinsGrupo={checkinsGrupo}
       semana={semana}
       checkinDiasUsuario={Array.from(checkinsDoUsuario)}
       ranking={ranking}

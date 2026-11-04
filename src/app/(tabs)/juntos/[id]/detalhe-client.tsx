@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { CheckinSheet, type LivroLendo } from "@/components/checkin-sheet";
 import { DiaLeituraSheet } from "@/components/dia-leitura-sheet";
+import { CheckinsGrupoSheet, type CheckinDia, type MembroCor } from "./checkins-grupo-sheet";
 import { SegmentToggle } from "@/components/segment-toggle";
 import { leaveChallenge } from "@/app/actions/groups";
 import { avatarDeExibicao, AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
@@ -26,7 +27,7 @@ function pad2(n: number): string {
 type Avatar = { avatarUrl: string | null; avatarZoom: number; avatarBg: string };
 type SemanaItem = { chave: string; data: number; label: string; estado: "vazio" | "feito" | "hoje" | "hoje-feito" };
 type RankingItem = Avatar & { posicao: number; userId: string; nome: string; metrica: string; ehVoce: boolean };
-type AtividadeItem = Avatar & { id: string; userId: string; nome: string; texto: string; nota: string | null; quando: string; ehVoce: boolean };
+type AtividadeItem = Avatar & { id: string; userId: string; nome: string; cor: string; texto: string; nota: string | null; quando: string; ehVoce: boolean };
 
 type Group = {
   id: string; nome: string; metric: string; unit: string;
@@ -34,6 +35,8 @@ type Group = {
   encerrado: boolean;
   naoComecou: boolean;
   comecaEm: string | null;
+  metricaLabel: string;
+  duracaoDias: number | null;
 };
 
 /** Foto de quem está no desafio — a mesma escolhida no perfil. */
@@ -60,8 +63,10 @@ function AvatarMembro({
 }
 
 export default function DesafioDetalheClient({
-  group, semana, checkinDiasUsuario, ranking, atividade, livros, amigosConvidaveis,
+  group, semana, checkinDiasUsuario, ranking, atividade, livros, amigosConvidaveis, membros, checkinsGrupo,
 }: {
+  membros: MembroCor[];
+  checkinsGrupo: CheckinDia[];
   amigosConvidaveis: AmigoConvidavel[];
   group: Group;
   semana: SemanaItem[];
@@ -87,6 +92,7 @@ export default function DesafioDetalheClient({
   const diasComCheckin = useMemo(() => new Set(checkinDiasUsuario), [checkinDiasUsuario]);
   // Dia tocado na semana ou no mês — abre as leituras dele, igual à aba Quill.
   const [diaAberto, setDiaAberto] = useState<string | null>(null);
+  const [grupoAberto, setGrupoAberto] = useState(false);
   const hojeChave = todayLocalDateKey();
 
   const limiteInicio = group.comecaEm ? group.comecaEm.slice(0, 7) : null; // "YYYY-MM"
@@ -279,6 +285,23 @@ export default function DesafioDetalheClient({
             </div>
           </div>
         )}
+        {membros.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setGrupoAberto(true)}
+            className="mt-3 font-display text-[10px] uppercase tracking-widest text-ink underline decoration-2 underline-offset-2"
+          >
+            Check-ins do grupo ›
+          </button>
+        )}
+        {grupoAberto && (
+          <CheckinsGrupoSheet
+            membros={membros}
+            checkins={checkinsGrupo}
+            comecaEm={group.comecaEm}
+            onClose={() => setGrupoAberto(false)}
+          />
+        )}
         {diaAberto && (
           <DiaLeituraSheet
             key={diaAberto}
@@ -312,13 +335,19 @@ export default function DesafioDetalheClient({
             {atividadeVisivel.map((a) => (
               <li key={a.id} className="border-2 border-ink bg-paper p-3 shadow-hard-sm">
                 <div className="flex items-start gap-3">
-                  <AvatarMembro
-                    nome={a.nome}
-                    avatarUrl={a.avatarUrl}
-                    avatarZoom={a.avatarZoom}
-                    avatarBg={a.avatarBg}
-                    tamanho={32}
-                  />
+                  {/* Cor do membro (a mesma dos pontos no calendário do grupo);
+                      ✓ = check-in, balão = check-in com nota. */}
+                  <span
+                    aria-hidden
+                    className="flex h-8 w-8 shrink-0 items-center justify-center border-2 border-ink text-paper"
+                    style={{ backgroundColor: a.cor }}
+                  >
+                    {a.nota ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" /></svg>
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+                    )}
+                  </span>
                   <div className="min-w-0 flex-1">
                     <p className="text-[12px] leading-tight text-ink">
                       <span className="font-display text-[11px] uppercase tracking-wider">{a.nome}</span>{" "}{a.texto}
@@ -353,6 +382,19 @@ export default function DesafioDetalheClient({
           <button onClick={copiarCodigo} className="shrink-0 border-2 border-ink bg-mustard px-3 py-2 font-display text-[10px] uppercase tracking-widest text-ink active:translate-x-[1px] active:translate-y-[1px]">
             {copiado ? "Copiado" : "Copiar"}
           </button>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <div className="border-2 border-ink bg-paper px-3 py-2.5">
+            <p className="font-display text-[9px] uppercase tracking-widest text-ink-soft">Métrica</p>
+            <p className="mt-1 font-serif text-lg italic leading-tight text-ink">{group.metricaLabel}</p>
+          </div>
+          <div className="border-2 border-ink bg-paper px-3 py-2.5">
+            <p className="font-display text-[9px] uppercase tracking-widest text-ink-soft">Duração</p>
+            <p className="mt-1 font-serif text-lg italic leading-tight text-ink">
+              {group.duracaoDias ? `${group.duracaoDias} ${group.duracaoDias === 1 ? "dia" : "dias"}` : "Sem prazo"}
+            </p>
+          </div>
         </div>
 
         {/* O código serve pra quem está fora da sua lista; pra quem já é amigo
