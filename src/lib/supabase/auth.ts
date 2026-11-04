@@ -14,3 +14,10 @@ export async function requireUserId() {
 
   return userId;
 }
+
+/** Como `requireUserId`, mas sem redirect — pra actions que precisam devolver erro à tela. */
+export async function userIdOuNull(): Promise<string | null> {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getClaims();
+  return (data?.claims?.sub as string | undefined) ?? null;
+}

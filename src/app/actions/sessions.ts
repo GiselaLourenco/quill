@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { requireUserId } from "@/lib/supabase/auth";
+import { requireUserId, userIdOuNull } from "@/lib/supabase/auth";
 import { updateItemStatus } from "@/app/actions/media-items";
 import { addDaysToKey, localDateKey, localTime } from "@/lib/date-br";
 
@@ -39,7 +39,15 @@ export async function createSession(input: {
   quantity: number | null;
   tags: string[];
 }): Promise<{ sessionId: string | null; error: string | null }> {
-  const userId = await requireUserId();
+  // Sem redirect: a sessão de leitura (tempo, livro, desafios) continua na
+  // tela e no aparelho — dá pra entrar de novo e salvar sem perder nada.
+  const userId = await userIdOuNull();
+  if (!userId) {
+    return {
+      sessionId: null,
+      error: "Seu login expirou. Entre de novo em outra aba e toque em salvar — a sessão continua guardada aqui.",
+    };
+  }
   const supabase = await createClient();
 
   const itemId = input.itemId || null;

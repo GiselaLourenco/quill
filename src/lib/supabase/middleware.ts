@@ -54,6 +54,13 @@ export async function updateSession(request: NextRequest) {
     return response;
   }
 
+  // Server action (POST com header Next-Action): redirecionar aqui faz o
+  // cliente perder o que estava salvando. A própria action checa o login e
+  // devolve um erro que a tela mostra, sem sair dela.
+  if (!isAuthenticated && request.headers.has("next-action")) {
+    return response;
+  }
+
   if (!isAuthenticated && !isPublicPath) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";

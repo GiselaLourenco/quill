@@ -207,7 +207,10 @@ export async function signup(
 
 export async function logout() {
   const supabase = await createClient();
-  await supabase.auth.signOut();
+  // Só este aparelho. O padrão do Supabase é "global": sair no computador
+  // derrubava o login do celular no meio de uma sessão de leitura, e o
+  // registro dela falhava ao salvar (2026-11-03).
+  await supabase.auth.signOut({ scope: "local" });
   redirect("/login");
 }
 
