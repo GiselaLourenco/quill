@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Portal } from "@/components/portal";
 import { BookCover } from "@/components/book-cover";
 import { sessoesDoDia, type SessaoDoDia } from "@/app/actions/sessions";
@@ -13,7 +13,7 @@ const TAG_CURTA: Record<string, string> = {
   hard: "difícil",
 };
 
-function tempoTexto(min: number): string {
+export function tempoTexto(min: number): string {
   const h = Math.floor(min / 60);
   const m = min % 60;
   return h > 0 ? `${h}h${String(m).padStart(2, "0")}` : `${m} min`;
@@ -34,10 +34,13 @@ export function DiaLeituraSheet({
   chave,
   hoje,
   onClose,
+  carregar = sessoesDoDia,
 }: {
   chave: string;
   hoje: boolean;
   onClose: () => void;
+  /** De onde vêm as sessões — a demo de desafio passa as simuladas. */
+  carregar?: (chave: string) => Promise<SessaoDoDia[]>;
 }) {
   const [sessoes, setSessoes] = useState<SessaoDoDia[] | null>(null);
   const [erro, setErro] = useState(false);
@@ -46,13 +49,13 @@ export function DiaLeituraSheet({
   // velho pra limpar aqui.
   useEffect(() => {
     let vivo = true;
-    sessoesDoDia(chave)
+    carregar(chave)
       .then((s) => vivo && setSessoes(s))
       .catch(() => vivo && setErro(true));
     return () => {
       vivo = false;
     };
-  }, [chave]);
+  }, [chave, carregar]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -160,7 +163,20 @@ export function DiaLeituraSheet({
   );
 }
 
-function SessaoItem({ s }: { s: SessaoDoDia }) {
+/**
+ * Cartão de uma sessão (capa, horário, páginas, como foi). `topo`/`rodape`
+ * entram dentro do mesmo cartão — o painel do dia do desafio usa pra pôr o
+ * nome de quem leu em cima e a nota/comentários embaixo.
+ */
+export function SessaoItem({
+  s,
+  topo,
+  rodape,
+}: {
+  s: SessaoDoDia;
+  topo?: ReactNode;
+  rodape?: ReactNode;
+}) {
   const chips: { texto: string; tag?: boolean }[] = [];
   if (s.paginaInicio != null && s.paginaFim != null && s.paginaFim > s.paginaInicio) {
     chips.push({ texto: `p. ${s.paginaInicio} → ${s.paginaFim} (+${s.paginaFim - s.paginaInicio})` });
@@ -224,6 +240,25 @@ function SessaoItem({ s }: { s: SessaoDoDia }) {
 
   const classe =
     "shadow-hard-sm flex items-start gap-3 rounded-xl border-2 border-ink bg-card p-2.5";
+
+  if (topo || rodape) {
+    // Com extras o cartão vira um contêiner, e só a linha do livro é link —
+    // os botões do rodapé não podem ficar dentro de um <a>.
+    return (
+      <div className="shadow-hard-sm rounded-xl border-2 border-ink bg-card p-2.5">
+        {topo}
+        {s.livro ? (
+          <Link href={`/books/${s.livro.id}`} className="flex items-start gap-3">
+            {conteudo}
+          </Link>
+        ) : (
+          <div className="flex items-start gap-3">{conteudo}</div>
+        )}
+        {rodape}
+      </div>
+    );
+  }
+
   return s.livro ? (
     <Link href={`/books/${s.livro.id}`} className={`${classe} active:translate-x-[2px] active:translate-y-[2px] active:shadow-none`}>
       {conteudo}

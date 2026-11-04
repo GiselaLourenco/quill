@@ -6,8 +6,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { CheckinSheet, type LivroLendo } from "@/components/checkin-sheet";
-import { DiaLeituraSheet } from "@/components/dia-leitura-sheet";
-import { CheckinsGrupoSheet, type CheckinDia, type MembroCor } from "./checkins-grupo-sheet";
+import { comentarCheckin } from "@/app/actions/checkins";
+import { CheckinCard, type CheckinDetalhe, type ComentarCheckin, type MembroCor } from "./checkin-card";
+import { DiaGrupoSheet } from "./dia-grupo-sheet";
 import { SegmentToggle } from "@/components/segment-toggle";
 import { leaveChallenge } from "@/app/actions/groups";
 import { avatarDeExibicao, AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
@@ -20,6 +21,11 @@ const MES_LABEL = [
 ];
 const DIAS_SEMANA_LABEL = ["D", "S", "T", "Q", "Q", "S", "S"];
 
+// Visão do mês: quantos pontos cabem numa linha da célula (~35px úteis a
+// 390px de largura) e quantos nomes a legenda mostra antes do "+N".
+const MAX_PONTOS_DIA = 4;
+const MAX_NOMES_LEGENDA = 6;
+
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
 }
@@ -27,7 +33,6 @@ function pad2(n: number): string {
 type Avatar = { avatarUrl: string | null; avatarZoom: number; avatarBg: string };
 type SemanaItem = { chave: string; data: number; label: string; estado: "vazio" | "feito" | "hoje" | "hoje-feito" };
 type RankingItem = Avatar & { posicao: number; userId: string; nome: string; metrica: string; ehVoce: boolean };
-type AtividadeItem = Avatar & { id: string; userId: string; nome: string; cor: string; texto: string; nota: string | null; quando: string; ehVoce: boolean };
 
 type Group = {
   id: string; nome: string; metric: string; unit: string;
@@ -63,16 +68,17 @@ function AvatarMembro({
 }
 
 export default function DesafioDetalheClient({
-  group, semana, checkinDiasUsuario, ranking, atividade, livros, amigosConvidaveis, membros, checkinsGrupo,
+  group, semana, ranking, checkins, livros, amigosConvidaveis, membros, demo = false,
 }: {
   membros: MembroCor[];
-  checkinsGrupo: CheckinDia[];
+  /** Todos os check-ins do desafio, do mais recente pro mais antigo. */
+  checkins: CheckinDetalhe[];
+  /** /juntos/demo: comentar fica só na tela, nada vai pro banco. */
+  demo?: boolean;
   amigosConvidaveis: AmigoConvidavel[];
   group: Group;
   semana: SemanaItem[];
-  checkinDiasUsuario: string[];
   ranking: RankingItem[];
-  atividade: AtividadeItem[];
   livros: LivroLendo[];
 }) {
   const router = useRouter();
@@ -89,11 +95,51 @@ export default function DesafioDetalheClient({
   const hoje = new Date();
   const [mesAno, setMesAno] = useState({ ano: hoje.getFullYear(), mes: hoje.getMonth() + 1 });
 
-  const diasComCheckin = useMemo(() => new Set(checkinDiasUsuario), [checkinDiasUsuario]);
-  // Dia tocado na semana ou no mês — abre as leituras dele, igual à aba Quill.
+  // Dia tocado na semana ou no mês — abre os check-ins de todo mundo nele.
   const [diaAberto, setDiaAberto] = useState<string | null>(null);
-  const [grupoAberto, setGrupoAberto] = useState(false);
   const hojeChave = todayLocalDateKey();
+
+  // Chip de pessoa na visão do mês: null = todos.
+  const [filtro, setFiltro] = useState<string | null>(null);
+  const [legendaCompleta, setLegendaCompleta] = useState(false);
+  const eu = membros.find((m) => m.ehVoce);
+  const meuNome = eu?.nome ?? "Você";
+  const minhaCor = eu?.cor ?? "#6b6152";
+
+  // dia → check-ins de todo mundo (painel do dia); e os dias em que eu li
+  // (quadrado verde no calendário).
+  const { checkinsPorDia, diasComCheckin } = useMemo(() => {
+    const porDia = new Map<string, CheckinDetalhe[]>();
+    const meus = new Set<string>();
+    for (const c of checkins) {
+      porDia.set(c.dia, [...(porDia.get(c.dia) ?? []), c]);
+      if (eu && c.userId === eu.userId) meus.add(c.dia);
+    }
+    return { checkinsPorDia: porDia, diasComCheckin: meus };
+  }, [checkins, eu]);
+
+  // Visão do mês: dia → quem leu (você primeiro, depois na ordem do ranking).
+  const pontosPorDia = useMemo(() => {
+    const ordem = new Map(membros.map((m, i) => [m.userId, m.ehVoce ? -1 : i]));
+    const mapa = new Map<string, MembroCor[]>();
+    for (const c of checkins) {
+      if (filtro && c.userId !== filtro) continue;
+      const lista = mapa.get(c.dia) ?? [];
+      const m = membros.find((x) => x.userId === c.userId);
+      if (m && !lista.some((x) => x.userId === m.userId)) lista.push(m);
+      mapa.set(c.dia, lista);
+    }
+    for (const l of mapa.values()) l.sort((a, b) => (ordem.get(a.userId) ?? 0) - (ordem.get(b.userId) ?? 0));
+    return mapa;
+  }, [checkins, membros, filtro]);
+  const nomeChip = (m: MembroCor) => (m.ehVoce ? "Você" : m.nome);
+
+  const comentar: ComentarCheckin = async (checkinId, texto, gifUrl) => {
+    if (demo) return null;
+    const { error } = await comentarCheckin({ checkinId, groupId: group.id, content: texto, gifUrl });
+    if (!error) router.refresh();
+    return error;
+  };
 
   const limiteInicio = group.comecaEm ? group.comecaEm.slice(0, 7) : null; // "YYYY-MM"
   const limiteFim = `${hoje.getFullYear()}-${pad2(hoje.getMonth() + 1)}`;
@@ -118,10 +164,14 @@ export default function DesafioDetalheClient({
       const chave = `${ano}-${pad2(mes)}-${pad2(dia)}`;
       celulas.push({ chave, dia, feito: diasComCheckin.has(chave), hoje: chave === hojeChave });
     }
-    return { offset, celulas };
+    const sobra = (7 - ((offset + diasNoMes) % 7)) % 7;
+    return { offset, celulas, sobra };
   }, [mesAno, diasComCheckin]);
 
+  const atividade = checkins.slice(0, 20);
   const atividadeVisivel = verMais ? atividade : atividade.slice(0, 3);
+
+
 
   const copiarCodigo = async () => {
     try {
@@ -203,7 +253,7 @@ export default function DesafioDetalheClient({
         </div>
       </section>
 
-      {/* Check-ins: semana ou mês */}
+      {/* Meus check-ins (verde = eu li); tocar no dia mostra os de todo mundo */}
       <section className="px-4 pt-5">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="font-display text-[10px] uppercase tracking-widest text-ink">Meus check-ins</h3>
@@ -230,7 +280,7 @@ export default function DesafioDetalheClient({
                     type="button"
                     onClick={() => setDiaAberto(d.chave)}
                     disabled={d.chave > hojeChave}
-                    aria-label={`Dia ${d.data}${preenchido ? ", com check-in" : ""} — ver sessões`}
+                    aria-label={`Dia ${d.data}${preenchido ? ", com check-in" : ""} — ver check-ins`}
                     className={["flex aspect-square w-full items-center justify-center border-2 border-ink text-xs font-black enabled:active:translate-x-[1px] enabled:active:translate-y-[1px]", preenchido ? "bg-moss text-paper" : "bg-paper text-ink", isHoje ? "border-[3px] bg-mustard text-ink shadow-hard-sm" : ""].join(" ")}
                   >
                     {d.data}
@@ -263,50 +313,104 @@ export default function DesafioDetalheClient({
               </button>
             </div>
 
+            {membros.length > 1 && (
+              // Uma linha só, rolando de lado — com 10+ pessoas os chips
+              // quebrariam em várias linhas e empurrariam o calendário.
+              <div className="-mx-4 mb-3 flex gap-1.5 overflow-x-auto px-4 pb-1.5">
+                {[null, ...membros.map((m) => m.userId)].map((uid) => {
+                  const m = uid ? membros.find((x) => x.userId === uid)! : null;
+                  const ativo = filtro === uid;
+                  return (
+                    <button
+                      key={uid ?? "todos"}
+                      type="button"
+                      onClick={() => setFiltro(uid)}
+                      aria-pressed={ativo}
+                      className={`shadow-hard-sm shrink-0 border-2 border-ink px-2.5 py-1 font-display text-[9px] uppercase tracking-widest active:translate-x-[1px] active:translate-y-[1px] active:shadow-none ${
+                        ativo ? "bg-moss text-paper" : "bg-paper text-ink"
+                      }`}
+                    >
+                      {m ? nomeChip(m) : "Todos"}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             <div className="grid grid-cols-7 gap-1">
               {DIAS_SEMANA_LABEL.map((l, i) => (
                 <span key={i} className="text-center font-display text-[9px] uppercase text-ink-soft">{l}</span>
               ))}
               {Array.from({ length: celulasDoMes.offset }, (_, i) => (
-                <span key={`v-${i}`} />
+                <span key={`v-${i}`} className="aspect-square border-2 border-dashed border-ink/20" />
               ))}
-              {celulasDoMes.celulas.map((c) => (
-                <button
-                  type="button"
-                  key={c.chave}
-                  onClick={() => setDiaAberto(c.chave)}
-                  disabled={c.chave > hojeChave}
-                  aria-label={`Dia ${c.dia}${c.feito ? ", com check-in" : ""} — ver sessões`}
-                  className={["flex aspect-square items-center justify-center border-2 border-ink text-[11px] font-black enabled:active:translate-x-[1px] enabled:active:translate-y-[1px]", c.hoje ? "border-[3px] bg-mustard text-ink shadow-hard-sm" : c.feito ? "bg-moss text-paper" : "bg-paper text-ink"].join(" ")}
-                >
-                  {c.dia}
-                </button>
+              {celulasDoMes.celulas.map((c) => {
+                const quem = pontosPorDia.get(c.chave) ?? [];
+                // Até MAX_PONTOS_DIA cabe tudo; passou disso, um ponto a menos + "+N".
+                const visiveis = quem.length > MAX_PONTOS_DIA ? quem.slice(0, MAX_PONTOS_DIA - 1) : quem;
+                const resto = quem.length - visiveis.length;
+                return (
+                  <button
+                    type="button"
+                    key={c.chave}
+                    onClick={() => setDiaAberto(c.chave)}
+                    disabled={c.chave > hojeChave}
+                    aria-label={`Dia ${c.dia}: ${quem.map(nomeChip).join(", ") || "sem check-in"} — ver check-ins`}
+                    className={`flex aspect-square flex-col justify-between border-2 bg-paper p-1 text-left enabled:active:translate-x-[1px] enabled:active:translate-y-[1px] disabled:opacity-50 ${c.hoje ? "border-coral" : "border-ink"}`}
+                  >
+                    {/* número em cima, uma linha de pontos embaixo — nunca quebra */}
+                    <span className="block font-display text-[10px] leading-none text-ink">{c.dia}</span>
+                    {quem.length > 0 && (
+                      <span className="flex flex-nowrap items-center justify-center gap-[2px] overflow-hidden">
+                        {visiveis.map((m) => (
+                          <i key={m.userId} className="h-[6px] w-[6px] shrink-0 rounded-full border border-ink" style={{ backgroundColor: m.cor }} />
+                        ))}
+                        {resto > 0 && (
+                          <span className="shrink-0 font-display text-[7px] leading-none text-ink-soft">+{resto}</span>
+                        )}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+              {Array.from({ length: celulasDoMes.sobra }, (_, i) => (
+                <span key={`f-${i}`} className="aspect-square border-2 border-dashed border-ink/20" />
               ))}
             </div>
+
+            {membros.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                {(legendaCompleta ? membros : membros.slice(0, MAX_NOMES_LEGENDA)).map((m) => (
+                  <span key={m.userId} className="inline-flex items-center gap-1.5 font-display text-[9px] uppercase tracking-widest text-ink">
+                    <i className="h-2.5 w-2.5 rounded-full border border-ink" style={{ backgroundColor: m.cor }} />
+                    {nomeChip(m)}
+                  </span>
+                ))}
+                {membros.length > MAX_NOMES_LEGENDA && (
+                  <button
+                    type="button"
+                    onClick={() => setLegendaCompleta((v) => !v)}
+                    className="font-display text-[9px] uppercase tracking-widest text-ink-soft underline underline-offset-2"
+                  >
+                    {legendaCompleta ? "menos" : `+${membros.length - MAX_NOMES_LEGENDA}`}
+                  </button>
+                )}
+              </div>
+            )}
+            <p className="mt-2 font-serif text-[11px] italic text-ink-soft">
+              Cada ponto = um membro com check-in no dia. Filtre por pessoa nos chips acima.
+            </p>
           </div>
         )}
-        {membros.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setGrupoAberto(true)}
-            className="mt-3 font-display text-[10px] uppercase tracking-widest text-ink underline decoration-2 underline-offset-2"
-          >
-            Check-ins do grupo ›
-          </button>
-        )}
-        {grupoAberto && (
-          <CheckinsGrupoSheet
-            membros={membros}
-            checkins={checkinsGrupo}
-            comecaEm={group.comecaEm}
-            onClose={() => setGrupoAberto(false)}
-          />
-        )}
         {diaAberto && (
-          <DiaLeituraSheet
+          <DiaGrupoSheet
             key={diaAberto}
             chave={diaAberto}
             hoje={diaAberto === hojeChave}
+            checkins={checkinsPorDia.get(diaAberto) ?? []}
+            comentar={comentar}
+            meuNome={meuNome}
+            minhaCor={minhaCor}
             onClose={() => setDiaAberto(null)}
           />
         )}
@@ -332,35 +436,9 @@ export default function DesafioDetalheClient({
         <section className="px-4 pt-8">
           <h2 className="mb-3 font-display text-sm uppercase tracking-wider text-ink">Atividade recente</h2>
           <ul className="space-y-2">
-            {atividadeVisivel.map((a) => (
-              <li key={a.id} className="border-2 border-ink bg-paper p-3 shadow-hard-sm">
-                <div className="flex items-start gap-3">
-                  {/* Cor do membro (a mesma dos pontos no calendário do grupo);
-                      ✓ = check-in, balão = check-in com nota. */}
-                  <span
-                    aria-hidden
-                    className="flex h-8 w-8 shrink-0 items-center justify-center border-2 border-ink text-paper"
-                    style={{ backgroundColor: a.cor }}
-                  >
-                    {a.nota ? (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" /></svg>
-                    ) : (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
-                    )}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[12px] leading-tight text-ink">
-                      <span className="font-display text-[11px] uppercase tracking-wider">{a.nome}</span>{" "}{a.texto}
-                    </p>
-                    <span className="mt-1 block font-display text-[9px] uppercase tracking-widest text-ink-soft">{a.quando}</span>
-                  </div>
-                </div>
-                {a.nota && (
-                  <div className="relative mt-3 ml-11 border-2 border-ink bg-mustard/40 p-3">
-                    <span aria-hidden className="absolute -top-[7px] left-4 h-3 w-3 rotate-45 border-t-2 border-l-2 border-ink bg-mustard/40" />
-                    <p className="font-serif text-[13px] italic leading-snug text-ink">&ldquo;{a.nota}&rdquo;</p>
-                  </div>
-                )}
+            {atividadeVisivel.map((c) => (
+              <li key={c.id}>
+                <CheckinCard c={c} comentar={comentar} meuNome={meuNome} minhaCor={minhaCor} />
               </li>
             ))}
           </ul>

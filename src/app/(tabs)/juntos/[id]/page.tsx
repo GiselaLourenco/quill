@@ -6,7 +6,7 @@ import { computeScores, daysRemaining, periodProgress, type ScoringMetric, SCORI
 import DesafioDetalheClient from "./detalhe-client";
 import { nomeExibicao } from "@/lib/nome-exibicao";
 import { AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
-import { localDateKey, todayLocalDateKey, addDaysToKey } from "@/lib/date-br";
+import { localDateKey, localTime, todayLocalDateKey, addDaysToKey } from "@/lib/date-br";
 
 export default async function DesafioDetalhePage({
   params,
@@ -52,11 +52,30 @@ export default async function DesafioDetalhePage({
   // Check-ins + membros
   const { data: checkins } = await supabase
     .from("challenge_checkins")
-    .select("user_id, note, created_at, session:sessions(started_at, duration_seconds, unit_start, unit_end, chapter_start, chapter_end)")
+    .select("id, user_id, note, created_at, session:sessions(id, started_at, ended_at, duration_seconds, unit_start, unit_end, chapter_start, chapter_end, quality_tags, item:media_items(id, title, creator, cover_kind, cover_url, cover_palette))")
     .eq("group_id", id)
     .order("created_at", { ascending: false });
 
   const memberIds = Array.from(new Set((checkins ?? []).map((c) => c.user_id as string)));
+
+  // Comentários nos check-ins (o "comentar"). Reações (🔥👏☕😮) também moram
+  // em comments com scope 'checkin' — ficam de fora.
+  const REACOES = new Set(["🔥", "👏", "☕", "😮"]);
+  const checkinIds = (checkins ?? []).map((c) => c.id as string);
+  const { data: comentariosRows } = checkinIds.length
+    ? await supabase
+        .from("comments")
+        .select("id, checkin_id, user_id, content, gif_url, created_at")
+        .eq("scope", "checkin")
+        .in("checkin_id", checkinIds)
+        .order("created_at", { ascending: true })
+    : { data: [] };
+  const comentariosValidos = (comentariosRows ?? []).filter(
+    (k) => k.gif_url || (k.content && !REACOES.has(k.content as string)),
+  );
+  const perfisIds = Array.from(
+    new Set([...memberIds, ...comentariosValidos.map((k) => k.user_id as string)]),
+  );
 
   // Quem já está no desafio sai da lista de convidáveis — e é `group_members`
   // que manda, não quem fez check-in: entrou e ainda não leu continua dentro.
@@ -66,11 +85,11 @@ export default async function DesafioDetalhePage({
   ]);
   const idsNoDesafio = new Set((jaMembros ?? []).map((m) => m.user_id as string));
 
-  const { data: profiles } = memberIds.length
+  const { data: profiles } = perfisIds.length
     ? await supabase
         .from("profiles")
         .select("id, display_name, username, avatar_url, avatar_zoom, avatar_bg")
-        .in("id", memberIds)
+        .in("id", perfisIds)
     : { data: [] };
 
   // Ranking e feed mostram o nome de exibição de todo mundo, inclusive o seu —
@@ -127,7 +146,7 @@ export default async function DesafioDetalhePage({
 
   // Uma cor por membro — a mesma nos pontos do calendário do grupo e no
   // quadradinho do feed. Ordem do ranking, pra cor não pular entre visitas.
-  const CORES_MEMBRO = ["#1d9e75", "#d85a30", "#26215c", "#ef9f27", "#e28d6a", "#69b997", "#6e6887", "#f1ba65"];
+  const CORES_MEMBRO = ["#1d9e75", "#d85a30", "#26215c", "#ef9f27", "#e28d6a", "#69b997", "#6e6887", "#f1ba65", "#0f6e56", "#8a7f6b"];
   const corPorMembro = new Map(
     [...ranking.map((r) => r.userId), ...memberIds].map((uid, i, todos) => [uid, todos.indexOf(uid)]),
   );
@@ -138,19 +157,6 @@ export default async function DesafioDetalhePage({
     cor: corDe(uid),
     ehVoce: uid === userId,
   }));
-
-  // Check-ins de todo mundo por dia (fuso do Brasil), pro "Check-ins do mês".
-  const checkinsGrupo = Array.from(
-    new Set(
-      (checkins ?? []).map((c) => {
-        const s = (c.session as unknown) as { started_at: string } | null;
-        return `${c.user_id as string}|${localDateKey(s?.started_at ?? (c.created_at as string))}`;
-      }),
-    ),
-  ).map((par) => {
-    const [uid, dia] = par.split("|");
-    return { userId: uid!, dia: dia! };
-  });
 
   // Check-ins da semana atual (do usuário) — dia calculado no fuso do
   // Brasil: uma sessão feita à noite local não pode cair no dia seguinte só
@@ -184,40 +190,74 @@ export default async function DesafioDetalhePage({
     };
   });
 
-  // Feed de atividade recente (últimos 20 check-ins de todos)
-  const atividade = (checkins ?? []).slice(0, 20).map((c, idx) => {
+  // Todos os check-ins, já no formato do cartão: feed (os 20 primeiros) e
+  // painel do dia usam os mesmos.
+  const comentariosPorCheckin = new Map<string, typeof comentariosValidos>();
+  for (const k of comentariosValidos) {
+    const id = k.checkin_id as string;
+    comentariosPorCheckin.set(id, [...(comentariosPorCheckin.get(id) ?? []), k]);
+  }
+  const detalhes = (checkins ?? []).map((c) => {
     const s = (c.session as unknown) as {
+      id: string;
       started_at: string;
+      ended_at: string | null;
       duration_seconds: number | null;
       unit_start: number | null;
       unit_end: number | null;
+      chapter_start: number | null;
+      chapter_end: number | null;
+      quality_tags: string[] | null;
+      // null quando o livro é de alguém que não é seu amigo (RLS)
+      item: { id: string; title: string; creator: string | null; cover_kind: string; cover_url: string | null; cover_palette: number } | null;
     } | null;
 
     let texto = "fez check-in";
-    if (metric === "pages" && s?.unit_start != null && s?.unit_end != null) {
-      const pages = Math.max(0, (s.unit_end ?? 0) - (s.unit_start ?? 0));
-      if (pages > 0) texto = `leu ${pages} pgs`;
-    } else if (metric === "minutes" && s?.duration_seconds) {
-      const min = Math.round(s.duration_seconds / 60);
-      texto = `leu ${min} min`;
-    }
+    const pages = s?.unit_start != null && s?.unit_end != null ? Math.max(0, s.unit_end - s.unit_start) : 0;
+    const caps = s?.chapter_start != null && s?.chapter_end != null ? Math.max(0, s.chapter_end - s.chapter_start) : 0;
+    const min = s?.duration_seconds ? Math.round(s.duration_seconds / 60) : 0;
+    if (metric === "minutes" && min > 0) texto = `leu ${min} min`;
+    else if (pages > 0) texto = `leu ${pages} pgs`;
+    else if (caps > 0) texto = `leu ${caps} cap.`;
+    else if (min > 0) texto = `leu ${min} min`;
 
-    const quando = formatQuando(c.created_at as string);
+    const detalhe = [metric !== "minutes" && min > 0 ? `${min} min` : null, s?.item?.title ?? null]
+      .filter(Boolean)
+      .join(" · ");
     const uid = c.user_id as string;
-    const perfil = perfilDe(uid);
 
     return {
-      id: `${uid}-${idx}`,
+      id: c.id as string,
       userId: uid,
-      nome: perfil.nome,
-      avatarUrl: perfil.avatarUrl,
-      avatarZoom: perfil.avatarZoom,
-      avatarBg: perfil.avatarBg,
+      nome: perfilDe(uid).nome,
       cor: corDe(uid),
+      dia: localDateKey(s?.started_at ?? (c.created_at as string)),
       texto,
+      detalhe: detalhe || null,
       nota: (c.note as string | null) ?? null,
-      quando,
-      ehVoce: uid === userId,
+      quando: formatQuando(c.created_at as string),
+      sessao: s
+        ? {
+            id: s.id,
+            inicio: localTime(s.started_at),
+            fim: s.ended_at ? localTime(s.ended_at) : null,
+            minutos: min,
+            paginaInicio: s.unit_start,
+            paginaFim: s.unit_end,
+            capituloInicio: s.chapter_start,
+            capituloFim: s.chapter_end,
+            tags: s.quality_tags ?? [],
+            livro: s.item,
+          }
+        : null,
+      comentarios: (comentariosPorCheckin.get(c.id as string) ?? []).map((k) => ({
+        id: k.id as string,
+        nome: perfilDe(k.user_id as string).nome,
+        cor: memberIds.includes(k.user_id as string) ? corDe(k.user_id as string) : "#6b6152",
+        texto: (k.content as string | null) ?? null,
+        gifUrl: (k.gif_url as string | null) ?? null,
+        quando: formatQuando(k.created_at as string).toLowerCase(),
+      })),
     };
   });
 
@@ -267,11 +307,9 @@ export default async function DesafioDetalhePage({
             : null,
       }}
       membros={membros}
-      checkinsGrupo={checkinsGrupo}
       semana={semana}
-      checkinDiasUsuario={Array.from(checkinsDoUsuario)}
       ranking={ranking}
-      atividade={atividade}
+      checkins={detalhes}
       livros={livrosLendo}
     />
   );

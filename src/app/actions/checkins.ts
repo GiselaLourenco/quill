@@ -53,3 +53,32 @@ export async function replyToCheckin(formData: FormData) {
 
   revalidatePath(`/juntos/${groupId}`);
 }
+
+// Comentário num check-in do desafio (texto e/ou GIF) — o "comentar" do feed
+// e do painel do dia. Quem lê é quem está no grupo (RLS "members read checkin
+// comments").
+export async function comentarCheckin(input: {
+  checkinId: string;
+  groupId: string;
+  content: string;
+  gifUrl: string | null;
+}): Promise<{ error: string | null }> {
+  const userId = await requireUserId();
+  const content = input.content.trim();
+  if (!input.checkinId || (!content && !input.gifUrl)) {
+    return { error: "Escreva algo ou escolha um GIF." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("comments").insert({
+    scope: "checkin",
+    checkin_id: input.checkinId,
+    user_id: userId,
+    content: content || null,
+    gif_url: input.gifUrl,
+  });
+  if (error) return { error: "Não deu pra comentar. Tente de novo." };
+
+  revalidatePath(`/juntos/${input.groupId}`);
+  return { error: null };
+}
