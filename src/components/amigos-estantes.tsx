@@ -60,7 +60,7 @@ export function AmigosEstantes({
         >
           ‹ todos os amigos
         </button>
-        <Estante shelf={aberta} />
+        <Estante shelf={aberta} demo={demo} />
       </div>
     );
   }
@@ -281,7 +281,15 @@ function Adicionados({
   );
 }
 
-function Estante({ shelf, onAbrir }: { shelf: FriendShelf; onAbrir?: () => void }) {
+function Estante({
+  shelf,
+  onAbrir,
+  demo = false,
+}: {
+  shelf: FriendShelf;
+  onAbrir?: () => void;
+  demo?: boolean;
+}) {
   return (
     <section>
       <div className="mb-2 flex items-center gap-2">
@@ -301,7 +309,7 @@ function Estante({ shelf, onAbrir }: { shelf: FriendShelf; onAbrir?: () => void 
       </div>
       <div className="flex flex-col gap-2">
         {shelf.items.map((it) => (
-          <LivroDoAmigo key={it.id} item={it} />
+          <LivroDoAmigo key={it.id} item={it} comAcoes demo={demo} />
         ))}
       </div>
     </section>
@@ -317,7 +325,7 @@ function LivroDoAmigo({
   emFoco = false,
 }: {
   item: FriendItem;
-  /** Curtir/comentar — só no feed, não na estante de um amigo. */
+  /** Curtir/comentar a última atualização do livro (feed e estante do amigo). */
   comAcoes?: boolean;
   demo?: boolean;
   /** Veio do sino: rola até aqui e pisca a borda. */
