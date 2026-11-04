@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 import CompartilharClient, { type PeriodoStats, type LivroCartaz } from "./compartilhar-client";
-import { localDateKey, localHour, todayLocalDateKey } from "@/lib/date-br";
+import { fimDoMes, fracaoDaSessaoEntre, localDateKey, localHour, segundosPorDiaDaSessao, todayLocalDateKey } from "@/lib/date-br";
 
 const MESES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -71,7 +71,7 @@ export default async function CompartilharPage() {
   const [{ data: sessions }, { data: livrosRows }, { data: ratings }] = await Promise.all([
     supabase
       .from("sessions")
-      .select("started_at, duration_seconds, unit_start, unit_end, item_id")
+      .select("started_at, ended_at, duration_seconds, unit_start, unit_end, item_id")
       .eq("user_id", userId)
       .eq("cadastro", false)
       .gte("started_at", `${inicio}T00:00:00`),
@@ -101,14 +101,26 @@ export default async function CompartilharPage() {
 
   const periodos: PeriodoStats[] = meses.map(({ id, ano, mes }) => {
     const doMes = rows.filter((s) => localDateKey(s.started_at).slice(0, 7) === id);
-    const segundos = doMes.reduce((soma, s) => soma + (s.duration_seconds ?? 0), 0);
-    const paginas = doMes.reduce((soma, s) => {
-      if (s.item_id && s.unit_start != null && s.unit_end != null) {
-        return soma + Math.max(0, s.unit_end - s.unit_start);
+    // Tempo e dias lidos seguem o relógio (sessão que vira a noite conta nos
+    // dois dias); páginas são repartidas na mesma proporção.
+    let segundos = 0;
+    const dias = new Set<string>();
+    for (const s of rows) {
+      for (const [dia, seg] of segundosPorDiaDaSessao(s)) {
+        if (dia.slice(0, 7) !== id) continue;
+        segundos += seg;
+        dias.add(dia);
       }
-      return soma;
-    }, 0);
-    const diasLidos = new Set(doMes.map((s) => localDateKey(s.started_at))).size;
+    }
+    const paginas = Math.round(
+      rows.reduce((soma, s) => {
+        if (s.item_id && s.unit_start != null && s.unit_end != null) {
+          return soma + Math.max(0, s.unit_end - s.unit_start) * fracaoDaSessaoEntre(s, `${id}-01`, fimDoMes(id));
+        }
+        return soma;
+      }, 0),
+    );
+    const diasLidos = dias.size;
     const diasNoMes = new Date(ano, mes + 1, 0).getDate();
 
     // Livros com alguma atualização de leitura neste mês, da sessão mais

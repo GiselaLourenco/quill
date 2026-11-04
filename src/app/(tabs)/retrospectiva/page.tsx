@@ -9,7 +9,7 @@ import {
   type SessionRow,
 } from "@/lib/gamification";
 import { formatDuration, paginasDeLivrosTerminados } from "@/lib/reading-stats";
-import { localDateKey, todayLocalDateKey } from "@/lib/date-br";
+import { fracaoDaSessaoEntre, localDateKey, segundosPorDiaDaSessao, todayLocalDateKey } from "@/lib/date-br";
 
 const MONTH_NAMES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -38,14 +38,26 @@ function summarize(sessions: SessionRow[], start: string, end: string) {
     const key = localDateKey(s.started_at);
     return key >= start && key <= end;
   });
-  const totalSeconds = inRange.reduce((sum, s) => sum + (s.duration_seconds ?? 0), 0);
-  const pagesRead = inRange.reduce((sum, s) => {
-    if (s.item_id && s.unit_start != null && s.unit_end != null) {
-      return sum + Math.max(0, s.unit_end - s.unit_start);
+  // Tempo e dias lidos seguem o relógio: sessão que vira a noite reparte o
+  // tempo e conta nos dois dias; páginas são repartidas na mesma proporção.
+  let totalSeconds = 0;
+  const dias = new Set<string>();
+  for (const s of sessions) {
+    for (const [key, seg] of segundosPorDiaDaSessao(s)) {
+      if (key < start || key > end) continue;
+      totalSeconds += seg;
+      dias.add(key);
     }
-    return sum;
-  }, 0);
-  const daysRead = new Set(inRange.map((s) => localDateKey(s.started_at))).size;
+  }
+  const pagesRead = Math.round(
+    sessions.reduce((sum, s) => {
+      if (s.item_id && s.unit_start != null && s.unit_end != null) {
+        return sum + Math.max(0, s.unit_end - s.unit_start) * fracaoDaSessaoEntre(s, start, end);
+      }
+      return sum;
+    }, 0),
+  );
+  const daysRead = dias.size;
   return { inRange, totalSeconds, pagesRead, daysRead };
 }
 
@@ -98,7 +110,7 @@ export default async function RetrospectivaPage({
   const [{ data: sessions }, { count: booksFinished }, { data: terminadosJanela }] = await Promise.all([
     supabase
       .from("sessions")
-      .select("started_at, duration_seconds, unit_start, unit_end, chapter_start, chapter_end, quality_tags, item_id")
+      .select("started_at, ended_at, duration_seconds, unit_start, unit_end, chapter_start, chapter_end, quality_tags, item_id")
       .eq("user_id", userId)
       .eq("cadastro", false)
       .gte("started_at", `${prevStart}T00:00:00`)

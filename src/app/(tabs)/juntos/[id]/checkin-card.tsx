@@ -23,7 +23,13 @@ export type CheckinDetalhe = {
   /** Cor do membro — a mesma dos pontos do calendário. */
   cor: string;
   dia: string; // YYYY-MM-DD, fuso do Brasil
+  /** Dias em que a leitura conta — mais de um quando virou a noite. Sem isso, só `dia`. */
+  dias?: string[];
   texto: string; // "leu 36 pgs"
+  /** Esse check-in fechou o livro. */
+  terminou?: boolean;
+  /** Posição no livro depois da sessão; `total` null quando o livro não é visível. */
+  progresso?: { atual: number; total: number | null; unidade: "pág" | "cap" } | null;
   detalhe: string | null; // "19 min · Circe"
   nota: string | null;
   quando: string;
@@ -77,12 +83,42 @@ export function CheckinCard({
             {c.quando}
             {c.detalhe ? ` · ${c.detalhe}` : ""}
           </span>
+          {c.progresso && <ProgressoNoLivro p={c.progresso} terminou={Boolean(c.terminou)} />}
         </div>
       </div>
 
       {/* key: quando o refresh traz o comentário do servidor, remonta e
           descarta a cópia otimista — senão ele aparecia duas vezes. */}
       <CheckinConversa key={c.comentarios.length} c={c} comentar={comentar} meuNome={meuNome} minhaCor={minhaCor} recuo />
+    </div>
+  );
+}
+
+/** "▓▓▓░░ pág 120 de 300" — onde a pessoa está no livro depois do check-in. */
+function ProgressoNoLivro({
+  p,
+  terminou,
+}: {
+  p: NonNullable<CheckinDetalhe["progresso"]>;
+  terminou: boolean;
+}) {
+  const percent = p.total ? Math.min(100, Math.round((p.atual / p.total) * 100)) : null;
+  const rotulo = p.total
+    ? terminou
+      ? `${p.total} de ${p.total}`
+      : `${p.unidade} ${p.atual} de ${p.total}`
+    : `${p.unidade} ${p.atual}`;
+  return (
+    <div className="mt-2 flex items-center gap-2">
+      {percent != null && (
+        <div className="h-2.5 flex-1 border-2 border-ink bg-paper">
+          <div
+            className={`h-full ${terminou ? "bg-coral" : "bg-moss"}`}
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+      )}
+      <span className="shrink-0 font-display text-[9px] uppercase tracking-widest text-ink">{rotulo}</span>
     </div>
   );
 }

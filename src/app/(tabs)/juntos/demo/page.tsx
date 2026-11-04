@@ -143,7 +143,10 @@ export default function DesafioDemoPage() {
       nome: pessoaDe(c.userId).nome,
       cor: corDe(c.userId),
       dia: c.dia,
-      texto: `leu ${c.paginas} pgs`,
+      // Livros de 420 págs: quem cruza o fim "termina o livro" no feed.
+      terminou: pagInicio + c.paginas >= 420,
+      texto: pagInicio + c.paginas >= 420 ? "terminou o livro! 🎉" : `leu ${c.paginas} pgs`,
+      progresso: { atual: Math.min(420, pagInicio + c.paginas), total: 420, unidade: "pág" },
       detalhe: `${c.minutos} min · ${livro.title}`,
       sessao: {
         id: `demo-s-${i}`,
@@ -161,6 +164,7 @@ export default function DesafioDemoPage() {
       quando: quando(c),
       comentarios: Array.from({ length: nRespostas }, (_, k) => {
         const quem = outros[Math.floor(rand() * outros.length)]!;
+        // `outros` exclui o autor do check-in — então "voce" aparece como quem comenta.
         return {
           id: `demo-${i}-${k}`,
           nome: quem.nome,

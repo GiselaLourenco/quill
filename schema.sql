@@ -198,6 +198,7 @@ create table public.challenge_checkins (
   user_id    uuid not null references auth.users(id) on delete cascade,
   photo_path text,                            -- bucket privado challenge-photos
   note       text,
+  finished_item_id uuid references public.media_items(id) on delete set null, -- livro terminado (métrica "Livros terminados")
   created_at timestamptz not null default now(),
   unique (group_id, session_id)
 );
@@ -327,6 +328,8 @@ create policy "publish own checkin" on public.challenge_checkins for insert to a
   with check (user_id = auth.uid() and public.is_group_member(group_id, auth.uid()));
 create policy "delete own checkin" on public.challenge_checkins for delete
   using (user_id = auth.uid());
+create policy "update own checkin" on public.challenge_checkins for update to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 -- friendships
 alter table public.friendships enable row level security;

@@ -6,7 +6,14 @@ import { computeScores, daysRemaining, periodProgress, type ScoringMetric, SCORI
 import DesafioDetalheClient from "./detalhe-client";
 import { nomeExibicao } from "@/lib/nome-exibicao";
 import { AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
-import { localDateKey, localTime, todayLocalDateKey, addDaysToKey } from "@/lib/date-br";
+import {
+  localDateKey,
+  localTime,
+  todayLocalDateKey,
+  addDaysToKey,
+  diasDaSessao,
+  type SessaoNoTempo,
+} from "@/lib/date-br";
 
 export default async function DesafioDetalhePage({
   params,
@@ -52,7 +59,7 @@ export default async function DesafioDetalhePage({
   // Check-ins + membros
   const { data: checkins } = await supabase
     .from("challenge_checkins")
-    .select("id, user_id, note, created_at, session:sessions(id, started_at, ended_at, duration_seconds, unit_start, unit_end, chapter_start, chapter_end, quality_tags, item:media_items(id, title, creator, cover_kind, cover_url, cover_palette))")
+    .select("id, user_id, note, finished_item_id, created_at, session:sessions(id, started_at, ended_at, duration_seconds, unit_start, unit_end, chapter_start, chapter_end, quality_tags, item:media_items(id, title, creator, cover_kind, cover_url, cover_palette, total_units, total_chapters))")
     .eq("group_id", id)
     .order("created_at", { ascending: false });
 
@@ -114,8 +121,10 @@ export default async function DesafioDetalhePage({
   const scores = computeScores(
     (checkins ?? []).map((c) => ({
       user_id: c.user_id as string,
+      finished_item_id: (c.finished_item_id as string | null) ?? null,
       session: (c.session as unknown) as {
         started_at: string;
+        ended_at: string | null;
         duration_seconds: number | null;
         unit_start: number | null;
         unit_end: number | null;
@@ -124,6 +133,7 @@ export default async function DesafioDetalhePage({
       } | null,
     })),
     metric,
+    { inicio: (group.starts_at as string | null) ?? null, fim: (group.ends_at as string | null) ?? null },
   );
 
   const ranking = Array.from(scores.entries())
@@ -170,11 +180,10 @@ export default async function DesafioDetalhePage({
   const checkinsDoUsuario = new Set(
     (checkins ?? [])
       .filter((c) => c.user_id === userId)
-      .map((c) => {
-        const s = (c.session as unknown) as { started_at: string } | null;
-        return s?.started_at ? localDateKey(s.started_at) : "";
-      })
-      .filter(Boolean),
+      .flatMap((c) => {
+        const s = (c.session as unknown) as SessaoNoTempo | null;
+        return s?.started_at ? diasDaSessao(s) : [];
+      }),
   );
 
   const DIAS_LABEL = ["D", "S", "T", "Q", "Q", "S", "S"];
@@ -197,6 +206,20 @@ export default async function DesafioDetalhePage({
     const id = k.checkin_id as string;
     comentariosPorCheckin.set(id, [...(comentariosPorCheckin.get(id) ?? []), k]);
   }
+  // "Terminou o livro!" só no check-in mais recente de cada livro terminado
+  // (por pessoa) — marcar "terminei" depois grava o livro em todos os
+  // check-ins dele, mas a comemoração é de um só. A lista vem do mais novo.
+  const checkinQueTerminou = new Set<string>();
+  const livrosJaVistos = new Set<string>();
+  for (const c of checkins ?? []) {
+    const livro = c.finished_item_id as string | null;
+    if (!livro) continue;
+    const chave = `${c.user_id}:${livro}`;
+    if (livrosJaVistos.has(chave)) continue;
+    livrosJaVistos.add(chave);
+    checkinQueTerminou.add(c.id as string);
+  }
+
   const detalhes = (checkins ?? []).map((c) => {
     const s = (c.session as unknown) as {
       id: string;
@@ -209,8 +232,27 @@ export default async function DesafioDetalhePage({
       chapter_end: number | null;
       quality_tags: string[] | null;
       // null quando o livro é de alguém que não é seu amigo (RLS)
-      item: { id: string; title: string; creator: string | null; cover_kind: string; cover_url: string | null; cover_palette: number } | null;
+      item: {
+        id: string;
+        title: string;
+        creator: string | null;
+        cover_kind: string;
+        cover_url: string | null;
+        cover_palette: number;
+        total_units: number | null;
+        total_chapters: number | null;
+      } | null;
     } | null;
+
+    const terminou = checkinQueTerminou.has(c.id as string);
+    // Onde a pessoa está no livro depois dessa sessão. O total só vem quando
+    // o livro é visível (amigos); sem ele, mostra só a página.
+    const progresso =
+      s?.unit_end != null
+        ? { atual: s.unit_end, total: s.item?.total_units ?? null, unidade: "pág" as const }
+        : s?.chapter_end != null
+          ? { atual: s.chapter_end, total: s.item?.total_chapters ?? null, unidade: "cap" as const }
+          : null;
 
     let texto = "fez check-in";
     const pages = s?.unit_start != null && s?.unit_end != null ? Math.max(0, s.unit_end - s.unit_start) : 0;
@@ -220,6 +262,7 @@ export default async function DesafioDetalhePage({
     else if (pages > 0) texto = `leu ${pages} pgs`;
     else if (caps > 0) texto = `leu ${caps} cap.`;
     else if (min > 0) texto = `leu ${min} min`;
+    if (terminou) texto = "terminou o livro! 🎉";
 
     const detalhe = [metric !== "minutes" && min > 0 ? `${min} min` : null, s?.item?.title ?? null]
       .filter(Boolean)
@@ -232,6 +275,10 @@ export default async function DesafioDetalhePage({
       nome: perfilDe(uid).nome,
       cor: corDe(uid),
       dia: localDateKey(s?.started_at ?? (c.created_at as string)),
+      // Todos os dias em que essa leitura conta (virou a noite → 2 dias).
+      dias: s ? diasDaSessao(s) : [localDateKey(c.created_at as string)],
+      terminou,
+      progresso,
       texto,
       detalhe: detalhe || null,
       nota: (c.note as string | null) ?? null,

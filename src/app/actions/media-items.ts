@@ -8,6 +8,7 @@ import { conquistasDoTitulo } from "@/lib/achievements";
 import { paletteIndexForTitle } from "@/lib/covers";
 import { chaveTitulo } from "@/lib/titulo";
 import { todayLocalDateKey } from "@/lib/date-br";
+import { sincronizarLivroTerminadoNosDesafios } from "@/lib/challenges";
 
 /** Livro da estante com o mesmo título (ver `chaveTitulo`), ignorando `excetoId`. */
 async function livroComMesmoTitulo(
@@ -176,6 +177,17 @@ export async function updateItemStatus(itemId: string, status: string) {
   await supabase.from("media_items").update(updates).eq("id", itemId);
 
   if (status === "finished") await registrarConquistaDeLivro(supabase, userId, itemId);
+
+  // Desafio "Livros terminados": o livro fica gravado nos check-ins dele.
+  if (status === "finished" || atual?.status === "finished") {
+    const grupos = await sincronizarLivroTerminadoNosDesafios(
+      supabase,
+      userId,
+      itemId,
+      status === "finished",
+    );
+    for (const groupId of grupos) revalidatePath(`/juntos/${groupId}`);
+  }
 
   revalidatePath(`/books/${itemId}`);
   revalidatePath("/estante");

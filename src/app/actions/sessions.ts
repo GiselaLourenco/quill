@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId, userIdOuNull } from "@/lib/supabase/auth";
 import { updateItemStatus } from "@/app/actions/media-items";
-import { addDaysToKey, localDateKey, localTime } from "@/lib/date-br";
+import { addDaysToKey, diasDaSessao, localTime, todayLocalDateKey } from "@/lib/date-br";
 
 export type SessionUnit = "chapters" | "pages";
 
@@ -64,6 +64,16 @@ export async function createSession(input: {
   // Quantidade só ancora numa posição de leitura quando há livro vinculado —
   // sem vínculo, a sessão vale pelo tempo (mesma regra de antes).
   if (itemId && quantity != null) {
+    // A posição nunca passa do total cadastrado: em 290 de 300, "li 20"
+    // termina o livro e conta 10 páginas (no desafio também), não 20.
+    const { data: livro } = await supabase
+      .from("media_items")
+      .select("total_units, total_chapters")
+      .eq("id", itemId)
+      .maybeSingle();
+    const limite = (total: number | null | undefined, start: number) =>
+      total != null && total > start ? Math.min(start + quantity, total) : start + quantity;
+
     if (input.unit === "pages") {
       const { data: last } = await supabase
         .from("sessions")
@@ -75,7 +85,7 @@ export async function createSession(input: {
         .maybeSingle();
       const start = last?.unit_end ?? 0;
       unitStart = start;
-      unitEnd = start + quantity;
+      unitEnd = limite(livro?.total_units, start);
     } else {
       const { data: last } = await supabase
         .from("sessions")
@@ -87,7 +97,7 @@ export async function createSession(input: {
         .maybeSingle();
       const start = last?.chapter_end ?? 0;
       chapterStart = start;
-      chapterEnd = start + quantity;
+      chapterEnd = limite(livro?.total_chapters, start);
     }
   }
 
@@ -286,7 +296,17 @@ export async function publishSession(input: {
       .limit(1)
       .maybeSingle();
     const start = last?.unit_end ?? 0;
-    const unitEnd = start + Math.round(input.pagesExtra);
+    const { data: livro } = await supabase
+      .from("media_items")
+      .select("total_units")
+      .eq("id", input.itemId)
+      .maybeSingle();
+    const total = livro?.total_units as number | null | undefined;
+    // Mesma trava do createSession: a posição não passa do total.
+    const unitEnd =
+      total != null && total > start
+        ? Math.min(start + Math.round(input.pagesExtra), total)
+        : start + Math.round(input.pagesExtra);
     await supabase
       .from("sessions")
       .update({ unit_start: start, unit_end: unitEnd })
@@ -297,11 +317,37 @@ export async function publishSession(input: {
 
   const note = input.note?.trim() || null;
   if (input.groupIds.length > 0) {
+    // Sessão que terminou o livro: o check-in conta no desafio "Livros
+    // terminados" — só se o término caiu dentro do período do desafio (um
+    // livro terminado antes, relido agora, não vale ponto).
+    let terminadoEm: string | null = null;
+    if (input.itemId) {
+      const { data: item } = await supabase
+        .from("media_items")
+        .select("status, finished_at")
+        .eq("id", input.itemId)
+        .maybeSingle();
+      if (item?.status === "finished") terminadoEm = (item.finished_at as string | null) ?? todayLocalDateKey();
+    }
+    const inicioPorGrupo = new Map<string, string | null>();
+    if (terminadoEm) {
+      const { data: grupos } = await supabase
+        .from("groups")
+        .select("id, starts_at")
+        .in("id", input.groupIds);
+      for (const g of grupos ?? []) inicioPorGrupo.set(g.id as string, (g.starts_at as string | null) ?? null);
+    }
+    const livroTerminadoNo = (groupId: string) => {
+      if (!terminadoEm || !input.itemId) return null;
+      const inicio = inicioPorGrupo.get(groupId);
+      return !inicio || terminadoEm >= inicio ? input.itemId : null;
+    };
     await supabase.from("challenge_checkins").insert(
       input.groupIds.map((groupId) => ({
         group_id: groupId,
         session_id: input.sessionId,
         user_id: userId,
+        finished_item_id: livroTerminadoNo(groupId),
         note:
           input.notasPorGrupo && groupId in input.notasPorGrupo
             ? input.notasPorGrupo[groupId]?.trim() || null
@@ -378,7 +424,7 @@ export async function sessoesDoDia(chave: string): Promise<SessaoDoDia[]> {
     .order("started_at", { ascending: true });
 
   return (data ?? [])
-    .filter((s) => localDateKey(s.started_at) === chave)
+    .filter((s) => diasDaSessao(s).includes(chave))
     .map((s) => {
       const livro = Array.isArray(s.media_items) ? s.media_items[0] : s.media_items;
       return {

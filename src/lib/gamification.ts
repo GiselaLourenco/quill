@@ -1,7 +1,17 @@
-import { localDateKey, todayLocalDateKey, localHour, addDaysToKey } from "@/lib/date-br";
+import {
+  localDateKey,
+  todayLocalDateKey,
+  localHour,
+  addDaysToKey,
+  diasLidos,
+  segundosPorDiaDaSessao,
+  fracaoDaSessaoEntre,
+  type SessaoNoTempo,
+} from "@/lib/date-br";
 
 export type SessionRow = {
   started_at: string;
+  ended_at?: string | null;
   duration_seconds: number | null;
   unit_start: number | null;
   unit_end: number | null;
@@ -29,15 +39,17 @@ export function weekKey(iso: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-function uniqueSortedDays(sessions: Pick<SessionRow, "started_at">[]): string[] {
-  return [...new Set(sessions.map((s) => dateKey(s.started_at)))].sort();
+// Dias lidos — uma sessão que vira a noite conta nos dois dias (ver
+// segundosPorDiaDaSessao em date-br).
+function uniqueSortedDays(sessions: SessaoNoTempo[]): string[] {
+  return [...diasLidos(sessions)].sort();
 }
 
 function uniqueSortedWeeks(sessions: SessionRow[]): string[] {
-  return [...new Set(sessions.map((s) => weekKey(s.started_at)))].sort();
+  return [...new Set(uniqueSortedDays(sessions).map((d) => weekKey(`${d}T12:00:00-03:00`)))].sort();
 }
 
-export function computeStreak(sessions: Pick<SessionRow, "started_at">[]): {
+export function computeStreak(sessions: SessaoNoTempo[]): {
   current: number;
   record: number;
 } {
@@ -103,9 +115,10 @@ export function computeDailyMinutes(
 ): Map<string, number> {
   const map = new Map<string, number>();
   for (const s of sessions) {
-    const key = dateKey(s.started_at);
-    if (key < startDate || key > endDate) continue;
-    map.set(key, (map.get(key) ?? 0) + (s.duration_seconds ?? 0) / 60);
+    for (const [key, segundos] of segundosPorDiaDaSessao(s)) {
+      if (key < startDate || key > endDate) continue;
+      map.set(key, (map.get(key) ?? 0) + segundos / 60);
+    }
   }
   return map;
 }
@@ -225,14 +238,14 @@ export function pagesReadInRange(
   start: string,
   end: string,
 ): number {
-  return sessions.reduce((sum, s) => {
-    const key = dateKey(s.started_at);
-    if (key < start || key > end) return sum;
+  // Sessão que vira a noite reparte as páginas na proporção do tempo.
+  const total = sessions.reduce((sum, s) => {
     if (s.item_id && s.unit_start != null && s.unit_end != null) {
-      return sum + Math.max(0, s.unit_end - s.unit_start);
+      return sum + Math.max(0, s.unit_end - s.unit_start) * fracaoDaSessaoEntre(s, start, end);
     }
     return sum;
   }, 0);
+  return Math.round(total);
 }
 
 export function goalProgress(

@@ -44,7 +44,7 @@ export default async function CalendarioPage({
   const supabase = await createClient();
   const { data: sessions } = await supabase
     .from("sessions")
-    .select("started_at, duration_seconds, unit_start, unit_end, chapter_start, chapter_end, quality_tags, item_id")
+    .select("started_at, ended_at, duration_seconds, unit_start, unit_end, chapter_start, chapter_end, quality_tags, item_id")
     .eq("user_id", userId)
     .eq("cadastro", false);
 

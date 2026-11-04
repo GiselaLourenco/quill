@@ -1,7 +1,8 @@
-import { localDateKey } from "@/lib/date-br";
+import { diasLidos } from "@/lib/date-br";
 
 export type SessionForStats = {
   started_at: string;
+  ended_at?: string | null;
   duration_seconds: number | null;
   unit_start: number | null;
   unit_end: number | null;
@@ -140,9 +141,7 @@ export function computeReadingStats(sessions: SessionForStats[]): ReadingStats {
   // olha o que foi lido no app: dias e páginas de posição informada à mão
   // (ex.: "já estava na 288 quando adicionei") não contam como leitura.
   const lidas = sessions.filter((s) => !s.cadastro);
-  const days = new Set(
-    lidas.map((s) => localDateKey(s.started_at)), // YYYY-MM-DD, fuso do Brasil
-  );
+  const days = diasLidos(lidas); // YYYY-MM-DD, fuso do Brasil; virar a noite conta 2 dias
 
   const currentPage = posicaoAtual(sessions).paginas;
   const paginasNoApp = lidas.reduce(
@@ -185,14 +184,13 @@ export type GlobalStats = { totalSeconds: number; daysRead: number };
 // Estatísticas globais (aba "Quill") — não dependem de um livro específico,
 // então não fazem sentido páginas/dia ou posição atual.
 export function computeGlobalStats(
-  sessions: { started_at: string; duration_seconds: number | null }[],
+  sessions: { started_at: string; ended_at?: string | null; duration_seconds: number | null }[],
 ): GlobalStats {
   const totalSeconds = sessions.reduce(
     (sum, s) => sum + (s.duration_seconds ?? 0),
     0,
   );
-  const days = new Set(sessions.map((s) => localDateKey(s.started_at)));
-  return { totalSeconds, daysRead: days.size };
+  return { totalSeconds, daysRead: diasLidos(sessions).size };
 }
 
 export function formatDuration(totalSeconds: number): string {

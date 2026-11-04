@@ -13,7 +13,14 @@ import { pillsEscolhidas, pillDisplay, type PillStats } from "@/lib/pills";
 import { getNotificacoes } from "@/lib/notificacoes";
 import { nomeExibicao } from "@/lib/nome-exibicao";
 import { AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
-import { localDateKey, todayLocalDateKey, localHour, localWeekday } from "@/lib/date-br";
+import {
+  localDateKey,
+  todayLocalDateKey,
+  localHour,
+  localWeekday,
+  segundosPorDiaDaSessao,
+  fracaoDaSessaoEntre,
+} from "@/lib/date-br";
 import HomeClient, { type Meta, type SemanaDados, type MesCalendario } from "./home-client";
 
 const DIA_LABEL = ["D", "S", "T", "Q", "Q", "S", "S"];
@@ -85,7 +92,7 @@ export default async function HomePage() {
         .maybeSingle(),
       supabase
         .from("sessions")
-        .select("started_at, duration_seconds, unit_start, unit_end, chapter_start, chapter_end, quality_tags, item_id")
+        .select("started_at, ended_at, duration_seconds, unit_start, unit_end, chapter_start, chapter_end, quality_tags, item_id")
         .eq("user_id", userId)
         .eq("cadastro", false)
         .gte("started_at", `${janelaInicio}T00:00:00`),
@@ -121,6 +128,16 @@ export default async function HomePage() {
   // atravessa o início da janela (ex.: virada do ano) seria cortada.
   const streakCompleto = computeStreak(historico.sessions);
 
+  // Segundos lidos por dia (fuso do Brasil). Sessão que vira a noite reparte
+  // o tempo entre os dois dias — é daqui que saem barras, calendário e horas.
+  const segundosPorDia = new Map<string, number>();
+  for (const s of todas) {
+    if (!s.started_at) continue;
+    for (const [dia, seg] of segundosPorDiaDaSessao(s)) {
+      segundosPorDia.set(dia, (segundosPorDia.get(dia) ?? 0) + seg);
+    }
+  }
+
   // ---- Semanas navegáveis ---------------------------------------------
   const semanas: SemanaDados[] = [];
   for (let i = SEMANAS_VISIVEIS - 1; i >= 0; i -= 1) {
@@ -133,11 +150,7 @@ export default async function HomePage() {
       const dia = new Date(inicio);
       dia.setDate(dia.getDate() + j);
       const chave = iso(dia);
-      const min = Math.round(
-        todas
-          .filter((s) => s.started_at && localDateKey(s.started_at) === chave)
-          .reduce((soma, s) => soma + (s.duration_seconds ?? 0), 0) / 60,
-      );
+      const min = Math.round((segundosPorDia.get(chave) ?? 0) / 60);
       return { d: DIA_LABEL[dia.getDay()]!, chave, min, hoje: chave === hoje, futuro: chave > hoje };
     });
 
@@ -149,13 +162,11 @@ export default async function HomePage() {
   for (let i = -MESES_ANTES; i <= MESES_DEPOIS; i += 1) {
     const ref = new Date(anoAtual, agora.getMonth() + i, 1);
     const prefixo = `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, "0")}`;
-    const doMes = todas.filter((s) => s.started_at && localDateKey(s.started_at).startsWith(prefixo));
-
     // Dia é "destaque" quando passou de 60 min lidos.
     const minutosPorDia = new Map<number, number>();
-    for (const s of doMes) {
-      const dia = Number(localDateKey(s.started_at).slice(8, 10));
-      minutosPorDia.set(dia, (minutosPorDia.get(dia) ?? 0) + (s.duration_seconds ?? 0) / 60);
+    for (const [chave, seg] of segundosPorDia) {
+      if (!chave.startsWith(prefixo)) continue;
+      minutosPorDia.set(Number(chave.slice(8, 10)), seg / 60);
     }
 
     const ehMesAtual = ref.getMonth() === agora.getMonth() && ref.getFullYear() === anoAtual;
@@ -184,9 +195,9 @@ export default async function HomePage() {
   // Mesmas contas da tela de Metas, pra os dois números nunca divergirem.
   const prefixoMes = `${anoAtual}-${String(agora.getMonth() + 1).padStart(2, "0")}`;
   const horasNoMes = Math.round(
-    todas
-      .filter((s) => s.started_at && localDateKey(s.started_at).startsWith(prefixoMes))
-      .reduce((soma, s) => soma + (s.duration_seconds ?? 0), 0) / 3600,
+    [...segundosPorDia]
+      .filter(([chave]) => chave.startsWith(prefixoMes))
+      .reduce((soma, [, seg]) => soma + seg, 0) / 3600,
   );
   const mesNome = agora.toLocaleString("pt-BR", { month: "long" });
 
@@ -225,10 +236,19 @@ export default async function HomePage() {
   // seis padrão. Todas as contas ficam prontas aqui — são baratas em cima das
   // sessões já carregadas, e assim trocar a seleção não exige tocar na home.
   const doAno = todas.filter((s) => s.started_at && localDateKey(s.started_at).startsWith(String(anoAtual)));
-  const diasComLeituraAno = new Set(doAno.map((s) => localDateKey(s.started_at)));
+  const diasComLeituraAno = new Set(
+    [...segundosPorDia.keys()].filter((chave) => chave.startsWith(String(anoAtual))),
+  );
 
   // Média de páginas por dia efetivamente lido (não por dia do calendário).
-  const paginasAno = doAno.reduce((soma, s) => soma + paginasDa(s), 0);
+  // Sessão que vira o ano reparte as páginas na proporção do tempo.
+  const paginasAno = todas.reduce(
+    (soma, s) =>
+      s.started_at
+        ? soma + paginasDa(s) * fracaoDaSessaoEntre(s, `${anoAtual}-01-01`, `${anoAtual}-12-31`)
+        : soma,
+    0,
+  );
   const mediaPaginas =
     diasComLeituraAno.size > 0 ? Math.round(paginasAno / diasComLeituraAno.size) : 0;
 

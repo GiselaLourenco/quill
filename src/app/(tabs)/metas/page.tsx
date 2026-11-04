@@ -6,7 +6,7 @@ import { requireUserId } from "@/lib/supabase/auth";
 import { ConfigurarMetas, type MetaConfiguravel } from "@/components/configurar-metas";
 import { ExcluirMeta } from "@/components/excluir-meta";
 import { computeStreak } from "@/lib/gamification";
-import { localDateKey, todayLocalDateKey } from "@/lib/date-br";
+import { segundosPorDiaDaSessao, todayLocalDateKey } from "@/lib/date-br";
 import {
   goalProgress,
   computePagesPerDay,
@@ -32,7 +32,7 @@ export default async function MetasPage({
     await Promise.all([
       supabase
         .from("sessions")
-        .select("started_at, duration_seconds, unit_start, unit_end, chapter_start, chapter_end, quality_tags, item_id")
+        .select("started_at, ended_at, duration_seconds, unit_start, unit_end, chapter_start, chapter_end, quality_tags, item_id")
         .eq("user_id", userId)
         .eq("cadastro", false),
       supabase
@@ -53,11 +53,15 @@ export default async function MetasPage({
 
   // ---- Valores atuais das três metas configuráveis --------------------
   const prefixoMes = hoje.slice(0, 7);
-  const horasNoMes = Math.round(
-    sessionRows
-      .filter((s) => s.started_at && localDateKey(s.started_at).startsWith(prefixoMes))
-      .reduce((soma, s) => soma + (s.duration_seconds ?? 0), 0) / 3600,
-  );
+  // Sessão que vira a noite (ou o mês) reparte o tempo entre os dias.
+  let segundosNoMes = 0;
+  for (const s of sessionRows) {
+    if (!s.started_at) continue;
+    for (const [dia, seg] of segundosPorDiaDaSessao(s)) {
+      if (dia.startsWith(prefixoMes)) segundosNoMes += seg;
+    }
+  }
+  const horasNoMes = Math.round(segundosNoMes / 3600);
   const streakAtual = computeStreak(sessionRows).current;
   const alvoPorTipo = new Map(
     (goals ?? []).map((g) => [g.type as string, Number(g.target_value)]),

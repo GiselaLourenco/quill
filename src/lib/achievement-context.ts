@@ -5,7 +5,7 @@ import {
   weekKey,
   type SessionRow,
 } from "@/lib/gamification";
-import { localDateKey, localHour } from "@/lib/date-br";
+import { localDateKey, localHour, segundosPorDiaDaSessao } from "@/lib/date-br";
 import { paginasDeLivrosTerminados } from "@/lib/reading-stats";
 import { ACHIEVEMENTS, evaluateAchievements, type AchievementContext } from "@/lib/achievements";
 
@@ -14,7 +14,7 @@ import { ACHIEVEMENTS, evaluateAchievements, type AchievementContext } from "@/l
 // `computeMaxSessionPages` ignora toda sessão e a "Maratona de 100 páginas"
 // nunca desbloqueava. Qualquer critério novo que precise de outra coluna
 // entra AQUI, não na página.
-const COLUNAS_SESSAO = "started_at, duration_seconds, unit_start, unit_end, item_id";
+const COLUNAS_SESSAO = "started_at, ended_at, duration_seconds, unit_start, unit_end, item_id";
 
 // O PostgREST corta em 1000 linhas por padrão; recorde e contagem precisam do
 // histórico inteiro, então paginamos.
@@ -162,8 +162,11 @@ function calcularContexto(
     if ((hora >= 22 || hora < 4) && minutos >= 30) lateLongSessions++;
     if (minutos >= 10) sessions10min++;
     longestSessionMinutes = Math.max(longestSessionMinutes, Math.floor(minutos));
-    const dia = localDateKey(s.started_at);
-    minutosPorDia.set(dia, (minutosPorDia.get(dia) ?? 0) + minutos);
+    // Sessão que vira a noite conta nos dois dias (tempo repartido).
+    for (const [dia, seg] of segundosPorDiaDaSessao(s)) {
+      if (ano !== null && anoDeData(dia) !== ano) continue;
+      minutosPorDia.set(dia, (minutosPorDia.get(dia) ?? 0) + seg / 60);
+    }
   }
   const dias = [...minutosPorDia.keys()];
 

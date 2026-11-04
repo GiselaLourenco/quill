@@ -2,9 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 import { EstanteShelf, type ShelfBook, type DbStatus } from "@/components/estante-shelf";
-import { RecommendationsStrip } from "@/components/recommendations-strip";
 import { getFriendsShelf, getFriends } from "@/lib/friends";
-import { getReceivedRecommendations } from "@/lib/recommendations";
 import { IndicarSheet, type LivroIndicavel } from "@/components/indicar-sheet";
 import { AmigosEstantes } from "@/components/amigos-estantes";
 import { EmptyState } from "@/components/empty-state";
@@ -243,9 +241,9 @@ async function FriendsShelf({
   supabase: Awaited<ReturnType<typeof createClient>>;
   userId: string;
 }) {
-  const [shelves, recs, amigos, { data: meusLivros }] = await Promise.all([
+  // Indicações recebidas ficam só no sino (notificações), não mais no topo daqui.
+  const [shelves, amigos, { data: meusLivros }] = await Promise.all([
     getFriendsShelf(supabase, userId),
-    getReceivedRecommendations(supabase, userId),
     getFriends(supabase, userId),
     supabase
       .from("media_items")
@@ -263,7 +261,7 @@ async function FriendsShelf({
     cover_palette: (l.cover_palette as number) ?? 0,
   }));
 
-  if (shelves.length === 0 && recs.length === 0) {
+  if (shelves.length === 0) {
     return (
       <main className="flex flex-1 flex-col">
         <EmptyState
@@ -278,8 +276,6 @@ async function FriendsShelf({
 
   return (
     <main className="flex-1 px-4 pb-6 pt-4">
-      <RecommendationsStrip recs={recs} />
-
       {/* Indicar livro a um amigo */}
       <IndicarSheet livros={livrosIndicaveis} amigos={amigos} />
 

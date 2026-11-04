@@ -112,8 +112,10 @@ export default function DesafioDetalheClient({
     const porDia = new Map<string, CheckinDetalhe[]>();
     const meus = new Set<string>();
     for (const c of checkins) {
-      porDia.set(c.dia, [...(porDia.get(c.dia) ?? []), c]);
-      if (eu && c.userId === eu.userId) meus.add(c.dia);
+      for (const dia of c.dias ?? [c.dia]) {
+        porDia.set(dia, [...(porDia.get(dia) ?? []), c]);
+        if (eu && c.userId === eu.userId) meus.add(dia);
+      }
     }
     return { checkinsPorDia: porDia, diasComCheckin: meus };
   }, [checkins, eu]);
@@ -124,10 +126,12 @@ export default function DesafioDetalheClient({
     const mapa = new Map<string, MembroCor[]>();
     for (const c of checkins) {
       if (filtro && c.userId !== filtro) continue;
-      const lista = mapa.get(c.dia) ?? [];
       const m = membros.find((x) => x.userId === c.userId);
-      if (m && !lista.some((x) => x.userId === m.userId)) lista.push(m);
-      mapa.set(c.dia, lista);
+      for (const dia of c.dias ?? [c.dia]) {
+        const lista = mapa.get(dia) ?? [];
+        if (m && !lista.some((x) => x.userId === m.userId)) lista.push(m);
+        mapa.set(dia, lista);
+      }
     }
     for (const l of mapa.values()) l.sort((a, b) => (ordem.get(a.userId) ?? 0) - (ordem.get(b.userId) ?? 0));
     return mapa;

@@ -88,7 +88,7 @@ export default async function JuntosPage({
         supabase
           .from("challenge_checkins")
           .select(
-            "user_id, session:sessions(started_at, duration_seconds, unit_start, unit_end, chapter_start, chapter_end)",
+            "user_id, finished_item_id, session:sessions(started_at, ended_at, duration_seconds, unit_start, unit_end, chapter_start, chapter_end)",
           )
           .eq("group_id", g.id),
       ]);
@@ -133,9 +133,11 @@ export default async function JuntosPage({
       const scores = computeScores(
         (checkins ?? []).map((c) => ({
           user_id: c.user_id,
+          finished_item_id: (c.finished_item_id as string | null) ?? null,
           session: Array.isArray(c.session) ? c.session[0] ?? null : c.session,
         })),
         g.scoring_metric as never,
+        { inicio: g.starts_at ?? null, fim: g.ends_at ?? null },
       );
 
       const ranked = (members ?? [])
