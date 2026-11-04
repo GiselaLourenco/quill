@@ -15,8 +15,8 @@ const NOMES_MES = [
 
 /**
  * Calendário da aba Leitura: só os dias em que esse livro foi lido. Começa
- * recolhido numa faixa (total de dias + os últimos 7 em quadradinhos); "ver
- * mais" abre o mês. Vai do mês do primeiro dia até hoje (ou até o último dia,
+ * recolhido numa faixa (total de dias + os últimos 7 em quadradinhos); tocar
+ * nela abre o mês. Vai do mês do primeiro dia até hoje (ou até o último dia,
  * se já terminou); tocar num dia abre o painel da home, filtrado pro livro.
  */
 export function CalendarioLivro({
@@ -83,7 +83,13 @@ export function CalendarioLivro({
       aria-label="Dias em que você leu este livro"
       className="shadow-hard overflow-hidden rounded-2xl border-2 border-ink bg-paper"
     >
-      <div className="bg-card px-3 py-2.5">
+      <button
+        type="button"
+        onClick={() => setAberto((a) => !a)}
+        aria-expanded={aberto}
+        className="flex w-full items-center justify-between gap-2 bg-card px-3 py-2.5 text-left active:bg-ink/5"
+      >
+        <div>
         <h3 className="font-display text-[11px] uppercase tracking-widest text-ink">Dias com este livro</h3>
         <p className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-moss">
           {dias.length} {dias.length === 1 ? "dia" : "dias"} · desde {primeiroDia.slice(8, 10)}/
@@ -102,7 +108,14 @@ export function CalendarioLivro({
             );
           })}
         </div>
-      </div>
+        </div>
+        <span
+          aria-hidden="true"
+          className={`font-display text-sm text-ink transition-transform ${aberto ? "rotate-90" : ""}`}
+        >
+          ›
+        </span>
+      </button>
 
       {aberto && (
       <div className="border-t-2 border-ink p-3">
@@ -175,15 +188,6 @@ export function CalendarioLivro({
         </p>
       </div>
       )}
-
-      <button
-        type="button"
-        onClick={() => setAberto((a) => !a)}
-        aria-expanded={aberto}
-        className="block w-full border-t-2 border-ink bg-paper py-2.5 font-display text-[10px] uppercase tracking-widest text-ink active:bg-ink/5"
-      >
-        {aberto ? "ver menos ↑" : "ver mais ↓"}
-      </button>
 
       {diaAberto && (
         <DiaLeituraSheet
