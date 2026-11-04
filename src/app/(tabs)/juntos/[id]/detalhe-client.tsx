@@ -428,9 +428,9 @@ export default function DesafioDetalheClient({
             <button onClick={() => setRankingAberto(true)} className="font-display text-[10px] uppercase tracking-widest text-ink underline decoration-2 underline-offset-2">VER TUDO</button>
           </div>
           <div className="flex h-32 items-end justify-between gap-2">
-            {podio.length >= 2 && <PodioColuna membro={podio[1]} posicao={2} altura="h-12" bg="bg-paper" />}
-            {podio.length >= 1 && <PodioColuna membro={podio[0]} posicao={1} altura="h-20" bg="bg-mustard" destaque />}
-            {podio.length >= 3 && <PodioColuna membro={podio[2]} posicao={3} altura="h-10" bg="bg-paper" />}
+            {podio.length >= 2 && <PodioColuna membro={podio[1]} />}
+            {podio.length >= 1 && <PodioColuna membro={podio[0]} />}
+            {podio.length >= 3 && <PodioColuna membro={podio[2]} />}
           </div>
         </section>
       )}
@@ -601,10 +601,15 @@ export default function DesafioDetalheClient({
   );
 }
 
-function PodioColuna({ membro, posicao, altura, bg, destaque = false }: {
-  membro: RankingItem; posicao: number;
-  altura: string; bg: string; destaque?: boolean;
-}) {
+// Altura e destaque vêm da posição real, não do lugar no pódio — empatados
+// ficam do mesmo tamanho.
+const ALTURA_PODIO: Record<number, string> = { 1: "h-20", 2: "h-12", 3: "h-10" };
+
+function PodioColuna({ membro }: { membro: RankingItem }) {
+  const posicao = membro.posicao;
+  const destaque = posicao === 1;
+  const altura = ALTURA_PODIO[posicao] ?? "h-10";
+  const bg = destaque ? "bg-mustard" : "bg-paper";
   const tamanho = destaque ? 56 : 44;
   return (
     <div className="flex flex-1 flex-col items-center">

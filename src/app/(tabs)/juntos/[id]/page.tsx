@@ -136,12 +136,16 @@ export default async function DesafioDetalhePage({
     { inicio: (group.starts_at as string | null) ?? null, fim: (group.ends_at as string | null) ?? null },
   );
 
-  const ranking = Array.from(scores.entries())
-    .sort((a, b) => b[1] - a[1])
-    .map(([ uid, score], i) => {
+  // Empate divide a posição (1º, 1º, 3º) — quem tem o mesmo número não pode
+  // aparecer à frente só pela ordem do banco. Entre empatados, você vem primeiro.
+  const ordenados = Array.from(scores.entries()).sort(
+    (a, b) => b[1] - a[1] || Number(b[0] === userId) - Number(a[0] === userId),
+  );
+  const ranking = ordenados
+    .map(([ uid, score]) => {
       const perfil = perfilDe(uid);
       return {
-        posicao: i + 1,
+        posicao: ordenados.findIndex(([, s]) => s === score) + 1,
         userId: uid,
         nome: perfil.nome,
         avatarUrl: perfil.avatarUrl,

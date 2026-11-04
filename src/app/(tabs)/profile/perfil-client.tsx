@@ -325,6 +325,21 @@ export function PerfilClient({
             </span>
             <span className="text-lg">›</span>
           </button>
+          <div className="border-b border-dashed border-ink/30" />
+          <a
+            href="https://claude.ai/artifact/QRW2KNhouw4VED8fH4v2bv"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex w-full items-center justify-between text-left"
+          >
+            <span>
+              <span className="block text-sm font-bold">Regras</span>
+              <span className="block text-[11px] text-ink-soft">
+                como funcionam os desafios e o ranking
+              </span>
+            </span>
+            <span className="text-lg">›</span>
+          </a>
         </div>
       </div>
 
