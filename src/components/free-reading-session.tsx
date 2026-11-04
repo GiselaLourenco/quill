@@ -58,6 +58,9 @@ function metricLabel(metric: string): string {
 type Fase = "idle" | "rodando" | "registro" | "salvo";
 
 const CHAVE_SESSAO = "quill.sessao-em-andamento";
+// A demo (/ler/demo) guarda o timer em outra chave pra não misturar com uma
+// sessão de verdade em andamento.
+const CHAVE_SESSAO_DEMO = "quill.sessao-em-andamento.demo";
 
 type SessaoSalva = {
   fase: "rodando" | "registro";
@@ -70,9 +73,9 @@ type SessaoSalva = {
   notaRascunhoPublica: boolean;
 };
 
-function lerSessaoSalva(): SessaoSalva | null {
+function lerSessaoSalva(chave: string): SessaoSalva | null {
   try {
-    const bruto = window.localStorage.getItem(CHAVE_SESSAO);
+    const bruto = window.localStorage.getItem(chave);
     if (!bruto) return null;
     const s = JSON.parse(bruto) as SessaoSalva;
     if (s.fase !== "rodando" && s.fase !== "registro") return null;
@@ -82,27 +85,31 @@ function lerSessaoSalva(): SessaoSalva | null {
   }
 }
 
-function gravarSessao(s: SessaoSalva) {
+function gravarSessao(chave: string, s: SessaoSalva) {
   try {
-    window.localStorage.setItem(CHAVE_SESSAO, JSON.stringify(s));
+    window.localStorage.setItem(chave, JSON.stringify(s));
   } catch {
     // sem storage (aba anônima etc.): o timer só não sobrevive à troca de aba
   }
 }
 
-function limparSessao() {
+function limparSessao(chave: string) {
   try {
-    window.localStorage.removeItem(CHAVE_SESSAO);
+    window.localStorage.removeItem(chave);
   } catch {}
 }
 
 export function FreeReadingSession({
   books,
   activeChallenges,
+  demo = false,
 }: {
   books: BookOption[];
   activeChallenges: ActiveChallenge[];
+  /** /ler/demo: nada é gravado no banco. */
+  demo?: boolean;
 }) {
+  const chaveSessao = demo ? CHAVE_SESSAO_DEMO : CHAVE_SESSAO;
   const [fase, setFase] = useState<Fase>("idle");
   const [startedAt, setStartedAt] = useState<string | null>(null);
   // Timestamp (ms) de quando o período de running atual começou
@@ -128,7 +135,7 @@ export function FreeReadingSession({
   // (depois do mount) pra não brigar com o HTML do servidor.
   const [restaurado, setRestaurado] = useState(false);
   useEffect(() => {
-    const salva = lerSessaoSalva();
+    const salva = lerSessaoSalva(chaveSessao);
     if (salva) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setStartedAt(salva.startedAt);
@@ -150,12 +157,12 @@ export function FreeReadingSession({
       setFase(salva.fase);
     }
     setRestaurado(true);
-  }, []);
+  }, [chaveSessao]);
 
   useEffect(() => {
     if (!restaurado) return;
     if (fase === "rodando" || (fase === "registro" && origem === "timer")) {
-      gravarSessao({
+      gravarSessao(chaveSessao, {
         fase,
         startedAt,
         runStartMs,
@@ -166,9 +173,10 @@ export function FreeReadingSession({
         notaRascunhoPublica,
       });
     } else {
-      limparSessao();
+      limparSessao(chaveSessao);
     }
   }, [
+    chaveSessao,
     restaurado,
     fase,
     origem,
@@ -270,6 +278,7 @@ export function FreeReadingSession({
         key={`${origem}-${minutosSessao}`}
         books={books}
         activeChallenges={activeChallenges}
+        demo={demo}
         minutosIniciais={minutosSessao}
         origem={origem}
         startedAt={startedAt ?? new Date().toISOString()}
@@ -594,6 +603,7 @@ function Passo({
 function TelaRegistro({
   books,
   activeChallenges,
+  demo,
   minutosIniciais,
   origem,
   startedAt,
@@ -604,6 +614,7 @@ function TelaRegistro({
 }: {
   books: BookOption[];
   activeChallenges: ActiveChallenge[];
+  demo: boolean;
   minutosIniciais: number;
   origem: "timer" | "manual";
   startedAt: string;
@@ -637,6 +648,10 @@ function TelaRegistro({
   const [visibilidade, setVisibilidade] = useState<"eu" | "amigos">(
     notaPublicaInicial ? "amigos" : "eu",
   );
+  // "comentar" do passo 05: vai só pro desafio (legenda do check-in). A nota
+  // do passo 04 é do livro e não vai mais pro desafio — cada texto num lugar.
+  // Um por desafio (id → texto); a caixa aberta é a do desafio que tem chave.
+  const [comentariosDesafio, setComentariosDesafio] = useState<Record<string, string>>({});
   const [desafiosOn, setDesafiosOn] = useState<Set<string>>(
     () => new Set(activeChallenges.filter((d) => d.scoring_metric === "active_days").map((d) => d.id)),
   );
@@ -667,7 +682,7 @@ function TelaRegistro({
     setRecemMarcados((prev) => [...prev, escolhido]);
     setLivroId(escolhido.id);
     setBuscaEstante("");
-    startMarcarLendo(() => updateItemStatus(escolhido.id, "reading"));
+    if (!demo) startMarcarLendo(() => updateItemStatus(escolhido.id, "reading"));
   }
 
   function toggleTag(value: string) {
@@ -691,6 +706,10 @@ function TelaRegistro({
   function finalizar() {
     setErro(null);
     startSave(async () => {
+      if (demo) {
+        onSalvo({ minutos: total, titulo: livro?.title ?? "Sem livro vinculado", quantidade, unidade });
+        return;
+      }
       const resultado = await createSession({
         itemId: livroId,
         startedAt,
@@ -710,7 +729,10 @@ function TelaRegistro({
           sessionId: resultado.sessionId,
           itemId: livroId,
           groupIds: [...desafiosOn],
-          note: nota.trim() || null,
+          note: null,
+          notasPorGrupo: Object.fromEntries(
+            [...desafiosOn].map((id) => [id, comentariosDesafio[id]?.trim() || null]),
+          ),
           pagesExtra: null,
         });
       }
@@ -1066,20 +1088,6 @@ function TelaRegistro({
                 Vincule um livro para a anotação virar comentário na página dele.
               </p>
             )}
-            {/* A nota vai junto no check-in (publishSession) — e lá todo mundo
-                do desafio vê, mesmo com "só eu", que vale pra página do livro. */}
-            {desafiosOn.size > 0 && (
-              <p className="mt-2 text-[11px] text-ink-soft">
-                Também aparece em{" "}
-                <span className="font-semibold text-ink">
-                  {activeChallenges
-                    .filter((d) => desafiosOn.has(d.id))
-                    .map((d) => d.name)
-                    .join(", ")}
-                </span>
-                {visibilidade === "eu" ? " — pra quem participa do desafio." : "."}
-              </p>
-            )}
           </div>
         </Passo>
 
@@ -1098,14 +1106,15 @@ function TelaRegistro({
                         ? `+${unidade === "pages" ? quantidade : 0} pág`
                         : `+${unidade === "chapters" ? quantidade : 0} cap`;
                 return (
-                  <li key={d.id}>
+                  <li
+                    key={d.id}
+                    className={`rounded-md border-2 border-ink ${on ? "shadow-hard-sm bg-card" : "bg-card/60"}`}
+                  >
                     <button
                       type="button"
                       onClick={() => toggleDesafio(d.id)}
                       aria-pressed={on}
-                      className={`flex w-full items-center gap-3 rounded-md border-2 border-ink p-3 text-left ${
-                        on ? "shadow-hard-sm bg-card" : "bg-card/60"
-                      }`}
+                      className="flex w-full items-center gap-3 p-3 text-left"
                     >
                       <span
                         className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border-2 border-ink ${
@@ -1130,10 +1139,55 @@ function TelaRegistro({
                         {valor}
                       </span>
                     </button>
+
+                    {/* "comentar" do desafio: só nele, nunca na página do livro */}
+                    {on &&
+                      (d.id in comentariosDesafio ? (
+                        <div className="px-3 pb-3">
+                          <div className="rounded-md border-2 border-ink bg-paper p-2.5">
+                            <textarea
+                              value={comentariosDesafio[d.id]}
+                              onChange={(e) =>
+                                setComentariosDesafio((c) => ({ ...c, [d.id]: e.target.value }))
+                              }
+                              placeholder="Conta pro pessoal do desafio como foi…"
+                              autoFocus
+                              className="min-h-[64px] w-full resize-y bg-transparent text-sm placeholder:text-ink-soft/60 focus:outline-none"
+                            />
+                          </div>
+                          <div className="mt-1.5 flex items-center justify-between gap-2">
+                            <p className="text-[11px] text-ink-soft">Só neste desafio — não vai pra página do livro.</p>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setComentariosDesafio((c) => {
+                                  const resto = { ...c };
+                                  delete resto[d.id];
+                                  return resto;
+                                })
+                              }
+                              className="shrink-0 text-[11px] font-semibold text-ink-soft underline underline-offset-2"
+                            >
+                              cancelar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="-mt-1 flex justify-end px-3 pb-2.5">
+                          <button
+                            type="button"
+                            onClick={() => setComentariosDesafio((c) => ({ ...c, [d.id]: "" }))}
+                            className="text-[11px] font-semibold text-ink-soft underline underline-offset-2"
+                          >
+                            comentar
+                          </button>
+                        </div>
+                      ))}
                   </li>
                 );
               })}
             </ul>
+
           </Passo>
         )}
 

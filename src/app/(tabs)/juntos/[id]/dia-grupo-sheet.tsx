@@ -119,7 +119,7 @@ export function DiaGrupoSheet({
                           </p>
                         }
                         rodape={
-                          <CheckinConversa c={c} comentar={comentar} meuNome={meuNome} minhaCor={minhaCor} />
+                          <CheckinConversa key={c.comentarios.length} c={c} comentar={comentar} meuNome={meuNome} minhaCor={minhaCor} />
                         }
                       />
                     </li>

@@ -80,7 +80,9 @@ export function CheckinCard({
         </div>
       </div>
 
-      <CheckinConversa c={c} comentar={comentar} meuNome={meuNome} minhaCor={minhaCor} recuo />
+      {/* key: quando o refresh traz o comentário do servidor, remonta e
+          descarta a cópia otimista — senão ele aparecia duas vezes. */}
+      <CheckinConversa key={c.comentarios.length} c={c} comentar={comentar} meuNome={meuNome} minhaCor={minhaCor} recuo />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { createSession, publishSession, saveSessionMemory } from "@/app/actions/sessions";
+import { createSession, publishSession } from "@/app/actions/sessions";
 import {
   MAX_MINUTOS,
   minutosAoTrocarUnidade,
@@ -19,8 +19,8 @@ const PRESETS_MIN = [15, 30, 60];
 const PRESETS_H = [1, 2, 3];
 
 // Sheet de check-in do desafio: grava uma sessão de leitura de verdade e
-// publica o check-in no grupo. O comentário vira nota do check-in e, quando
-// há livro vinculado, também comentário na página do livro.
+// publica o check-in no grupo. O comentário fica só no desafio (nota do
+// check-in) — a página do livro recebe só a nota escrita na aba Ler.
 export function CheckinSheet({
   groupId,
   livros,
@@ -95,14 +95,6 @@ export function CheckinSheet({
         note: publico && comentario.trim() ? comentario.trim() : null,
         pagesExtra: null,
       });
-
-      if (!semLivro && comentario.trim()) {
-        await saveSessionMemory({
-          itemId: livroId,
-          text: comentario,
-          isPublic: publico,
-        });
-      }
 
       setSalvo(true);
       setTimeout(() => {

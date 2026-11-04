@@ -263,6 +263,8 @@ export async function publishSession(input: {
   itemId: string | null;
   groupIds: string[];
   note: string | null;
+  /** Comentário diferente por desafio (aba Ler); sem entrada, vale `note`. */
+  notasPorGrupo?: Record<string, string | null>;
   pagesExtra: number | null;
 }) {
   const userId = await requireUserId();
@@ -300,7 +302,10 @@ export async function publishSession(input: {
         group_id: groupId,
         session_id: input.sessionId,
         user_id: userId,
-        note,
+        note:
+          input.notasPorGrupo && groupId in input.notasPorGrupo
+            ? input.notasPorGrupo[groupId]?.trim() || null
+            : note,
       })),
     );
     for (const groupId of input.groupIds) revalidatePath(`/juntos/${groupId}`);
