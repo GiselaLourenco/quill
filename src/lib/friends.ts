@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { nomeExibicao } from "@/lib/nome-exibicao";
-import { paginasLidas, posicaoAtualPorItem } from "@/lib/reading-stats";
+import { paginasLidas, posicaoAtualPorItem, posicaoExibida } from "@/lib/reading-stats";
 
 export type Friend = { id: string; name: string };
 
@@ -51,6 +51,35 @@ export type FriendItem = {
   total_units: number | null; // páginas
   paginas_lidas: number; // pro somatório de "Páginas" quando a estante dele é exibida com EstanteShelf
   lastComment: { content: string; chapterRef: number | null } | null;
+  /** O que o amigo fez de mais recente com o livro — ordena o feed. */
+  atividade: Atividade;
+};
+
+/**
+ * Última atualização de um livro do amigo. `noCadastro` = o status é o mesmo
+ * desde que o livro entrou na estante (vira "adicionou à estante").
+ */
+export type Atividade = { em: string } & (
+  | { tipo: "status"; status: string; noCadastro: boolean }
+  | { tipo: "nota"; estrelas: number }
+  | { tipo: "comentario"; texto: string; capitulo: number | null }
+  | { tipo: "leitura"; posicao: string | null }
+);
+
+type ItemRow = {
+  id: string;
+  user_id: string;
+  title: string;
+  creator: string | null;
+  cover_kind: string;
+  cover_url: string | null;
+  cover_palette: number;
+  status: string;
+  is_recommended: boolean | null;
+  created_at: string;
+  status_changed_at?: string | null;
+  total_units: number | null;
+  total_chapters: number | null;
 };
 
 export type FriendShelf = {
@@ -82,16 +111,25 @@ export async function getFriendsShelf(
 
   // Tabelas que só se ligam via auth.users não têm FK direta entre si —
   // buscamos separado e cruzamos em JS (gotcha conhecido do PostgREST).
-  const [{ data: profiles }, { data: items }] = await Promise.all([
-    supabase.from("profiles").select("id, display_name, username").in("id", friendIds),
+  // `status_changed_at` e `ratings.updated_at` vêm da migração
+  // scripts/2026-11-03-feed-atividade.sql. Sem ela a consulta falha e
+  // repetimos sem essas colunas — o feed cai pra data de cadastro.
+  const COLUNAS_ITEM =
+    "id, user_id, title, creator, cover_kind, cover_url, cover_palette, status, is_recommended, created_at, total_units, total_chapters";
+  const buscarItens = (colunas: string) =>
     supabase
       .from("media_items")
-      .select(
-        "id, user_id, title, creator, cover_kind, cover_url, cover_palette, status, is_recommended, created_at, total_units, total_chapters",
-      )
+      .select(colunas)
       .in("user_id", friendIds)
-      .order("created_at", { ascending: false }),
+      .order("created_at", { ascending: false })
+      .returns<ItemRow[]>();
+  const [{ data: profiles }, itensComData] = await Promise.all([
+    supabase.from("profiles").select("id, display_name, username").in("id", friendIds),
+    buscarItens(`${COLUNAS_ITEM}, status_changed_at`),
   ]);
+  const items = itensComData.error
+    ? (await buscarItens(COLUNAS_ITEM)).data
+    : itensComData.data;
 
   const nameById = new Map(
     (profiles ?? []).map((p) => [
@@ -105,7 +143,15 @@ export async function getFriendsShelf(
   const [{ data: ratings }, { data: comments }, { data: sessions }] =
     itemIds.length
       ? await Promise.all([
-          supabase.from("ratings").select("item_id, stars").in("item_id", itemIds),
+          supabase
+            .from("ratings")
+            .select("item_id, stars, updated_at")
+            .in("item_id", itemIds)
+            .then(async (r) =>
+              r.error
+                ? await supabase.from("ratings").select("item_id, stars, created_at").in("item_id", itemIds)
+                : r,
+            ),
           supabase
             .from("comments")
             .select("item_id, content, chapter_ref, created_at")
@@ -115,7 +161,7 @@ export async function getFriendsShelf(
             .order("created_at", { ascending: false }),
           supabase
             .from("sessions")
-            .select("item_id, unit_end, chapter_end, created_at")
+            .select("item_id, unit_end, chapter_end, created_at, cadastro")
             .in("item_id", itemIds),
         ])
       : [{ data: [] }, { data: [] }, { data: [] }];
@@ -123,9 +169,15 @@ export async function getFriendsShelf(
   const starsByItem = new Map(
     (ratings ?? []).map((r) => [r.item_id, r.stars as number]),
   );
+  const ratedAtByItem = new Map(
+    (ratings ?? []).map((r) => [
+      r.item_id,
+      ("updated_at" in r ? r.updated_at : r.created_at) as string,
+    ]),
+  );
   const lastCommentByItem = new Map<
     string,
-    { content: string; chapterRef: number | null }
+    { content: string; chapterRef: number | null; createdAt: string }
   >();
   for (const c of comments ?? []) {
     if (!c.content) continue;
@@ -133,6 +185,24 @@ export async function getFriendsShelf(
       lastCommentByItem.set(c.item_id, {
         content: c.content,
         chapterRef: c.chapter_ref ?? null,
+        createdAt: c.created_at as string,
+      });
+    }
+  }
+  // Última sessão de leitura de verdade — posição informada no cadastro da
+  // estante não é atividade (mesma regra das métricas).
+  const lastReadByItem = new Map<
+    string,
+    { em: string; pagina: number | null; capitulo: number | null }
+  >();
+  for (const s of sessions ?? []) {
+    if (s.cadastro) continue;
+    const atual = lastReadByItem.get(s.item_id);
+    if (!atual || s.created_at > atual.em) {
+      lastReadByItem.set(s.item_id, {
+        em: s.created_at as string,
+        pagina: (s.unit_end as number | null) ?? null,
+        capitulo: (s.chapter_end as number | null) ?? null,
       });
     }
   }
@@ -143,12 +213,6 @@ export async function getFriendsShelf(
       chapter_end: s.chapter_end as number | null,
       created_at: s.created_at as string,
     })),
-  );
-  const progressByItem = new Map(
-    [...posicaoPorItem.entries()].map(([id, pos]) => [
-      id,
-      { pages: pos.paginas, chapters: pos.capitulos },
-    ]),
   );
 
   const shelfByFriend = new Map<string, FriendShelf>();
@@ -161,19 +225,18 @@ export async function getFriendsShelf(
   }
 
   for (const it of itemRows) {
-    const progress = progressByItem.get(it.id);
+    const pos = posicaoExibida(posicaoPorItem.get(it.id), it);
+    const progress = { pages: pos.paginas, chapters: pos.capitulos };
     let progressLabel: string | null = null;
     let percentLido: number | null = null;
-    if (progress) {
-      if (it.status === "reading") {
-        if (progress.chapters > 0) progressLabel = `cap. ${progress.chapters}`;
-        else if (progress.pages > 0) progressLabel = `pág. ${progress.pages}`;
-      }
-      if (it.total_units && progress.pages > 0) {
-        percentLido = Math.min(100, Math.round((progress.pages / it.total_units) * 100));
-      } else if (it.total_chapters && progress.chapters > 0) {
-        percentLido = Math.min(100, Math.round((progress.chapters / it.total_chapters) * 100));
-      }
+    if (it.status === "reading") {
+      if (progress.chapters > 0) progressLabel = `cap. ${progress.chapters}`;
+      else if (progress.pages > 0) progressLabel = `pág. ${progress.pages}`;
+    }
+    if (it.total_units && progress.pages > 0) {
+      percentLido = Math.min(100, Math.round((progress.pages / it.total_units) * 100));
+    } else if (it.total_chapters && progress.chapters > 0) {
+      percentLido = Math.min(100, Math.round((progress.chapters / it.total_chapters) * 100));
     }
     shelfByFriend.get(it.user_id)?.items.push({
       id: it.id,
@@ -188,8 +251,14 @@ export async function getFriendsShelf(
       progressLabel,
       percent_lido: percentLido,
       total_units: it.total_units,
-      paginas_lidas: paginasLidas(it, progress?.pages),
+      paginas_lidas: paginasLidas(it, posicaoPorItem.get(it.id)?.paginas),
       lastComment: lastCommentByItem.get(it.id) ?? null,
+      atividade: ultimaAtividade(it, {
+        estrelas: starsByItem.get(it.id) ?? null,
+        notaEm: ratedAtByItem.get(it.id) ?? null,
+        comentario: lastCommentByItem.get(it.id) ?? null,
+        leitura: lastReadByItem.get(it.id) ?? null,
+      }),
     });
   }
 
@@ -197,6 +266,50 @@ export async function getFriendsShelf(
   return Array.from(shelfByFriend.values())
     .filter((s) => s.items.length > 0)
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** A mais recente entre mudança de status, nota, comentário público e leitura. */
+function ultimaAtividade(
+  it: { status: string; created_at: string; status_changed_at?: string | null },
+  fontes: {
+    estrelas: number | null;
+    notaEm: string | null;
+    comentario: { content: string; chapterRef: number | null; createdAt: string } | null;
+    leitura: { em: string; pagina: number | null; capitulo: number | null } | null;
+  },
+): Atividade {
+  const statusEm = it.status_changed_at ?? it.created_at;
+  const candidatas: Atividade[] = [
+    {
+      tipo: "status",
+      status: it.status,
+      em: statusEm,
+      // o trigger grava o created_at no insert; qualquer troca depois difere
+      noCadastro: new Date(statusEm).getTime() - new Date(it.created_at).getTime() < 60_000,
+    },
+  ];
+  if (fontes.estrelas && fontes.notaEm) {
+    candidatas.push({ tipo: "nota", estrelas: fontes.estrelas, em: fontes.notaEm });
+  }
+  if (fontes.comentario) {
+    candidatas.push({
+      tipo: "comentario",
+      texto: fontes.comentario.content,
+      capitulo: fontes.comentario.chapterRef,
+      em: fontes.comentario.createdAt,
+    });
+  }
+  if (fontes.leitura) {
+    const { pagina, capitulo } = fontes.leitura;
+    candidatas.push({
+      tipo: "leitura",
+      posicao: capitulo ? `cap. ${capitulo}` : pagina ? `pág. ${pagina}` : null,
+      em: fontes.leitura.em,
+    });
+  }
+  return candidatas.reduce((a, b) =>
+    new Date(b.em).getTime() > new Date(a.em).getTime() ? b : a,
+  );
 }
 
 export type PedidoRecebido = {
