@@ -149,6 +149,7 @@ export default async function DesafioDetalhePage({
     const isHoje = isoDate === hojeKey;
     const feito = checkinsDoUsuario.has(isoDate);
     return {
+      chave: isoDate,
       data: new Date(isoDate + "T12:00:00").getDate(),
       label: DIAS_LABEL[i],
       estado: (isHoje && feito ? "hoje-feito" : isHoje ? "hoje" : feito ? "feito" : "vazio") as

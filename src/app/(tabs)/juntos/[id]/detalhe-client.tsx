@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { CheckinSheet, type LivroLendo } from "@/components/checkin-sheet";
+import { DiaLeituraSheet } from "@/components/dia-leitura-sheet";
 import { SegmentToggle } from "@/components/segment-toggle";
 import { leaveChallenge } from "@/app/actions/groups";
 import { avatarDeExibicao, AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
@@ -23,7 +24,7 @@ function pad2(n: number): string {
 }
 
 type Avatar = { avatarUrl: string | null; avatarZoom: number; avatarBg: string };
-type SemanaItem = { data: number; label: string; estado: "vazio" | "feito" | "hoje" | "hoje-feito" };
+type SemanaItem = { chave: string; data: number; label: string; estado: "vazio" | "feito" | "hoje" | "hoje-feito" };
 type RankingItem = Avatar & { posicao: number; userId: string; nome: string; metrica: string; ehVoce: boolean };
 type AtividadeItem = Avatar & { id: string; userId: string; nome: string; texto: string; nota: string | null; quando: string; ehVoce: boolean };
 
@@ -84,6 +85,9 @@ export default function DesafioDetalheClient({
   const [mesAno, setMesAno] = useState({ ano: hoje.getFullYear(), mes: hoje.getMonth() + 1 });
 
   const diasComCheckin = useMemo(() => new Set(checkinDiasUsuario), [checkinDiasUsuario]);
+  // Dia tocado na semana ou no mês — abre as leituras dele, igual à aba Quill.
+  const [diaAberto, setDiaAberto] = useState<string | null>(null);
+  const hojeChave = todayLocalDateKey();
 
   const limiteInicio = group.comecaEm ? group.comecaEm.slice(0, 7) : null; // "YYYY-MM"
   const limiteFim = `${hoje.getFullYear()}-${pad2(hoje.getMonth() + 1)}`;
@@ -216,9 +220,15 @@ export default function DesafioDetalheClient({
               return (
                 <div key={d.data} className={`flex flex-1 flex-col items-center gap-1 ${isHoje ? "scale-110" : ""}`}>
                   <span className={`font-display text-[9px] uppercase tracking-wider ${isHoje ? "text-coral" : "text-ink-soft"}`}>{d.label}</span>
-                  <div className={["flex aspect-square w-full items-center justify-center border-2 border-ink text-xs font-black", preenchido ? "bg-moss text-paper" : "bg-paper text-ink", isHoje ? "border-[3px] bg-mustard text-ink shadow-hard-sm" : ""].join(" ")}>
+                  <button
+                    type="button"
+                    onClick={() => setDiaAberto(d.chave)}
+                    disabled={d.chave > hojeChave}
+                    aria-label={`Dia ${d.data}${preenchido ? ", com check-in" : ""} — ver sessões`}
+                    className={["flex aspect-square w-full items-center justify-center border-2 border-ink text-xs font-black enabled:active:translate-x-[1px] enabled:active:translate-y-[1px]", preenchido ? "bg-moss text-paper" : "bg-paper text-ink", isHoje ? "border-[3px] bg-mustard text-ink shadow-hard-sm" : ""].join(" ")}
+                  >
                     {d.data}
-                  </div>
+                  </button>
                 </div>
               );
             })}
@@ -255,15 +265,27 @@ export default function DesafioDetalheClient({
                 <span key={`v-${i}`} />
               ))}
               {celulasDoMes.celulas.map((c) => (
-                <div
+                <button
+                  type="button"
                   key={c.chave}
-                  className={["flex aspect-square items-center justify-center border-2 border-ink text-[11px] font-black", c.hoje ? "border-[3px] bg-mustard text-ink shadow-hard-sm" : c.feito ? "bg-moss text-paper" : "bg-paper text-ink"].join(" ")}
+                  onClick={() => setDiaAberto(c.chave)}
+                  disabled={c.chave > hojeChave}
+                  aria-label={`Dia ${c.dia}${c.feito ? ", com check-in" : ""} — ver sessões`}
+                  className={["flex aspect-square items-center justify-center border-2 border-ink text-[11px] font-black enabled:active:translate-x-[1px] enabled:active:translate-y-[1px]", c.hoje ? "border-[3px] bg-mustard text-ink shadow-hard-sm" : c.feito ? "bg-moss text-paper" : "bg-paper text-ink"].join(" ")}
                 >
                   {c.dia}
-                </div>
+                </button>
               ))}
             </div>
           </div>
+        )}
+        {diaAberto && (
+          <DiaLeituraSheet
+            key={diaAberto}
+            chave={diaAberto}
+            hoje={diaAberto === hojeChave}
+            onClose={() => setDiaAberto(null)}
+          />
         )}
       </section>
 

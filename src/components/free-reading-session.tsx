@@ -1066,6 +1066,20 @@ function TelaRegistro({
                 Vincule um livro para a anotação virar comentário na página dele.
               </p>
             )}
+            {/* A nota vai junto no check-in (publishSession) — e lá todo mundo
+                do desafio vê, mesmo com "só eu", que vale pra página do livro. */}
+            {desafiosOn.size > 0 && (
+              <p className="mt-2 text-[11px] text-ink-soft">
+                Também aparece em{" "}
+                <span className="font-semibold text-ink">
+                  {activeChallenges
+                    .filter((d) => desafiosOn.has(d.id))
+                    .map((d) => d.name)
+                    .join(", ")}
+                </span>
+                {visibilidade === "eu" ? " — pra quem participa do desafio." : "."}
+              </p>
+            )}
           </div>
         </Passo>
 
