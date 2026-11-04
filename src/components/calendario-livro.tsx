@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { DiaLeituraSheet, tempoTexto } from "@/components/dia-leitura-sheet";
 import { sessoesDoLivroNoDia } from "@/app/actions/sessoes-livro";
+import { addDaysToKey } from "@/lib/date-br";
 
 /** Dia com pelo menos isso de leitura ganha o verde cheio. */
 const MIN_DIA_FORTE = 30;
@@ -13,9 +14,10 @@ const NOMES_MES = [
 ];
 
 /**
- * Calendário da aba Leitura: só os dias em que esse livro foi lido. Vai do
- * mês do primeiro dia até hoje (ou até o último dia, se já terminou); tocar
- * num dia abre o mesmo painel da home, filtrado pro livro.
+ * Calendário da aba Leitura: só os dias em que esse livro foi lido. Começa
+ * recolhido numa faixa (total de dias + os últimos 7 em quadradinhos); "ver
+ * mais" abre o mês. Vai do mês do primeiro dia até hoje (ou até o último dia,
+ * se já terminou); tocar num dia abre o painel da home, filtrado pro livro.
  */
 export function CalendarioLivro({
   itemId,
@@ -56,6 +58,7 @@ export function CalendarioLivro({
     return lista;
   }, [primeiroDia, ultimoDia]);
 
+  const [aberto, setAberto] = useState(false);
   const [mesIdx, setMesIdx] = useState(meses.length - 1);
   const [diaAberto, setDiaAberto] = useState<string | null>(null);
   const carregar = useCallback((chave: string) => sessoesDoLivroNoDia(itemId, chave), [itemId]);
@@ -69,6 +72,9 @@ export function CalendarioLivro({
   for (let i = 0; i < primeiroDiaSemana; i += 1) cells.push(null);
   for (let d = 1; d <= diasNoMes; d += 1) cells.push(d);
 
+  // Os 7 dias até `ultimoDia`, do mais antigo pro mais recente.
+  const ultimos7 = Array.from({ length: 7 }, (_, i) => addDaysToKey(ultimoDia, i - 6));
+
   const doMes = dias.filter((d) => d.startsWith(prefixo));
   const minutosMes = doMes.reduce((s, d) => s + minutosPorDia[d]!, 0);
 
@@ -77,14 +83,29 @@ export function CalendarioLivro({
       aria-label="Dias em que você leu este livro"
       className="shadow-hard overflow-hidden rounded-2xl border-2 border-ink bg-paper"
     >
-      <div className="flex items-center justify-between gap-2 border-b-2 border-ink bg-card px-3 py-2.5">
+      <div className="bg-card px-3 py-2.5">
         <h3 className="font-display text-[11px] uppercase tracking-widest text-ink">Dias com este livro</h3>
-        <span className="text-[10px] font-bold uppercase tracking-widest text-moss">
-          desde {primeiroDia.slice(8, 10)}/{primeiroDia.slice(5, 7)}
-        </span>
+        <p className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-moss">
+          {dias.length} {dias.length === 1 ? "dia" : "dias"} · desde {primeiroDia.slice(8, 10)}/
+          {primeiroDia.slice(5, 7)}
+        </p>
+        <div className="mt-1.5 flex gap-[3px]" aria-hidden="true">
+          {ultimos7.map((chave) => {
+            const min = minutosPorDia[chave];
+            return (
+              <span
+                key={chave}
+                className={`h-2.5 w-2.5 border-[1.5px] border-ink ${
+                  min === undefined ? "bg-paper" : min >= MIN_DIA_FORTE ? "bg-moss" : "bg-moss/40"
+                }`}
+              />
+            );
+          })}
+        </div>
       </div>
 
-      <div className="p-3">
+      {aberto && (
+      <div className="border-t-2 border-ink p-3">
         <div className="mb-2 flex items-center justify-between">
           <SetaMes
             direcao="‹"
@@ -153,6 +174,16 @@ export function CalendarioLivro({
             : `nenhum dia lido em ${NOMES_MES[mes - 1]}`}
         </p>
       </div>
+      )}
+
+      <button
+        type="button"
+        onClick={() => setAberto((a) => !a)}
+        aria-expanded={aberto}
+        className="block w-full border-t-2 border-ink bg-paper py-2.5 font-display text-[10px] uppercase tracking-widest text-ink active:bg-ink/5"
+      >
+        {aberto ? "ver menos ↑" : "ver mais ↓"}
+      </button>
 
       {diaAberto && (
         <DiaLeituraSheet
