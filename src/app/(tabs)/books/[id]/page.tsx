@@ -13,6 +13,7 @@ import { LivroDetalhes } from "@/components/livro-detalhes";
 import { EmptyState } from "@/components/empty-state";
 import { CommentComposer } from "@/components/comment-composer";
 import { EditorPosicaoLinha, EditorPosicaoTile } from "@/components/editor-posicao";
+import { CalendarioLivro } from "@/components/calendario-livro";
 import { getFriends } from "@/lib/friends";
 import {
   computeReadingStats,
@@ -22,7 +23,7 @@ import {
   predictFinish,
 } from "@/lib/reading-stats";
 import { toSpotifyEmbedUrl } from "@/lib/spotify";
-import { dataBR, todayLocalDateKey } from "@/lib/date-br";
+import { dataBR, segundosPorDiaDaSessao, todayLocalDateKey } from "@/lib/date-br";
 import { nomeExibicao } from "@/lib/nome-exibicao";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -85,7 +86,7 @@ export default async function BookPage({
     await Promise.all([
       supabase
         .from("sessions")
-        .select("started_at, duration_seconds, unit_start, unit_end, chapter_end, created_at, cadastro")
+        .select("started_at, ended_at, duration_seconds, unit_start, unit_end, chapter_end, created_at, cadastro")
         .eq("item_id", id),
       supabase
         .from("comments")
@@ -123,6 +124,21 @@ export default async function BookPage({
         ) + 1,
       )
     : null;
+  // Minutos por dia neste livro, pro calendário da aba Leitura. Sessões de
+  // cadastro da estante não são leitura de verdade.
+  const segundosPorDia = new Map<string, number>();
+  for (const s of sessions ?? []) {
+    if (s.cadastro) continue;
+    for (const [dia, seg] of segundosPorDiaDaSessao(s)) {
+      segundosPorDia.set(dia, (segundosPorDia.get(dia) ?? 0) + seg);
+    }
+  }
+  const minutosPorDia = Object.fromEntries(
+    [...segundosPorDia].map(([dia, seg]) => [dia, Math.round(seg / 60)]),
+  );
+  const hoje = todayLocalDateKey();
+  const terminado = item.status === "finished";
+  const ultimoDiaLido = [...segundosPorDia.keys()].sort().at(-1);
   const embedUrl = item.spotify_url ? toSpotifyEmbedUrl(item.spotify_url) : null;
 
   const statusStyle = STATUS_STYLE[item.status] ?? "bg-paper text-ink";
@@ -234,6 +250,16 @@ export default async function BookPage({
                   editor-posicao.tsx). */}
               <EditorPosicaoLinha itemId={item.id} atual={posicao.paginas} total={item.total_units} unidade="pages" />
 
+              {prediction && (
+                <div className="border-2 border-moss bg-moss/10 px-3 py-2.5">
+                  <p className="text-sm text-ink">
+                    Nesse ritmo, você termina em{" "}
+                    <strong>~{prediction.daysRemaining} dias</strong>{" "}
+                    ({prediction.dateLabel}).
+                  </p>
+                </div>
+              )}
+
               {/* Os outros quatro números, 2×2 — Capítulos aqui dobra como editor
                   de posição (mesmo cálculo que alimenta a % da estante). */}
               <section className="grid grid-cols-2 gap-2">
@@ -246,14 +272,15 @@ export default async function BookPage({
                 />
               </section>
 
-              {prediction && (
-                <div className="border-2 border-moss bg-moss/10 px-3 py-2.5">
-                  <p className="text-sm text-ink">
-                    Nesse ritmo, você termina em{" "}
-                    <strong>~{prediction.daysRemaining} dias</strong>{" "}
-                    ({prediction.dateLabel}).
-                  </p>
-                </div>
+              {ultimoDiaLido && (
+                <CalendarioLivro
+                  itemId={item.id}
+                  minutosPorDia={minutosPorDia}
+                  ultimoDia={terminado || item.status === "abandoned" ? ultimoDiaLido : hoje}
+                  hoje={hoje}
+                  terminado={terminado}
+                  totalPaginas={item.total_units}
+                />
               )}
 
               {embedUrl && (

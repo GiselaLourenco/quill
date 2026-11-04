@@ -1,0 +1,194 @@
+"use client";
+
+import { useCallback, useMemo, useState } from "react";
+import { DiaLeituraSheet, tempoTexto } from "@/components/dia-leitura-sheet";
+import { sessoesDoLivroNoDia } from "@/app/actions/sessoes-livro";
+
+/** Dia com pelo menos isso de leitura ganha o verde cheio. */
+const MIN_DIA_FORTE = 30;
+
+const NOMES_MES = [
+  "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+  "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+];
+
+/**
+ * Calendário da aba Leitura: só os dias em que esse livro foi lido. Vai do
+ * mês do primeiro dia até hoje (ou até o último dia, se já terminou); tocar
+ * num dia abre o mesmo painel da home, filtrado pro livro.
+ */
+export function CalendarioLivro({
+  itemId,
+  minutosPorDia,
+  ultimoDia,
+  hoje,
+  terminado,
+  totalPaginas,
+}: {
+  itemId: string;
+  /** YYYY-MM-DD → minutos lidos nesse livro (já com a regra de virar a noite). */
+  minutosPorDia: Record<string, number>;
+  /** Até onde o calendário vai: hoje, ou o último dia lido se terminou. */
+  ultimoDia: string;
+  hoje: string;
+  terminado: boolean;
+  totalPaginas: number | null;
+}) {
+  const dias = useMemo(() => Object.keys(minutosPorDia).sort(), [minutosPorDia]);
+  const primeiroDia = dias[0]!;
+  const fimDaLeitura = dias[dias.length - 1]!;
+
+  // Meses "YYYY-MM" do primeiro dia lido até `ultimoDia`.
+  const meses = useMemo(() => {
+    const lista: string[] = [];
+    let [y, m] = primeiroDia.slice(0, 7).split("-").map(Number) as [number, number];
+    const fim = ultimoDia.slice(0, 7);
+    for (;;) {
+      const p = `${y}-${String(m).padStart(2, "0")}`;
+      lista.push(p);
+      if (p >= fim) break;
+      m += 1;
+      if (m > 12) {
+        m = 1;
+        y += 1;
+      }
+    }
+    return lista;
+  }, [primeiroDia, ultimoDia]);
+
+  const [mesIdx, setMesIdx] = useState(meses.length - 1);
+  const [diaAberto, setDiaAberto] = useState<string | null>(null);
+  const carregar = useCallback((chave: string) => sessoesDoLivroNoDia(itemId, chave), [itemId]);
+
+  const prefixo = meses[mesIdx]!;
+  const [ano, mes] = prefixo.split("-").map(Number) as [number, number];
+  const primeiroDiaSemana = new Date(ano, mes - 1, 1).getDay();
+  const diasNoMes = new Date(ano, mes, 0).getDate();
+
+  const cells: Array<number | null> = [];
+  for (let i = 0; i < primeiroDiaSemana; i += 1) cells.push(null);
+  for (let d = 1; d <= diasNoMes; d += 1) cells.push(d);
+
+  const doMes = dias.filter((d) => d.startsWith(prefixo));
+  const minutosMes = doMes.reduce((s, d) => s + minutosPorDia[d]!, 0);
+
+  return (
+    <section
+      aria-label="Dias em que você leu este livro"
+      className="shadow-hard overflow-hidden rounded-2xl border-2 border-ink bg-paper"
+    >
+      <div className="flex items-center justify-between gap-2 border-b-2 border-ink bg-card px-3 py-2.5">
+        <h3 className="font-display text-[11px] uppercase tracking-widest text-ink">Dias com este livro</h3>
+        <span className="text-[10px] font-bold uppercase tracking-widest text-moss">
+          desde {primeiroDia.slice(8, 10)}/{primeiroDia.slice(5, 7)}
+        </span>
+      </div>
+
+      <div className="p-3">
+        <div className="mb-2 flex items-center justify-between">
+          <SetaMes
+            direcao="‹"
+            rotulo="Mês anterior"
+            desabilitado={mesIdx === 0}
+            onClick={() => setMesIdx((i) => Math.max(0, i - 1))}
+          />
+          <div className="flex flex-col items-center">
+            <h4 className="font-display text-base uppercase text-ink">{NOMES_MES[mes - 1]}</h4>
+            <span className="text-[10px] font-bold uppercase text-ink/50">{ano}</span>
+          </div>
+          <SetaMes
+            direcao="›"
+            rotulo="Próximo mês"
+            desabilitado={mesIdx >= meses.length - 1}
+            onClick={() => setMesIdx((i) => Math.min(meses.length - 1, i + 1))}
+          />
+        </div>
+
+        <div className="mb-1 grid grid-cols-7 gap-1 text-center text-[9px] font-bold uppercase text-ink/40">
+          {["D", "S", "T", "Q", "Q", "S", "S"].map((l, i) => (
+            <span key={i}>{l}</span>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {cells.map((d, i) => {
+            if (d === null) return <div key={i} className="aspect-square" />;
+            const chave = `${prefixo}-${String(d).padStart(2, "0")}`;
+            const min = minutosPorDia[chave];
+            const leu = min !== undefined;
+            const marca =
+              chave === primeiroDia ? "início" : terminado && chave === fimDaLeitura ? "fim" : null;
+            return (
+              <button
+                type="button"
+                key={i}
+                disabled={!leu}
+                onClick={() => setDiaAberto(chave)}
+                aria-label={
+                  leu ? `Dia ${d}: ${tempoTexto(min)} de leitura — ver registros` : `Dia ${d}: sem leitura deste livro`
+                }
+                className={[
+                  "relative flex aspect-square items-center justify-center border-2 font-display text-[11px]",
+                  leu
+                    ? `border-ink active:translate-x-[1px] active:translate-y-[1px] ${
+                        min >= MIN_DIA_FORTE ? "bg-moss text-paper" : "bg-moss/40 text-ink"
+                      }`
+                    : "border-transparent text-ink/30",
+                  chave === hoje ? "shadow-[0_0_0_2px_var(--color-coral)]" : "",
+                ].join(" ")}
+              >
+                {d}
+                {marca && (
+                  <span className="absolute -right-1.5 -top-2 rounded-md border-[1.5px] border-ink bg-mustard px-1 font-sans text-[7px] font-bold leading-[11px] text-ink">
+                    {marca}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <p className="mt-3 text-center font-serif text-[11px] italic text-ink/70">
+          {doMes.length > 0
+            ? `${doMes.length} ${doMes.length === 1 ? "dia lido" : "dias lidos"} em ${NOMES_MES[mes - 1]} · ${tempoTexto(minutosMes)}`
+            : `nenhum dia lido em ${NOMES_MES[mes - 1]}`}
+        </p>
+      </div>
+
+      {diaAberto && (
+        <DiaLeituraSheet
+          key={diaAberto}
+          chave={diaAberto}
+          hoje={diaAberto === hoje}
+          onClose={() => setDiaAberto(null)}
+          carregar={carregar}
+          totalPaginas={totalPaginas}
+        />
+      )}
+    </section>
+  );
+}
+
+function SetaMes({
+  direcao,
+  rotulo,
+  desabilitado,
+  onClick,
+}: {
+  direcao: "‹" | "›";
+  rotulo: string;
+  desabilitado: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={desabilitado}
+      aria-label={rotulo}
+      className="shadow-hard-sm flex h-8 w-8 items-center justify-center border-2 border-ink bg-paper font-display text-ink active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-30"
+    >
+      {direcao}
+    </button>
+  );
+}
+

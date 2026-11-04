@@ -35,12 +35,16 @@ export function DiaLeituraSheet({
   hoje,
   onClose,
   carregar = sessoesDoDia,
+  totalPaginas,
 }: {
   chave: string;
   hoje: boolean;
   onClose: () => void;
   /** De onde vêm as sessões — a demo de desafio passa as simuladas. */
   carregar?: (chave: string) => Promise<SessaoDoDia[]>;
+  /** Aberto pela página de um livro: o 4º número vira "% do livro" (contar
+   *  livros daria sempre 1). `null` = livro sem total cadastrado. */
+  totalPaginas?: number | null;
 }) {
   const [sessoes, setSessoes] = useState<SessaoDoDia[] | null>(null);
   const [erro, setErro] = useState(false);
@@ -135,7 +139,9 @@ export function DiaLeituraSheet({
                     { v: String(n), l: n === 1 ? "sessão" : "sessões" },
                     { v: tempoTexto(totalMin).replace(" min", "m"), l: "lido" },
                     { v: String(paginas), l: "páginas" },
-                    { v: String(livros), l: livros === 1 ? "livro" : "livros" },
+                    totalPaginas
+                      ? { v: `+${Math.round((paginas / totalPaginas) * 100)}%`, l: "do livro" }
+                      : { v: String(livros), l: livros === 1 ? "livro" : "livros" },
                   ].map((x, i) => (
                     <div key={x.l} className={`px-1 py-2 ${i > 0 ? "border-l-2 border-ink" : ""}`}>
                       <strong className="block font-display text-lg tabular-nums text-ink">{x.v}</strong>
