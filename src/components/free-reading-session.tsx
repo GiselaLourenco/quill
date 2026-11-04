@@ -8,7 +8,7 @@ import {
 } from "@/lib/tempo";
 import { BookThumb } from "@/components/book-thumb";
 import { BookCover, type CoverFields } from "@/components/book-cover";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   createSession,
   publishSession,
@@ -69,9 +69,26 @@ type SessaoSalva = {
   accSeconds: number;
   pausado: boolean;
   minutosSessao: number;
-  notaRascunho: string;
-  notaRascunhoPublica: boolean;
+  notas?: NotaSessao[];
+  /** Formato antigo (uma nota só) — lido pra não perder sessão em andamento. */
+  notaRascunho?: string;
+  notaRascunhoPublica?: boolean;
 };
+
+/** Nota escrita com o timer rodando ("+ Nota"). Vira comentário no registro. */
+type NotaSessao = { id: string; texto: string; publica: boolean };
+
+function novaNotaId() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function notasDaSessaoSalva(s: SessaoSalva): NotaSessao[] {
+  if (Array.isArray(s.notas)) return s.notas;
+  if (s.notaRascunho?.trim()) {
+    return [{ id: novaNotaId(), texto: s.notaRascunho, publica: !!s.notaRascunhoPublica }];
+  }
+  return [];
+}
 
 function lerSessaoSalva(chave: string): SessaoSalva | null {
   try {
@@ -125,8 +142,7 @@ export function FreeReadingSession({
   // Nota escrita com o timer rodando (botão "+ Nota") — fica guardada aqui
   // até a tela de registro, onde o livro é escolhido e ela vira comentário
   // de verdade junto com o resto da sessão.
-  const [notaRascunho, setNotaRascunho] = useState("");
-  const [notaRascunhoPublica, setNotaRascunhoPublica] = useState(false);
+  const [notas, setNotas] = useState<NotaSessao[]>([]);
 
   const rodando = fase === "rodando" && !pausado;
 
@@ -148,8 +164,7 @@ export function FreeReadingSession({
             ? Math.floor((Date.now() - salva.runStartMs) / 1000)
             : 0),
       );
-      setNotaRascunho(salva.notaRascunho);
-      setNotaRascunhoPublica(salva.notaRascunhoPublica);
+      setNotas(notasDaSessaoSalva(salva));
       if (salva.fase === "registro") {
         setMinutosSessao(salva.minutosSessao);
         setOrigem("timer");
@@ -169,8 +184,7 @@ export function FreeReadingSession({
         accSeconds,
         pausado,
         minutosSessao,
-        notaRascunho,
-        notaRascunhoPublica,
+        notas,
       });
     } else {
       limparSessao(chaveSessao);
@@ -185,8 +199,7 @@ export function FreeReadingSession({
     accSeconds,
     pausado,
     minutosSessao,
-    notaRascunho,
-    notaRascunhoPublica,
+    notas,
   ]);
 
   // O tempo decorrido NUNCA é contado somando ticks: ele é sempre recalculado a
@@ -218,8 +231,7 @@ export function FreeReadingSession({
     setElapsed(0);
     setRunStartMs(Date.now());
     setPausado(false);
-    setNotaRascunho("");
-    setNotaRascunhoPublica(false);
+    setNotas([]);
     setFase("rodando");
   }
 
@@ -264,8 +276,7 @@ export function FreeReadingSession({
     setPausado(false);
     setStartedAt(null);
     setResumo(null);
-    setNotaRascunho("");
-    setNotaRascunhoPublica(false);
+    setNotas([]);
   }
 
   if (fase === "salvo" && resumo) {
@@ -282,8 +293,7 @@ export function FreeReadingSession({
         minutosIniciais={minutosSessao}
         origem={origem}
         startedAt={startedAt ?? new Date().toISOString()}
-        notaInicial={notaRascunho}
-        notaPublicaInicial={notaRascunhoPublica}
+        notasIniciais={notas}
         onVoltar={voltarAoInicio}
         onSalvo={(r) => {
           setResumo(r);
@@ -300,12 +310,11 @@ export function FreeReadingSession({
         pausado={pausado}
         onPausar={alternarPausa}
         onEncerrar={encerrar}
-        nota={notaRascunho}
-        notaPublica={notaRascunhoPublica}
-        onSalvarNota={(texto, publica) => {
-          setNotaRascunho(texto);
-          setNotaRascunhoPublica(publica);
-        }}
+        notas={notas}
+        onAdicionarNota={(texto, publica) =>
+          setNotas((n) => [...n, { id: novaNotaId(), texto, publica }])
+        }
+        onRemoverNota={(id) => setNotas((n) => n.filter((x) => x.id !== id))}
       />
     );
   }
@@ -396,17 +405,17 @@ function TelaRodando({
   pausado,
   onPausar,
   onEncerrar,
-  nota,
-  notaPublica,
-  onSalvarNota,
+  notas,
+  onAdicionarNota,
+  onRemoverNota,
 }: {
   segundos: number;
   pausado: boolean;
   onPausar: () => void;
   onEncerrar: () => void;
-  nota: string;
-  notaPublica: boolean;
-  onSalvarNota: (texto: string, publica: boolean) => void;
+  notas: NotaSessao[];
+  onAdicionarNota: (texto: string, publica: boolean) => void;
+  onRemoverNota: (id: string) => void;
 }) {
   const [notaAberta, setNotaAberta] = useState(false);
   const h = Math.floor(segundos / 3600);
@@ -465,19 +474,23 @@ function TelaRodando({
           <path d="M12 5v14M5 12h14" />
         </svg>
         + NOTA
-        {nota.trim() && <span className="ml-1 h-1.5 w-1.5 rounded-full bg-coral" aria-label="nota salva" />}
+        {notas.length > 0 && (
+          <span
+            className="ml-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-coral px-1.5 text-[10px] text-paper"
+            aria-label={`${notas.length} ${notas.length === 1 ? "nota salva" : "notas salvas"}`}
+          >
+            {notas.length}
+          </span>
+        )}
       </button>
 
       {notaAberta && (
         <ModalNotaSessao
           segundos={segundos}
-          textoInicial={nota}
-          publicaInicial={notaPublica}
+          notas={notas}
           onFechar={() => setNotaAberta(false)}
-          onSalvar={(texto, publica) => {
-            onSalvarNota(texto, publica);
-            setNotaAberta(false);
-          }}
+          onSalvar={onAdicionarNota}
+          onRemover={onRemoverNota}
         />
       )}
     </div>
@@ -490,25 +503,36 @@ function TelaRodando({
 
 function ModalNotaSessao({
   segundos,
-  textoInicial,
-  publicaInicial,
+  notas,
   onFechar,
   onSalvar,
+  onRemover,
 }: {
   segundos: number;
-  textoInicial: string;
-  publicaInicial: boolean;
+  notas: NotaSessao[];
   onFechar: () => void;
   onSalvar: (texto: string, publica: boolean) => void;
+  onRemover: (id: string) => void;
 }) {
-  const [texto, setTexto] = useState(textoInicial);
-  const [publica, setPublica] = useState(publicaInicial);
+  // Salvar não fecha: a nota desce pra lista e a caixa zera pra próxima.
+  // A visibilidade fica como estava — quem marcou "amigos" costuma seguir assim.
+  const [texto, setTexto] = useState("");
+  const [publica, setPublica] = useState(notas[notas.length - 1]?.publica ?? false);
+  const campo = useRef<HTMLTextAreaElement>(null);
   const m = Math.floor(segundos / 60);
   const s = segundos % 60;
+  const vazio = !texto.trim();
+
+  function salvar() {
+    if (vazio) return;
+    onSalvar(texto.trim(), publica);
+    setTexto("");
+    campo.current?.focus();
+  }
 
   return (
     <div className="fixed inset-0 z-30 flex items-end justify-center bg-ink/55" role="dialog" aria-modal="true" aria-label="Adicionar nota">
-      <div className="w-full max-w-[390px] rounded-t-2xl border-2 border-ink bg-paper p-5 pb-7">
+      <div className="max-h-[90dvh] w-full max-w-[390px] overflow-y-auto rounded-t-2xl border-2 border-ink bg-paper p-5 pb-7">
         <div className="mb-1 flex items-center justify-between">
           <span className="font-display text-[10px] uppercase tracking-widest text-ink-soft">
             sessão continua rodando — {String(m).padStart(2, "0")}:{String(s).padStart(2, "0")}
@@ -528,9 +552,10 @@ function ModalNotaSessao({
         </h2>
 
         <textarea
+          ref={campo}
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
-          placeholder="Anota aquela frase ou sentimento…"
+          placeholder={notas.length > 0 ? "Mais uma nota…" : "Anota aquela frase ou sentimento…"}
           autoFocus
           className="min-h-[92px] w-full resize-none rounded-md border-2 border-ink bg-white p-3 text-sm placeholder:text-ink-soft/60 focus:outline-none"
         />
@@ -549,8 +574,12 @@ function ModalNotaSessao({
           <span className="text-[11px] text-ink-soft">quem pode ver essa nota</span>
         </div>
 
-        <p className="mt-2 font-serif text-[11px] italic text-ink-soft">
-          Fica guardada com a sessão — você escolhe o livro no fim, como hoje.
+        {notas.length > 0 && (
+          <ListaNotas notas={notas} onRemover={onRemover} className="mt-4" />
+        )}
+
+        <p className="mt-3 font-serif text-[11px] italic text-ink-soft">
+          Ficam guardadas com a sessão — você escolhe o livro no fim, como hoje.
         </p>
 
         <div className="mt-4 flex gap-3">
@@ -559,18 +588,51 @@ function ModalNotaSessao({
             onClick={onFechar}
             className="shadow-hard-sm h-12 flex-1 rounded-md border-2 border-ink bg-paper font-display text-xs uppercase tracking-wide text-ink active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
           >
-            Cancelar
+            {notas.length > 0 ? "Fechar" : "Cancelar"}
           </button>
           <button
             type="button"
-            onClick={() => onSalvar(texto, publica)}
-            className="shadow-hard-sm h-12 flex-1 rounded-md border-2 border-ink bg-moss-dark font-display text-xs uppercase tracking-wide text-paper active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+            onClick={salvar}
+            disabled={vazio}
+            className="shadow-hard-sm h-12 flex-1 rounded-md border-2 border-ink bg-moss-dark font-display text-xs uppercase tracking-wide text-paper active:translate-x-[1px] active:translate-y-[1px] active:shadow-none disabled:opacity-50"
           >
             Salvar nota
           </button>
         </div>
       </div>
     </div>
+  );
+}
+
+/** Notas já salvas na sessão, cada uma com quem pode ver e um "tirar". */
+function ListaNotas({
+  notas,
+  onRemover,
+  className = "",
+}: {
+  notas: NotaSessao[];
+  onRemover: (id: string) => void;
+  className?: string;
+}) {
+  return (
+    <ul className={`space-y-2 ${className}`} aria-label="Notas salvas">
+      {notas.map((n) => (
+        <li key={n.id} className="flex items-start gap-2 rounded-md border-2 border-cover-border bg-white px-3 py-2">
+          <span className="mt-0.5 text-xs" aria-label={n.publica ? "visível para amigos" : "só você"}>
+            {n.publica ? "🌍" : "🔒"}
+          </span>
+          <p className="min-w-0 flex-1 whitespace-pre-line break-words text-sm">{n.texto}</p>
+          <button
+            type="button"
+            onClick={() => onRemover(n.id)}
+            aria-label="Apagar nota"
+            className="-mr-1 shrink-0 px-1 text-xs text-ink-soft"
+          >
+            ✕
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -607,8 +669,7 @@ function TelaRegistro({
   minutosIniciais,
   origem,
   startedAt,
-  notaInicial,
-  notaPublicaInicial,
+  notasIniciais,
   onVoltar,
   onSalvo,
 }: {
@@ -618,8 +679,7 @@ function TelaRegistro({
   minutosIniciais: number;
   origem: "timer" | "manual";
   startedAt: string;
-  notaInicial: string;
-  notaPublicaInicial: boolean;
+  notasIniciais: NotaSessao[];
   onVoltar: () => void;
   onSalvo: (r: { minutos: number; titulo: string; quantidade: number; unidade: SessionUnit }) => void;
 }) {
@@ -642,11 +702,13 @@ function TelaRegistro({
   const [total, setTotal] = useState(minutosIniciais);
   const [unidadeTempo, setUnidadeTempo] = useState<UnidadeTempo>("min");
   const [tags, setTags] = useState<Set<string>>(new Set());
-  // Pode já vir preenchida — nota escrita com o timer rodando, no passo
-  // "+ Nota" (ver TelaRodando).
-  const [nota, setNota] = useState(notaInicial);
+  // Notas escritas com o timer rodando ("+ Nota", ver TelaRodando): aparecem
+  // em lista acima da caixa, e cada uma vira um comentário separado no livro.
+  // A caixa é pra mais uma, escrita agora.
+  const [notasTimer, setNotasTimer] = useState<NotaSessao[]>(notasIniciais);
+  const [nota, setNota] = useState("");
   const [visibilidade, setVisibilidade] = useState<"eu" | "amigos">(
-    notaPublicaInicial ? "amigos" : "eu",
+    notasIniciais[notasIniciais.length - 1]?.publica ? "amigos" : "eu",
   );
   // "comentar" do passo 05: vai só pro desafio (legenda do check-in). A nota
   // do passo 04 é do livro e não vai mais pro desafio — cada texto num lugar.
@@ -737,12 +799,16 @@ function TelaRegistro({
         });
       }
 
-      if (livroId && nota.trim()) {
-        await saveSessionMemory({
-          itemId: livroId,
-          text: nota,
-          isPublic: visibilidade === "amigos",
-        });
+      if (livroId) {
+        const paraSalvar = [
+          ...notasTimer.map((n) => ({ texto: n.texto, publica: n.publica })),
+          ...(nota.trim() ? [{ texto: nota, publica: visibilidade === "amigos" }] : []),
+        ];
+        // Em ordem, uma de cada vez: os comentários ficam na sequência em que
+        // foram escritos na página do livro.
+        for (const n of paraSalvar) {
+          await saveSessionMemory({ itemId: livroId, text: n.texto, isPublic: n.publica });
+        }
       }
 
       onSalvo({
@@ -1061,11 +1127,19 @@ function TelaRegistro({
             })}
           </div>
 
+          {notasTimer.length > 0 && (
+            <ListaNotas
+              notas={notasTimer}
+              onRemover={(id) => setNotasTimer((n) => n.filter((x) => x.id !== id))}
+              className="mt-3"
+            />
+          )}
+
           <div className="mt-3 rounded-md border-2 border-ink bg-card p-3">
             <textarea
               value={nota}
               onChange={(e) => setNota(e.target.value)}
-              placeholder="Anota aquela frase ou sentimento…"
+              placeholder={notasTimer.length > 0 ? "Mais uma nota…" : "Anota aquela frase ou sentimento…"}
               className="min-h-[80px] w-full resize-y bg-transparent text-sm placeholder:text-ink-soft/60 focus:outline-none"
             />
             <div className="mt-2 flex justify-end">
@@ -1083,7 +1157,7 @@ function TelaRegistro({
                 </select>
               </label>
             </div>
-            {nota.trim() && !livroId && (
+            {(nota.trim() || notasTimer.length > 0) && !livroId && (
               <p className="mt-2 text-[11px] text-ink-soft">
                 Vincule um livro para a anotação virar comentário na página dele.
               </p>
