@@ -6,6 +6,7 @@ import { useActionState, useState } from "react";
 import { ZigZag } from "@/components/zig-zag";
 import { login, resetPassword } from "@/app/actions/auth";
 import { CampoSenha } from "@/components/campo-senha";
+import { ComSpinner } from "@/components/carregando";
 
 type Modo = "login" | "recuperar" | "enviado";
 
@@ -86,7 +87,7 @@ export function LoginClient({ modoInicial }: { modoInicial: Modo }) {
               disabled={loginPending}
               className="shadow-hard mt-1 w-full rounded-xl border-2 border-ink bg-coral px-4 py-3.5 font-display text-base tracking-wide text-ink transition-transform hover:-translate-x-0.5 hover:-translate-y-0.5 active:translate-x-0 active:translate-y-0 active:shadow-hard-sm disabled:opacity-60"
             >
-              {loginPending ? "Entrando…" : "Entrar"}
+              <ComSpinner ocupado={loginPending}>{loginPending ? "Entrando…" : "Entrar"}</ComSpinner>
             </button>
           </form>
         )}
@@ -110,7 +111,7 @@ export function LoginClient({ modoInicial }: { modoInicial: Modo }) {
               disabled={resetPending}
               className="shadow-hard w-full rounded-md border-2 border-ink bg-coral px-4 py-3.5 font-display text-base tracking-wide text-ink transition-transform hover:-translate-x-0.5 hover:-translate-y-0.5 active:translate-x-0 active:translate-y-0 active:shadow-hard-sm disabled:opacity-60"
             >
-              {resetPending ? "Enviando…" : "Enviar link"}
+              <ComSpinner ocupado={resetPending}>{resetPending ? "Enviando…" : "Enviar link"}</ComSpinner>
             </button>
 
             <button

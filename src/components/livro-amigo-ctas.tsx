@@ -7,6 +7,7 @@ import { type CoverFields } from "@/components/book-cover";
 import { addFriendBookToShelf } from "@/app/actions/media-items";
 import { recommendBook } from "@/app/actions/recommendations";
 import type { Friend } from "@/lib/friends";
+import { ComSpinner } from "@/components/carregando";
 
 // CTAs da página do livro de um amigo: adicionar à minha estante e indicar o
 // livro a outros amigos.
@@ -121,7 +122,7 @@ export function LivroAmigoCtas({
                 disabled={pendente}
                 className="shadow-hard mt-6 w-full border-2 border-ink bg-coral py-3 font-display text-sm uppercase tracking-wider text-paper active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-60"
               >
-                {pendente ? "Adicionando…" : "Adicionar livro"}
+                <ComSpinner ocupado={pendente}>{pendente ? "Adicionando…" : "Adicionar livro"}</ComSpinner>
               </button>
             </>
           )}
@@ -193,11 +194,13 @@ export function LivroAmigoCtas({
                 onClick={indicar}
                 className="shadow-hard mt-5 w-full border-2 border-ink bg-coral py-3 font-display text-sm uppercase tracking-wider text-paper active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-40 disabled:shadow-none"
               >
+                <ComSpinner ocupado={pendente}>
                 {pendente
                   ? "Enviando…"
                   : selecionados.length > 1
                     ? `Indicar para ${selecionados.length} amigos`
                     : "Indicar"}
+                </ComSpinner>
               </button>
             </>
           )}

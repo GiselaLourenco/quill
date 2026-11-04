@@ -6,7 +6,23 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 import { conquistasDoTitulo } from "@/lib/achievements";
 import { paletteIndexForTitle } from "@/lib/covers";
+import { chaveTitulo } from "@/lib/titulo";
 import { todayLocalDateKey } from "@/lib/date-br";
+
+/** Livro da estante com o mesmo título (ver `chaveTitulo`), ignorando `excetoId`. */
+async function livroComMesmoTitulo(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  titulo: string,
+  excetoId?: string,
+): Promise<{ id: string } | null> {
+  const { data } = await supabase.from("media_items").select("id, title").eq("user_id", userId);
+  const chave = chaveTitulo(titulo);
+  const achado = (data ?? []).find(
+    (l) => l.id !== excetoId && chaveTitulo(l.title as string) === chave,
+  );
+  return achado ? { id: achado.id as string } : null;
+}
 
 /** Campo `<input type="date">` → YYYY-MM-DD, ou null se vazio/inválido. */
 function dataDoForm(valor: FormDataEntryValue | null): string | null {
@@ -56,6 +72,10 @@ export async function createMediaItem(formData: FormData) {
   }
 
   const supabase = await createClient();
+  if (await livroComMesmoTitulo(supabase, userId, title)) {
+    redirect("/books/new?error=Esse livro já está na sua estante.");
+  }
+
   const { data: criado, error } = await supabase.from("media_items").insert({
     user_id: userId,
     title,
@@ -208,12 +228,7 @@ export async function addFriendBookToShelf(input: {
 
   if (!source) return { itemId: null, error: "Livro não encontrado." };
 
-  const { data: existing } = await supabase
-    .from("media_items")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("title", source.title)
-    .maybeSingle();
+  const existing = await livroComMesmoTitulo(supabase, userId, source.title as string);
 
   if (existing) {
     // Já tinha o livro: não duplica, mas registra a indicação nele — a marca
@@ -306,6 +321,9 @@ export async function atualizarCampoLivro(
   switch (campo) {
     case "titulo":
       if (!texto) return { error: "Título é obrigatório." };
+      if (await livroComMesmoTitulo(supabase, userId, texto, itemId)) {
+        return { error: "Já existe outro livro com esse título na sua estante." };
+      }
       updates = { title: texto, cover_palette: paletteIndexForTitle(texto) };
       break;
     case "autor":

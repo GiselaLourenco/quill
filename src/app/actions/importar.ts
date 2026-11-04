@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUserId } from "@/lib/supabase/auth";
 import { ehAdmin } from "@/app/actions/admin";
 import { paletteIndexForTitle } from "@/lib/covers";
+import { chaveTitulo } from "@/lib/titulo";
 import { buscarLivros, type LivroEncontrado } from "@/lib/open-library";
 import { buscarLivrosGoogleBooks } from "@/lib/google-books";
 
@@ -188,11 +189,15 @@ export async function importarLivros(input: {
     .from("media_items")
     .select("title")
     .eq("user_id", input.userId);
-  const jaTem = new Set(
-    (existentes ?? []).map((l) => (l.title as string).trim().toLowerCase()),
-  );
+  const jaTem = new Set((existentes ?? []).map((l) => chaveTitulo(l.title as string)));
 
-  const novos = limpos.filter((l) => !jaTem.has(l.title.toLowerCase()));
+  // O próprio CSV também repete título — o Set evita gravar a cópia de dentro do lote.
+  const novos = limpos.filter((l) => {
+    const chave = chaveTitulo(l.title);
+    if (jaTem.has(chave)) return false;
+    jaTem.add(chave);
+    return true;
+  });
   const pulados = limpos.length - novos.length;
 
   if (novos.length === 0) {

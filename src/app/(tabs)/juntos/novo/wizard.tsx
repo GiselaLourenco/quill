@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useMemo, useState } from "react";
+import { useRef, useMemo, useState, useTransition } from "react";
 import { createChallenge } from "@/app/actions/groups";
+import { ComSpinner } from "@/components/carregando";
 
 type UnidadeDuracao = "semana" | "mes" | "ano";
 type Duracao = "1_semana" | "2_semanas" | "1_mes" | "3_meses" | "1_ano" | "custom";
@@ -86,6 +87,9 @@ function gerarCodigo() {
 export default function NovoDesafioWizard({ amigos }: { amigos: Amigo[] }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
+  // A ação termina num redirect pro desafio criado — a transição fica
+  // pendente até a navegação, então o spinner só some quando a tela troca.
+  const [criando, startCriar] = useTransition();
   const [passo, setPasso] = useState<1 | 2 | 3>(1);
 
   const [nome, setNome] = useState("");
@@ -149,7 +153,7 @@ export default function NovoDesafioWizard({ amigos }: { amigos: Amigo[] }) {
   const diasAteComecar = Math.round((+inicio - +hojeZerado()) / 86_400_000);
 
   const proximo = () => {
-    if (!podeAvancar) return;
+    if (!podeAvancar || criando) return;
     if (passo < 3) { setPasso((p) => (p + 1) as 1 | 2 | 3); return; }
     if (formRef.current) {
       const form = formRef.current;
@@ -163,7 +167,8 @@ export default function NovoDesafioWizard({ amigos }: { amigos: Amigo[] }) {
       (form.elements.namedItem("invite_code") as HTMLInputElement).value = codigo;
       const competesEl = form.elements.namedItem("competes") as HTMLInputElement | null;
       if (competesEl) competesEl.value = participarRanking ? "on" : "";
-      form.requestSubmit();
+      const dados = new FormData(form);
+      startCriar(() => createChallenge(dados));
     }
   };
 
@@ -243,8 +248,10 @@ export default function NovoDesafioWizard({ amigos }: { amigos: Amigo[] }) {
           <button onClick={voltar} className="flex-1 border-2 border-ink bg-paper py-3 font-display text-xs uppercase tracking-widest text-ink shadow-hard-sm active:translate-x-[2px] active:translate-y-[2px] active:shadow-none">
             {passo === 1 ? "Cancelar" : "Voltar"}
           </button>
-          <button onClick={proximo} disabled={!podeAvancar} className="flex-[2] border-2 border-ink bg-moss py-3 font-display text-xs uppercase tracking-widest text-paper shadow-hard-sm disabled:cursor-not-allowed disabled:bg-ink-soft disabled:opacity-70 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none">
-            {passo === 3 ? "Criar desafio" : "Próximo passo"}
+          <button onClick={proximo} disabled={!podeAvancar || criando} className="flex-[2] border-2 border-ink bg-moss py-3 font-display text-xs uppercase tracking-widest text-paper shadow-hard-sm disabled:cursor-not-allowed disabled:bg-ink-soft disabled:opacity-70 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none">
+            <ComSpinner ocupado={criando}>
+              {passo === 3 ? (criando ? "Criando…" : "Criar desafio") : "Próximo passo"}
+            </ComSpinner>
           </button>
         </div>
       </footer>

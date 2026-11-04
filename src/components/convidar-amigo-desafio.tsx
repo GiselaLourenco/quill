@@ -1,5 +1,6 @@
 "use client";
 
+import { ComSpinner } from "@/components/carregando";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { adicionarAmigoAoDesafio } from "@/app/actions/groups";
@@ -32,6 +33,7 @@ export function ConvidarAmigoDesafio({
   const [aberto, setAberto] = useState(false);
   const [adicionados, setAdicionados] = useState<string[]>([]);
   const [pendente, iniciar] = useTransition();
+  const [chamando, setChamando] = useState<string | null>(null);
 
   const disponiveis = amigos.filter(
     (a) => !a.jaEstaNoDesafio && !adicionados.includes(a.id),
@@ -67,17 +69,18 @@ export function ConvidarAmigoDesafio({
                 <button
                   type="button"
                   disabled={pendente}
-                  onClick={() =>
+                  onClick={() => {
+                    setChamando(a.id);
                     iniciar(async () => {
                       const r = await adicionarAmigoAoDesafio({ groupId, friendId: a.id });
                       if (r.error) return;
                       setAdicionados((p) => [...p, a.id]);
                       router.refresh();
-                    })
-                  }
+                    });
+                  }}
                   className="shadow-hard-sm shrink-0 rounded-md border-2 border-ink bg-coral px-2.5 py-1 font-display text-[10px] uppercase tracking-wider text-paper disabled:opacity-60"
                 >
-                  Chamar
+                  <ComSpinner ocupado={pendente && chamando === a.id}>Chamar</ComSpinner>
                 </button>
               </div>
             ))

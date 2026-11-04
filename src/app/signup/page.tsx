@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState } from "react";
 import { signup } from "@/app/actions/auth";
 import { CampoSenha } from "@/components/campo-senha";
+import { ComSpinner } from "@/components/carregando";
 
 export default function SignupPage() {
   const [state, formAction, pending] = useActionState(signup, undefined);
@@ -76,7 +77,7 @@ export default function SignupPage() {
             type="submit"
             className="mt-2 rounded-md bg-mustard px-4 py-2 font-display text-sm text-ink shadow-hard-sm disabled:opacity-60"
           >
-            {pending ? "Criando…" : "Criar conta"}
+            <ComSpinner ocupado={pending}>{pending ? "Criando…" : "Criar conta"}</ComSpinner>
           </button>
         </form>
         <p className="mt-4 text-sm">

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Portal } from "@/components/portal";
 import { deleteMediaItem } from "@/app/actions/media-items";
+import { ComSpinner } from "@/components/carregando";
 
 // Kebab (3 pontos) do meu livro: só excluir, com confirmação — a exclusão
 // leva junto sessões, notas e comentários do livro. Corrigir título, autor,
@@ -75,7 +76,7 @@ export function LivroKebab({ itemId, titulo }: { itemId: string; titulo: string 
                 onClick={() => startDelete(async () => { await deleteMediaItem(itemId); })}
                 className="shadow-hard-sm flex-1 border-2 border-ink bg-coral py-3 font-display text-xs uppercase tracking-widest text-paper active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-60"
               >
-                {excluindo ? "Excluindo…" : "Excluir"}
+                <ComSpinner ocupado={excluindo}>{excluindo ? "Excluindo…" : "Excluir"}</ComSpinner>
               </button>
             </div>
           </div>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { toPng } from "html-to-image";
+import { ComSpinner } from "@/components/carregando";
 
 /** Formato Stories/Reels — o que o Instagram espera. */
 const LARGURA_STORY = 1080;
@@ -284,7 +285,7 @@ export default function CompartilharClient({
         className="shadow-hard mt-6 flex w-full items-center justify-center gap-3 rounded-xl border-2 border-ink bg-coral py-4 text-paper transition-transform active:translate-x-1 active:translate-y-1 active:shadow-none disabled:opacity-60"
       >
         <span className="font-display text-xs uppercase tracking-widest">
-          {salvando ? "Gerando…" : "Salvar imagem"}
+          <ComSpinner ocupado={salvando}>{salvando ? "Gerando…" : "Salvar imagem"}</ComSpinner>
         </span>
         <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />

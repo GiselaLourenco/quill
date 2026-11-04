@@ -8,6 +8,7 @@ import {
   type LivroImportado,
   type UsuarioImportacao,
 } from "@/app/actions/importar";
+import { ComSpinner } from "@/components/carregando";
 
 /**
  * Divide uma linha de CSV respeitando aspas.
@@ -267,7 +268,7 @@ export function ImportarAmazon() {
             disabled={enviando || marcados.size === 0 || !usuarioId}
             className="shadow-hard rounded-md border-2 border-ink bg-moss py-2.5 font-display text-xs uppercase tracking-widest text-paper active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-60"
           >
-            {enviando ? "Importando…" : `Importar ${marcados.size}`}
+            <ComSpinner ocupado={enviando}>{enviando ? "Importando…" : `Importar ${marcados.size}`}</ComSpinner>
           </button>
         </>
       )}

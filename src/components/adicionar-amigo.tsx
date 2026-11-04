@@ -1,5 +1,6 @@
 "use client";
 
+import { ComSpinner } from "@/components/carregando";
 import Image from "next/image";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -33,6 +34,7 @@ export function AdicionarAmigo() {
   // uma ida ao servidor à toa.
   const [enviados, setEnviados] = useState<string[]>([]);
   const [erro, setErro] = useState<string | null>(null);
+  const [enviandoPara, setEnviandoPara] = useState<string | null>(null);
 
   const limpo = termo.trim();
   const ativo = limpo.length >= MIN_BUSCA;
@@ -52,6 +54,7 @@ export function AdicionarAmigo() {
 
   function adicionar(pessoa: PessoaEncontrada) {
     setErro(null);
+    setEnviandoPara(pessoa.id);
     iniciarEnvio(async () => {
       const r = await enviarPedido(pessoa.id);
       if (r.error) {
@@ -118,6 +121,7 @@ export function AdicionarAmigo() {
                 pessoa={p}
                 jaEnviado={enviados.includes(p.id)}
                 ocupado={enviando}
+                carregando={enviando && enviandoPara === p.id}
                 onAdicionar={() => adicionar(p)}
               />
             </li>
@@ -132,11 +136,13 @@ function Acao({
   pessoa,
   jaEnviado,
   ocupado,
+  carregando,
   onAdicionar,
 }: {
   pessoa: PessoaEncontrada;
   jaEnviado: boolean;
   ocupado: boolean;
+  carregando: boolean;
   onAdicionar: () => void;
 }) {
   const situacao = jaEnviado ? "pedido-enviado" : pessoa.situacao;
@@ -154,7 +160,9 @@ function Acao({
     >
       {/* Quem já pediu pra mim vira "Aceitar": mandar pedido de volta deixaria
           os dois esperando um do outro. */}
-      {situacao === "pedido-recebido" ? "Aceitar" : "Adicionar"}
+      <ComSpinner ocupado={carregando}>
+        {situacao === "pedido-recebido" ? "Aceitar" : "Adicionar"}
+      </ComSpinner>
     </button>
   );
 }

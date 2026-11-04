@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { excluirComentario, alterarVisibilidadeComentario } from "@/app/actions/comments";
+import { ComSpinner } from "@/components/carregando";
 
 export type Nota = {
   id: string;
@@ -122,7 +123,7 @@ export function NotaItem({ nota, itemId }: { nota: Nota; itemId: string }) {
             disabled={apagando}
             className="shadow-hard-sm rounded-md border-2 border-ink bg-coral px-2.5 py-1.5 font-display text-[10px] uppercase tracking-wider text-paper active:translate-x-[1px] active:translate-y-[1px] active:shadow-none disabled:opacity-60"
           >
-            {apagando ? "Apagando…" : "Apagar"}
+            <ComSpinner ocupado={apagando}>{apagando ? "Apagando…" : "Apagar"}</ComSpinner>
           </button>
         </div>
       )}

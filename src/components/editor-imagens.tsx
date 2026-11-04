@@ -7,6 +7,7 @@ import { AJUSTE_PADRAO, type MapaSlots, type SlotImagem } from "@/lib/ajustes-im
 import { rotuloDoSlot } from "@/lib/slots-imagem";
 import { enviarArte, limparSlotImagem, removerArte, salvarSlotImagem } from "@/app/actions/admin";
 import type { Previa } from "@/components/imagens-provider";
+import { ComSpinner } from "@/components/carregando";
 
 const CHAVE_MODO = "quill:edicao-imagens";
 
@@ -210,6 +211,7 @@ export function FolhaSlot({
   const [enviadas, setEnviadas] = useState<string[]>([]);
   const [removidas, setRemovidas] = useState<string[]>([]);
   const [salvando, startSave] = useTransition();
+  const [restaurando, setRestaurando] = useState(false);
   const [enviando, startEnvio] = useTransition();
 
   // Guarda a posição do início do arrasto — o movimento é sempre relativo a
@@ -395,7 +397,7 @@ export function FolhaSlot({
               }`}
             >
               <span className="text-base leading-none">＋</span>
-              {enviando ? "enviando…" : "enviar"}
+              <ComSpinner ocupado={enviando}>{enviando ? "enviando…" : "enviar"}</ComSpinner>
               <input
                 type="file"
                 accept="image/png,image/jpeg,image/webp,image/gif,image/avif,image/svg+xml"
@@ -450,7 +452,8 @@ export function FolhaSlot({
             <button
               type="button"
               disabled={salvando}
-              onClick={() =>
+              onClick={() => {
+                setRestaurando(true);
                 startSave(async () => {
                   const r = await limparSlotImagem(slot);
                   if (r.error) {
@@ -460,16 +463,17 @@ export function FolhaSlot({
                   onPrevia?.(null);
                   router.refresh();
                   onFechar();
-                })
-              }
+                });
+              }}
               className="shadow-hard-sm flex-1 rounded-md border-2 border-ink bg-paper py-3 font-display text-xs uppercase tracking-tight active:translate-x-[1px] active:translate-y-[1px] active:shadow-none disabled:opacity-60"
             >
-              Restaurar
+              <ComSpinner ocupado={salvando && restaurando}>Restaurar</ComSpinner>
             </button>
             <button
               type="button"
               disabled={salvando}
-              onClick={() =>
+              onClick={() => {
+                setRestaurando(false);
                 startSave(async () => {
                   const r = await salvarSlotImagem({
                     slot,
@@ -485,11 +489,11 @@ export function FolhaSlot({
                   onPrevia?.(null);
                   router.refresh();
                   onFechar();
-                })
-              }
+                });
+              }}
               className="shadow-hard-sm flex-[1.4] rounded-md border-2 border-ink bg-moss py-3 font-display text-xs uppercase tracking-tight text-paper active:translate-x-[1px] active:translate-y-[1px] active:shadow-none disabled:opacity-60"
             >
-              {salvando ? "Publicando…" : "Salvar e publicar"}
+              <ComSpinner ocupado={salvando && !restaurando}>{salvando && !restaurando ? "Publicando…" : "Salvar e publicar"}</ComSpinner>
             </button>
           </div>
           <p className="mt-2 text-center text-[10px] font-medium text-ink-soft">
@@ -580,7 +584,7 @@ export function BotaoRemoverArte({
       {confirmando && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-md border-2 border-coral bg-paper/95 p-1 text-center">
           <span className="text-[8px] font-bold uppercase leading-tight text-ink">
-            {erro ? "não deu" : removendo ? "removendo…" : "remover?"}
+            {erro ? "não deu" : removendo ? <ComSpinner ocupado>removendo…</ComSpinner> : "remover?"}
           </span>
           {!removendo && (
             <div className="flex gap-1">

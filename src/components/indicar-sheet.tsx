@@ -1,5 +1,6 @@
 "use client";
 
+import { ComSpinner } from "@/components/carregando";
 import { AppImage } from "@/components/app-image";
 import { useState, useTransition } from "react";
 import { BookThumb } from "@/components/book-thumb";
@@ -306,11 +307,13 @@ function SheetConteudo({
               onClick={enviar}
               className="shadow-hard mt-6 w-full border-2 border-ink bg-coral py-3 font-display text-sm uppercase tracking-wider text-paper active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-40 disabled:shadow-none"
             >
+              <ComSpinner ocupado={enviando}>
               {enviando
                 ? "Enviando…"
                 : selecionados.length > 1
                   ? `Indicar para ${selecionados.length} amigos`
                   : "Indicar"}
+              </ComSpinner>
             </button>
           </>
         )}

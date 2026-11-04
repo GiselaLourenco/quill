@@ -17,6 +17,7 @@ import {
 } from "@/app/actions/sessions";
 import { updateItemStatus } from "@/app/actions/media-items";
 import type { ActiveChallenge } from "@/lib/challenges";
+import { ComSpinner } from "@/components/carregando";
 
 export type BookOption = CoverFields & {
   id: string;
@@ -1130,7 +1131,7 @@ function TelaRegistro({
           disabled={salvando}
           className="shadow-hard mt-8 flex w-full items-center justify-center gap-2 rounded-md border-2 border-ink bg-coral py-4 font-display text-lg tracking-wide text-card transition hover:shadow-hard-hover active:translate-y-1 active:shadow-none disabled:opacity-60"
         >
-          {salvando ? "Salvando…" : "✓ Finalizar registro"}
+          <ComSpinner ocupado={salvando}>{salvando ? "Salvando…" : "✓ Finalizar registro"}</ComSpinner>
         </button>
       </div>
     </div>

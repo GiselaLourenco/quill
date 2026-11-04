@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveGoals } from "@/app/actions/goals";
+import { ComSpinner } from "@/components/carregando";
 
 export type MetaConfiguravel = {
   type: "books_per_year" | "hours_per_month" | "streak_days";
@@ -140,7 +141,7 @@ function ModalMetas({
           disabled={salvando}
           className="shadow-hard mt-5 w-full rounded-xl border-2 border-ink bg-moss py-4 font-display text-base uppercase tracking-wider text-paper active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-60"
         >
-          {salvando ? "Salvando…" : "Salvar metas"}
+          <ComSpinner ocupado={salvando}>{salvando ? "Salvando…" : "Salvar metas"}</ComSpinner>
         </button>
         <p className="mt-2 text-center text-[11px] text-ink-soft">
           Deixe em 0 para desligar uma meta.

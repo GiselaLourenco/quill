@@ -1,5 +1,6 @@
 "use client";
 
+import { BotaoEnviar } from "@/components/carregando";
 import { useState } from "react";
 import Image from "next/image";
 import { createMediaItem } from "@/app/actions/media-items";
@@ -314,12 +315,12 @@ export function AddBookForm({
         </div>
       )}
 
-      <button
-        type="submit"
-        className="mt-2 rounded-md bg-moss-dark px-4 py-3 font-display text-sm text-paper shadow-hard-sm"
+      <BotaoEnviar
+        textoOcupado={initial ? "Salvando…" : "Adicionando…"}
+        className="mt-2 rounded-md bg-moss-dark px-4 py-3 font-display text-sm text-paper shadow-hard-sm disabled:opacity-70"
       >
         {submitLabel}
-      </button>
+      </BotaoEnviar>
     </form>
   );
 }

@@ -8,7 +8,7 @@ import { getReceivedRecommendations } from "@/lib/recommendations";
 import { IndicarSheet, type LivroIndicavel } from "@/components/indicar-sheet";
 import { AmigosEstantes } from "@/components/amigos-estantes";
 import { EmptyState } from "@/components/empty-state";
-import { paginasLidas, posicaoAtualPorItem } from "@/lib/reading-stats";
+import { paginasLidas, posicaoAtualPorItem, posicaoExibida } from "@/lib/reading-stats";
 
 
 
@@ -207,17 +207,15 @@ async function MyShelf({
   );
 
   const books: ShelfBook[] = (items ?? []).map((item) => {
-    const progresso = progressoPorItem.get(item.id);
+    const progresso = posicaoExibida(progressoPorItem.get(item.id), item);
     // Páginas tem prioridade sobre capítulos (mesma regra do check-in de
     // desafio) — só entra se o livro tiver o total cadastrado e já houver
     // alguma posição registrada.
     let percentLido: number | null = null;
-    if (progresso) {
-      if (item.total_units && progresso.paginas > 0) {
-        percentLido = Math.min(100, Math.round((progresso.paginas / item.total_units) * 100));
-      } else if (item.total_chapters && progresso.capitulos > 0) {
-        percentLido = Math.min(100, Math.round((progresso.capitulos / item.total_chapters) * 100));
-      }
+    if (item.total_units && progresso.paginas > 0) {
+      percentLido = Math.min(100, Math.round((progresso.paginas / item.total_units) * 100));
+    } else if (item.total_chapters && progresso.capitulos > 0) {
+      percentLido = Math.min(100, Math.round((progresso.capitulos / item.total_chapters) * 100));
     }
     return {
       id: item.id,

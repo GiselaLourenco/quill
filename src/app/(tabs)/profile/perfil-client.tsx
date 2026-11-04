@@ -1,5 +1,6 @@
 "use client";
 
+import { BotaoEnviar, ComSpinner, Spinner } from "@/components/carregando";
 import Image from "next/image";
 import { ImportarAmazon } from "@/components/importar-amazon";
 import { useImagens } from "@/components/imagens-provider";
@@ -367,12 +368,12 @@ export function PerfilClient({
       </div>
 
       <form action={logoutAction}>
-        <button
-          type="submit"
-          className="shadow-hard mt-4 w-full rounded-md border-2 border-ink bg-card py-4 font-display text-sm uppercase tracking-tight transition-all active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+        <BotaoEnviar
+          textoOcupado="Saindo…"
+          className="shadow-hard mt-4 w-full rounded-md border-2 border-ink bg-card py-4 font-display text-sm uppercase tracking-tight transition-all active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-70"
         >
           Sair da conta
-        </button>
+        </BotaoEnviar>
       </form>
 
       {/* ---- Dialogs ---- */}
@@ -1164,7 +1165,7 @@ function EditarPerfilDialog({
           }
           className="shadow-hard-sm flex-1 rounded-md border-2 border-ink bg-moss py-3 font-display text-xs uppercase tracking-tight text-paper transition-all active:translate-x-[1px] active:translate-y-[1px] active:shadow-none disabled:opacity-60"
         >
-          {salvando ? "Salvando…" : "Salvar"}
+          <ComSpinner ocupado={salvando}>{salvando ? "Salvando…" : "Salvar"}</ComSpinner>
         </button>
       </div>
     </DialogShell>
@@ -1260,8 +1261,8 @@ function RankingDialog({
         </ul>
       )}
       {salvando && (
-        <p className="mt-3 text-center text-[11px] uppercase tracking-widest text-ink-soft">
-          salvando…
+        <p className="mt-3 flex items-center justify-center gap-2 text-center text-[11px] uppercase tracking-widest text-ink-soft">
+          <Spinner /> salvando…
         </p>
       )}
     </DialogShell>
@@ -1335,7 +1336,7 @@ function SenhaDialog({ onClose }: { onClose: () => void }) {
           disabled={pendente}
           className="shadow-hard rounded-md border-2 border-ink bg-moss py-3 font-display text-xs uppercase tracking-widest text-paper active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-60"
         >
-          {pendente ? "Trocando…" : "Trocar senha"}
+          <ComSpinner ocupado={pendente}>{pendente ? "Trocando…" : "Trocar senha"}</ComSpinner>
         </button>
 
         <Link
@@ -1399,7 +1400,7 @@ function ExcluirDialog({
           }
           className="shadow-hard flex-1 rounded-md border-2 border-ink bg-coral py-3 font-display text-xs uppercase tracking-widest text-paper active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-40 disabled:shadow-none"
         >
-          {excluindo ? "Excluindo…" : "Excluir"}
+          <ComSpinner ocupado={excluindo}>{excluindo ? "Excluindo…" : "Excluir"}</ComSpinner>
         </button>
       </div>
     </DialogShell>

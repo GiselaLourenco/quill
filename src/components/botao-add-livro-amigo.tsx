@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { addFriendBookToShelf } from "@/app/actions/media-items";
+import { ComSpinner } from "@/components/carregando";
 
 /**
  * "+ minha estante" para um livro que está na estante de um amigo.
@@ -45,7 +46,7 @@ export function BotaoAddLivroAmigo({ itemId }: { itemId: string }) {
         }}
         className="shadow-hard-sm rounded-md border-2 border-ink bg-coral px-2.5 py-1 font-display text-[10px] uppercase tracking-wider text-paper active:translate-x-[1px] active:translate-y-[1px] active:shadow-none disabled:opacity-60"
       >
-        {pendente ? "Adicionando…" : "+ minha estante"}
+        <ComSpinner ocupado={pendente}>{pendente ? "Adicionando…" : "+ minha estante"}</ComSpinner>
       </button>
       {erro && <p className="mt-1 text-[11px] font-medium text-coral">{erro}</p>}
     </>

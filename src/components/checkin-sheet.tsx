@@ -9,6 +9,7 @@ import {
   valorNaUnidade,
   type UnidadeTempo,
 } from "@/lib/tempo";
+import { ComSpinner } from "@/components/carregando";
 
 export type LivroLendo = { id: string; titulo: string };
 
@@ -314,7 +315,7 @@ export function CheckinSheet({
                 podeSalvar ? "bg-coral text-paper" : "bg-paper text-ink-soft opacity-60"
               }`}
             >
-              {salvando ? "Registrando…" : "Registrar check-in"}
+              <ComSpinner ocupado={salvando}>{salvando ? "Registrando…" : "Registrar check-in"}</ComSpinner>
             </button>
           </div>
         )}

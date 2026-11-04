@@ -10,6 +10,7 @@ import { SegmentToggle } from "@/components/segment-toggle";
 import { leaveChallenge } from "@/app/actions/groups";
 import { avatarDeExibicao, AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
 import { todayLocalDateKey } from "@/lib/date-br";
+import { ComSpinner } from "@/components/carregando";
 
 const MES_LABEL = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -409,7 +410,7 @@ export default function DesafioDetalheClient({
                 onClick={() => startSaida(async () => { await leaveChallenge(group.id); })}
                 className="shadow-hard-sm flex-1 border-2 border-ink bg-coral py-3 font-display text-xs uppercase tracking-widest text-paper active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-60"
               >
-                {saindo ? "Saindo…" : "Sair"}
+                <ComSpinner ocupado={saindo}>{saindo ? "Saindo…" : "Sair"}</ComSpinner>
               </button>
             </div>
           </div>

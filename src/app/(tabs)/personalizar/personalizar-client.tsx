@@ -1,5 +1,6 @@
 "use client";
 
+import { BotaoEnviar } from "@/components/carregando";
 import { useState } from "react";
 import { updateMetricsPrefs } from "@/app/actions/pills";
 import { PILL_CATALOG, MAX_PILLS, type PillKey } from "@/lib/pills";
@@ -55,13 +56,13 @@ export function PersonalizarClient({ inicial }: { inicial: PillKey[] }) {
         );
       })}
 
-      <button
-        type="submit"
+      <BotaoEnviar
         disabled={escolhidas.length === 0}
+        textoOcupado="Salvando…"
         className="mt-3 rounded-md border-2 border-ink bg-moss-dark px-4 py-2.5 font-display text-sm text-paper shadow-hard-sm disabled:opacity-60"
       >
         Salvar
-      </button>
+      </BotaoEnviar>
       {escolhidas.length === 0 && (
         <p className="text-xs text-ink-soft">
           Escolha pelo menos uma — o painel não fica vazio.

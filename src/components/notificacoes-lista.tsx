@@ -9,6 +9,7 @@ import { aceitarPedido, recusarPedido } from "@/app/actions/friends";
 import { addFriendBookToShelf } from "@/app/actions/media-items";
 import { limparNotificacoes } from "@/app/actions/notificacoes";
 import type { Notificacao, TipoNotificacao } from "@/lib/notificacoes";
+import { ComSpinner } from "@/components/carregando";
 
 const FILTROS: { id: "todas" | TipoNotificacao; label: string }[] = [
   { id: "todas", label: "Todas" },
@@ -162,7 +163,7 @@ export function NotificacoesLista({ inicial }: { inicial: Notificacao[] }) {
               disabled={carregando}
               className="shadow-hard-sm rounded-md border-2 border-ink bg-card py-2.5 font-display text-[10px] uppercase tracking-widest text-ink active:translate-x-[1px] active:translate-y-[1px] active:shadow-none disabled:opacity-60"
             >
-              {carregando ? "carregando…" : `ver mais ${Math.min(faltam, PAGINA)}`}
+              <ComSpinner ocupado={carregando}>{carregando ? "carregando…" : `ver mais ${Math.min(faltam, PAGINA)}`}</ComSpinner>
             </button>
           )}
 
@@ -180,7 +181,7 @@ export function NotificacoesLista({ inicial }: { inicial: Notificacao[] }) {
               }
               className="mt-2 self-center text-xs font-semibold text-ink-soft underline underline-offset-2 hover:text-coral disabled:opacity-60"
             >
-              {limpando ? "limpando…" : "Limpar notificações"}
+              <ComSpinner ocupado={limpando}>{limpando ? "limpando…" : "Limpar notificações"}</ComSpinner>
             </button>
           )}
         </div>
@@ -200,6 +201,7 @@ function Card({
 }) {
   const router = useRouter();
   const [pendente, iniciar] = useTransition();
+  const [acao, setAcao] = useState<"aceitar" | "recusar" | null>(null);
   const base = "rounded-md border-2 border-ink p-4 shadow-hard";
 
   if (n.tipo === "amizade") {
@@ -223,30 +225,32 @@ function Card({
             <button
               type="button"
               disabled={pendente}
-              onClick={() =>
+              onClick={() => {
+                setAcao("aceitar");
                 iniciar(async () => {
                   await aceitarPedido(n.autorId!);
                   onResolver("Amizade aceita ✓");
                   router.refresh();
-                })
-              }
+                });
+              }}
               className="shadow-hard-sm flex-1 rounded-md border-2 border-ink bg-moss py-2 font-display text-[10px] uppercase tracking-wider text-paper disabled:opacity-60"
             >
-              Aceitar
+              <ComSpinner ocupado={pendente && acao === "aceitar"}>Aceitar</ComSpinner>
             </button>
             <button
               type="button"
               disabled={pendente}
-              onClick={() =>
+              onClick={() => {
+                setAcao("recusar");
                 iniciar(async () => {
                   await recusarPedido(n.autorId!);
                   onResolver("Pedido recusado");
                   router.refresh();
-                })
-              }
+                });
+              }}
               className="shadow-hard-sm flex-1 rounded-md border-2 border-ink bg-paper py-2 font-display text-[10px] uppercase tracking-wider text-ink disabled:opacity-60"
             >
-              Recusar
+              <ComSpinner ocupado={pendente && acao === "recusar"}>Recusar</ComSpinner>
             </button>
           </div>
         )}
@@ -324,7 +328,7 @@ function Card({
             }
             className="shadow-hard-sm rounded-md border-2 border-ink bg-coral px-3 py-1.5 font-display text-[10px] uppercase tracking-wider text-paper disabled:opacity-60"
           >
-            {resolvido ?? "+ estante"}
+            <ComSpinner ocupado={pendente}>{resolvido ?? "+ estante"}</ComSpinner>
           </button>
         )}
         {n.itemRef && (

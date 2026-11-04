@@ -7,6 +7,7 @@ import { AJUSTE_PADRAO, estiloDoAjuste, type MapaAjustes, type MapaSlots } from 
 import { BotaoRemoverArte, FolhaSlot } from "@/components/editor-imagens";
 import { rotuloDoSlot, SLOTS_FORA_DO_APP } from "@/lib/slots-imagem";
 import { enviarArte, limparSlotImagem, restaurarArte } from "@/app/actions/admin";
+import { ComSpinner, Spinner } from "@/components/carregando";
 
 type Acao = (input: { path: string; zoom: number; posX: number; posY: number }) => Promise<{ error: string | null }>;
 
@@ -234,7 +235,7 @@ function RestaurarSlot({ slot }: { slot: string }) {
       }
       className="shrink-0 rounded-md border-2 border-ink bg-paper px-2 py-1.5 font-display text-[10px] uppercase tracking-tight disabled:opacity-60"
     >
-      {limpando ? "…" : "restaurar"}
+      {limpando ? <Spinner /> : "restaurar"}
     </button>
   );
 }
@@ -388,7 +389,7 @@ function Editor({
             }
             className="shadow-hard-sm flex-1 rounded-md border-2 border-ink bg-moss py-3 font-display text-xs uppercase tracking-tight text-paper active:translate-x-[1px] active:translate-y-[1px] active:shadow-none disabled:opacity-60"
           >
-            {salvando ? "Salvando…" : "Salvar"}
+            <ComSpinner ocupado={salvando}>{salvando ? "Salvando…" : "Salvar"}</ComSpinner>
           </button>
         </div>
       </div>
@@ -449,7 +450,7 @@ function MostrarArte({ path }: { path: string }) {
       }
       className="shrink-0 rounded-md border-2 border-ink bg-paper px-2 py-1.5 font-display text-[10px] uppercase tracking-tight disabled:opacity-60"
     >
-      {voltando ? "…" : "mostrar"}
+      {voltando ? <Spinner /> : "mostrar"}
     </button>
   );
 }
@@ -470,7 +471,7 @@ function EnviarArte() {
       }`}
       title={erro ?? undefined}
     >
-      {enviando ? "enviando…" : erro ? "erro — tentar de novo" : "+ enviar imagem"}
+      <ComSpinner ocupado={enviando}>{enviando ? "enviando…" : erro ? "erro — tentar de novo" : "+ enviar imagem"}</ComSpinner>
       <input
         type="file"
         accept="image/png,image/jpeg,image/webp,image/gif,image/avif,image/svg+xml"

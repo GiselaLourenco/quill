@@ -1,6 +1,7 @@
 "use client";
 
-import { useTransition } from "react";
+import { ComSpinner } from "@/components/carregando";
+import { useState, useTransition } from "react";
 import { toggleRecommended, updateItemStatus } from "@/app/actions/media-items";
 
 const OPTIONS = [
@@ -27,6 +28,8 @@ export function StatusEditor({
   isRecommended: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
+  // Qual chip foi tocado — o spinner aparece só nele, não em todos.
+  const [clicado, setClicado] = useState<string | null>(null);
   const recomendado = isRecommended || status === "recomendado";
 
   return (
@@ -40,16 +43,17 @@ export function StatusEditor({
             type="button"
             disabled={isPending}
             aria-pressed={ativo}
-            onClick={() =>
+            onClick={() => {
+              setClicado(opt.value);
               startTransition(() =>
                 ehMarca ? toggleRecommended(itemId) : updateItemStatus(itemId, opt.value),
-              )
-            }
+              );
+            }}
             className={`rounded-full border-2 border-ink px-3 py-1.5 text-xs font-medium disabled:opacity-50 ${
               ativo ? (ehMarca ? "bg-navy text-paper" : "bg-mustard") : "bg-white"
             }`}
           >
-            {opt.label}
+            <ComSpinner ocupado={isPending && clicado === opt.value}>{opt.label}</ComSpinner>
           </button>
         );
       })}

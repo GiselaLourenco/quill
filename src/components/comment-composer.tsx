@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { createComment } from "@/app/actions/comments";
 import { GifPicker } from "@/components/gif-picker";
+import { Spinner } from "@/components/carregando";
 
 // Compositor de comentário: nível (livro/capítulo), texto, GIF e visibilidade
 // (🔒 só eu = padrão · 🌍 amigos). "Passagem" é backlog (dependia de foto).
@@ -132,7 +133,7 @@ export function CommentComposer({ itemId }: { itemId: string }) {
           disabled={!canSend || isSaving}
           className="ml-auto rounded border-2 border-ink bg-moss-dark px-4 py-1.5 text-sm font-medium text-paper disabled:opacity-50"
         >
-          {isSaving ? "…" : "Enviar"}
+          {isSaving ? <Spinner /> : "Enviar"}
         </button>
       </div>
     </div>

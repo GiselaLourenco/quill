@@ -6,6 +6,7 @@ import { AppImage } from "@/components/app-image";
 import { ZigZag } from "@/components/zig-zag";
 import { updatePassword } from "@/app/actions/auth";
 import { CampoSenha } from "@/components/campo-senha";
+import { ComSpinner } from "@/components/carregando";
 
 type Estado = "form" | "sucesso" | "expirado";
 
@@ -93,7 +94,7 @@ export function ResetClient({ linkValido }: { linkValido: boolean }) {
               disabled={pending}
               className="shadow-hard w-full rounded-md border-2 border-ink bg-coral px-4 py-3.5 font-display text-base tracking-wide text-ink transition-transform hover:-translate-x-0.5 hover:-translate-y-0.5 active:translate-x-0 active:translate-y-0 active:shadow-hard-sm disabled:opacity-60"
             >
-              {pending ? "Salvando…" : "Salvar nova senha"}
+              <ComSpinner ocupado={pending}>{pending ? "Salvando…" : "Salvar nova senha"}</ComSpinner>
             </button>
 
             <Link

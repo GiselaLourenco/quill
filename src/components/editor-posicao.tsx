@@ -7,6 +7,7 @@ import {
   definirTotalEPosicao,
   type SessionUnit,
 } from "@/app/actions/sessions";
+import { ComSpinner, Spinner } from "@/components/carregando";
 
 type Props = {
   itemId: string;
@@ -127,7 +128,7 @@ export function EditorPosicaoLinha({ itemId, atual, total, unidade }: Props) {
             disabled={pendente}
             className="shadow-hard-sm rounded-md border-2 border-ink bg-moss px-3 py-1.5 font-display text-[10px] uppercase tracking-widest text-paper disabled:opacity-60"
           >
-            {pendente ? "…" : "Atualizar"}
+            {pendente ? <Spinner /> : "Atualizar"}
           </button>
         </div>
       </div>
@@ -187,7 +188,7 @@ function DefinirTotalLinha({
           disabled={pendente}
           className="shadow-hard-sm ml-auto rounded-md border-2 border-ink bg-moss px-3 py-1.5 font-display text-[10px] uppercase tracking-widest text-paper disabled:opacity-60"
         >
-          {pendente ? "…" : "Salvar"}
+          {pendente ? <Spinner /> : "Salvar"}
         </button>
       </div>
       {erro && <p className="mt-2 text-xs font-medium text-coral">{erro}</p>}
@@ -227,7 +228,9 @@ export function EditorPosicaoTile({ itemId, atual, total, unidade }: Props) {
         />
         <span className="font-display text-base text-ink-soft">/{total}</span>
       </div>
-      <div className="mt-0.5 text-[10.5px] uppercase tracking-wide text-ink-soft">{rotulo}</div>
+      <div className="mt-0.5 text-[10.5px] uppercase tracking-wide text-ink-soft">
+        <ComSpinner ocupado={pendente}>{rotulo}</ComSpinner>
+      </div>
     </div>
   );
 }

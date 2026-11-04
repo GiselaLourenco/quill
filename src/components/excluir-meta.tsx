@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteGoal } from "@/app/actions/goals";
+import { ComSpinner } from "@/components/carregando";
 
 /** Lixeira discreta ao lado da meta — mesma cor da borda do card. */
 export function ExcluirMeta({ goalId, rotulo }: { goalId: string; rotulo: string }) {
@@ -62,7 +63,7 @@ export function ExcluirMeta({ goalId, rotulo }: { goalId: string; rotulo: string
                 }
                 className="shadow-hard-sm flex-1 rounded-md border-2 border-ink bg-coral py-3 font-display text-xs uppercase tracking-widest text-paper active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-60"
               >
-                {excluindo ? "Excluindo…" : "Excluir"}
+                <ComSpinner ocupado={excluindo}>{excluindo ? "Excluindo…" : "Excluir"}</ComSpinner>
               </button>
             </div>
           </div>

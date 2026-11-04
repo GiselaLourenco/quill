@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BotaoEnviar } from "@/components/carregando";
 import { BotaoFlutuante } from "@/components/botao-flutuante";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
@@ -301,12 +302,9 @@ function CodigoInput() {
           maxLength={6}
           className="flex-1 border-2 border-ink bg-paper px-3 py-3 font-mono text-sm uppercase tracking-[0.3em] text-ink shadow-hard-sm placeholder:text-ink/30 focus:outline-none focus:shadow-hard"
         />
-        <button
-          type="submit"
-          className="border-2 border-ink bg-ink px-4 font-display text-xs uppercase tracking-widest text-paper shadow-hard-sm active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
-        >
+        <BotaoEnviar className="border-2 border-ink bg-ink px-4 font-display text-xs uppercase tracking-widest text-paper shadow-hard-sm active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-70">
           Entrar
-        </button>
+        </BotaoEnviar>
       </div>
     </form>
   );
