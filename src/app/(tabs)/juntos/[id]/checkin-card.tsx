@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { GifPicker } from "@/components/gif-picker";
-import { Spinner } from "@/components/carregando";
+import { useState } from "react";
+import { CaixaComentario } from "@/components/caixa-comentario";
 import type { SessaoDoDia } from "@/app/actions/sessions";
 
 export type MembroCor = { userId: string; nome: string; cor: string; ehVoce: boolean };
@@ -14,6 +13,8 @@ export type ComentarioCheckin = {
   texto: string | null;
   gifUrl: string | null;
   quando: string;
+  /** Seu comentário — vai pra direita, como num chat. */
+  meu?: boolean;
 };
 
 export type CheckinDetalhe = {
@@ -157,17 +158,31 @@ export function CheckinConversa({
       )}
 
       {comentarios.length > 0 && (
-        <ul className={`${ml} mt-3 space-y-2 border-l-2 border-ink/15 pl-3`}>
+        <ul className={`${ml} mt-3 space-y-2`}>
           {comentarios.map((k) => (
-            <li key={k.id} className="text-[12px] leading-snug text-ink">
-              <span className="mr-1.5 inline-block h-2 w-2 rounded-full border border-ink align-middle" style={{ backgroundColor: k.cor }} />
-              <span className="font-semibold">{k.nome}</span>{" "}
-              {k.texto && <span>{k.texto}</span>}
-              <span className="ml-1.5 text-[10px] text-ink-soft">{k.quando}</span>
-              {k.gifUrl && (
-                // eslint-disable-next-line @next/next/no-img-element -- GIF externo do Giphy
-                <img src={k.gifUrl} alt="GIF" className="mt-1.5 block max-h-28 rounded border-2 border-cover-border" />
-              )}
+            <li key={k.id} className={`flex ${k.meu ? "justify-end" : "justify-start"}`}>
+              <div
+                className={`max-w-[85%] text-[12px] leading-snug text-ink ${
+                  k.meu ? "border-r-2 border-coral/40 pr-3 text-right" : "border-l-2 border-ink/15 pl-3"
+                }`}
+              >
+                {!k.meu && (
+                  <>
+                    <span className="mr-1.5 inline-block h-2 w-2 rounded-full border border-ink align-middle" style={{ backgroundColor: k.cor }} />
+                    <span className="font-semibold">{k.nome}</span>{" "}
+                  </>
+                )}
+                {k.texto && <span>{k.texto}</span>}
+                <span className="ml-1.5 text-[10px] text-ink-soft">{k.quando}</span>
+                {k.gifUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element -- GIF externo do Giphy
+                  <img
+                    src={k.gifUrl}
+                    alt="GIF"
+                    className={`mt-1.5 block max-h-28 rounded border-2 border-cover-border ${k.meu ? "ml-auto" : ""}`}
+                  />
+                )}
+              </div>
             </li>
           ))}
         </ul>
@@ -194,7 +209,7 @@ export function CheckinConversa({
               if (erro) return erro;
               setNovos((n) => [
                 ...n,
-                { id: `novo-${Date.now()}`, nome: meuNome, cor: minhaCor, texto: texto.trim() || null, gifUrl, quando: "agora" },
+                { id: `novo-${Date.now()}`, nome: meuNome, cor: minhaCor, texto: texto.trim() || null, gifUrl, quando: "agora", meu: true },
               ]);
               setAberto(false);
               return null;
@@ -203,96 +218,5 @@ export function CheckinConversa({
         </div>
       )}
     </>
-  );
-}
-
-/** A mesma caixa do comentário de livro (texto + GIF + Enviar), sem nível nem visibilidade. */
-function CaixaComentario({
-  onEnviar,
-  onCancelar,
-}: {
-  onEnviar: (texto: string, gifUrl: string | null) => Promise<string | null>;
-  onCancelar: () => void;
-}) {
-  const [texto, setTexto] = useState("");
-  const [gifUrl, setGifUrl] = useState<string | null>(null);
-  const [mostrarGif, setMostrarGif] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
-  const [enviando, startEnvio] = useTransition();
-  const podeEnviar = texto.trim().length > 0 || gifUrl != null;
-
-  return (
-    <div className="rounded-md border-2 border-ink bg-white p-3">
-      <textarea
-        value={texto}
-        onChange={(e) => setTexto(e.target.value)}
-        placeholder="Escrever um comentário"
-        rows={2}
-        autoFocus
-        className="block w-full resize-none rounded border-2 border-ink bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-moss-dark"
-      />
-
-      {gifUrl && (
-        <div className="relative mt-2 inline-block">
-          {/* eslint-disable-next-line @next/next/no-img-element -- GIF externo do Giphy */}
-          <img src={gifUrl} alt="GIF escolhido" className="max-h-28 rounded border-2 border-cover-border" />
-          <button
-            type="button"
-            onClick={() => setGifUrl(null)}
-            aria-label="Remover GIF"
-            className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-ink bg-white text-xs"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
-      {mostrarGif && !gifUrl && (
-        <div className="mt-2">
-          <GifPicker
-            onSelect={(url) => {
-              setGifUrl(url);
-              setMostrarGif(false);
-            }}
-            onClose={() => setMostrarGif(false)}
-          />
-        </div>
-      )}
-
-      {erro && <p className="mt-2 text-[11px] font-semibold text-coral">{erro}</p>}
-
-      <div className="mt-2 flex items-center gap-2">
-        {!gifUrl && (
-          <button
-            type="button"
-            onClick={() => setMostrarGif((v) => !v)}
-            className="rounded border-2 border-ink bg-white px-2.5 py-1 text-xs font-semibold"
-          >
-            GIF
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={onCancelar}
-          className="text-xs font-semibold text-ink-soft underline underline-offset-2"
-        >
-          cancelar
-        </button>
-        <button
-          type="button"
-          disabled={!podeEnviar || enviando}
-          onClick={() =>
-            startEnvio(async () => {
-              setErro(null);
-              const e = await onEnviar(texto, gifUrl);
-              if (e) setErro(e);
-            })
-          }
-          className="ml-auto rounded border-2 border-ink bg-moss-dark px-4 py-1.5 text-sm font-medium text-paper disabled:opacity-50"
-        >
-          {enviando ? <Spinner /> : "Enviar"}
-        </button>
-      </div>
-    </div>
   );
 }

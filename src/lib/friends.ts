@@ -1,6 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { nomeExibicao } from "@/lib/nome-exibicao";
 import { paginasLidas, posicaoAtualPorItem, posicaoExibida } from "@/lib/reading-stats";
+import {
+  carregarInteracoes,
+  chaveAtualizacao,
+  parChave,
+  SEM_INTERACOES,
+  type InteracoesCartao,
+} from "@/lib/interacoes";
 
 export type Friend = { id: string; name: string };
 
@@ -53,6 +60,9 @@ export type FriendItem = {
   lastComment: { content: string; chapterRef: number | null } | null;
   /** O que o amigo fez de mais recente com o livro — ordena o feed. */
   atividade: Atividade;
+  /** Identidade dessa atualização — curtir/comentar valem pra ela, não pro livro. */
+  chave: string;
+  interacoes: InteracoesCartao;
 };
 
 /**
@@ -253,14 +263,26 @@ export async function getFriendsShelf(
       total_units: it.total_units,
       paginas_lidas: paginasLidas(it, posicaoPorItem.get(it.id)?.paginas),
       lastComment: lastCommentByItem.get(it.id) ?? null,
-      atividade: ultimaAtividade(it, {
-        estrelas: starsByItem.get(it.id) ?? null,
-        notaEm: ratedAtByItem.get(it.id) ?? null,
-        comentario: lastCommentByItem.get(it.id) ?? null,
-        leitura: lastReadByItem.get(it.id) ?? null,
-      }),
+      ...(() => {
+        const atividade = ultimaAtividade(it, {
+          estrelas: starsByItem.get(it.id) ?? null,
+          notaEm: ratedAtByItem.get(it.id) ?? null,
+          comentario: lastCommentByItem.get(it.id) ?? null,
+          leitura: lastReadByItem.get(it.id) ?? null,
+        });
+        return { atividade, chave: chaveAtualizacao(atividade), interacoes: SEM_INTERACOES };
+      })(),
     });
   }
+
+  // Curtidas e comentários de cada atualização (a que está no cartão).
+  const todos = Array.from(shelfByFriend.values()).flatMap((sh) => sh.items);
+  const interacoes = await carregarInteracoes(
+    supabase,
+    userId,
+    todos.map((it) => ({ itemId: it.id, chave: it.chave })),
+  );
+  for (const it of todos) it.interacoes = interacoes.get(parChave(it.id, it.chave)) ?? SEM_INTERACOES;
 
   // só amigos com pelo menos um livro visível, ordem alfabética
   return Array.from(shelfByFriend.values())

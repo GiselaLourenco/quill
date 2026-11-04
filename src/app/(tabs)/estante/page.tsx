@@ -13,10 +13,10 @@ import { paginasLidas, posicaoAtualPorItem, posicaoExibida } from "@/lib/reading
 export default async function EstantePage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; foco?: string }>;
 }) {
   const userId = await requireUserId();
-  const { view } = await searchParams;
+  const { view, foco } = await searchParams;
   const isFriends = view === "amigos";
   const isDiary = view === "diario";
 
@@ -71,7 +71,7 @@ export default async function EstantePage({
       </header>
 
       {isFriends ? (
-        <FriendsShelf supabase={supabase} userId={userId} />
+        <FriendsShelf supabase={supabase} userId={userId} foco={foco} />
       ) : isDiary ? (
         <MyDiary supabase={supabase} userId={userId} />
       ) : (
@@ -237,9 +237,12 @@ async function MyShelf({
 async function FriendsShelf({
   supabase,
   userId,
+  foco,
 }: {
   supabase: Awaited<ReturnType<typeof createClient>>;
   userId: string;
+  /** "itemId|chave" vindo do sino — o feed rola até esse cartão. */
+  foco?: string;
 }) {
   // Indicações recebidas ficam só no sino (notificações), não mais no topo daqui.
   const [shelves, amigos, { data: meusLivros }] = await Promise.all([
@@ -279,7 +282,7 @@ async function FriendsShelf({
       {/* Indicar livro a um amigo */}
       <IndicarSheet livros={livrosIndicaveis} amigos={amigos} />
 
-      <AmigosEstantes shelves={shelves} />
+      <AmigosEstantes shelves={shelves} foco={foco} />
     </main>
   );
 }

@@ -17,6 +17,7 @@ const FILTROS: { id: "todas" | TipoNotificacao; label: string }[] = [
   { id: "desafio", label: "Desafios" },
   { id: "indicacao", label: "Indicações" },
   { id: "conquista", label: "Conquistas" },
+  { id: "feed", label: "Feed" },
 ];
 
 /**
@@ -57,6 +58,11 @@ const VAZIO: Record<"todas" | TipoNotificacao, { titulo: string; texto: string }
     titulo: "Nenhuma indicação",
     texto:
       "Livro indicado por amigo cai aqui. Você também pode indicar: é o botão na aba Amigos da estante.",
+  },
+  feed: {
+    titulo: "Nada no feed",
+    texto:
+      "Quando alguém curtir ou comentar uma atualização sua — ou uma em que você também interagiu —, aparece aqui.",
   },
   conquista: {
     titulo: "Nenhuma ainda",
@@ -255,6 +261,37 @@ function Card({
           </div>
         )}
       </article>
+    );
+  }
+
+  if (n.tipo === "feed") {
+    return (
+      <Link href={n.feedHref ?? "/estante?view=amigos"} className={`${base} block bg-paper`}>
+        <div className="flex gap-3">
+          <span
+            aria-hidden
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-ink ${
+              n.feedTipo === "curtida" ? "bg-coral text-paper" : "bg-mustard text-ink"
+            }`}
+          >
+            {n.feedTipo === "curtida" ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                <path d="M12 20s-7-4.4-9.2-8.6C1.3 8.3 3 4.5 6.6 4.5c2.1 0 3.4 1.2 4.4 2.6 1-1.4 2.3-2.6 4.4-2.6 3.6 0 5.3 3.8 3.8 6.9C19 15.6 12 20 12 20z" />
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" /></svg>
+            )}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm leading-snug text-ink">{n.feedTexto}</p>
+            {n.feedTrecho && (
+              <p className="mt-1 line-clamp-2 font-serif text-xs italic text-ink/75">“{n.feedTrecho}”</p>
+            )}
+            <Quando texto={n.quando} />
+          </div>
+          <span aria-hidden className="self-center font-display text-ink-soft">›</span>
+        </div>
+      </Link>
     );
   }
 

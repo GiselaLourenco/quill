@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ConversaAtualizacao } from "@/components/conversa-atualizacao";
 import { NotaItem } from "@/components/nota-item";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -58,11 +59,11 @@ export default async function BookPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; conversa?: string }>;
 }) {
   const userId = await requireUserId();
   const { id } = await params;
-  const { error } = await searchParams;
+  const { error, conversa } = await searchParams;
 
   const supabase = await createClient();
 
@@ -78,8 +79,25 @@ export default async function BookPage({
 
   const isOwner = item.user_id === userId;
 
+  // Vindo do sino (curtida/comentário numa atualização): abre a "Conversa".
+  const conversaBloco = conversa ? (
+    <ConversaAtualizacao
+      supabase={supabase}
+      userId={userId}
+      itemId={item.id as string}
+      donoId={item.user_id as string}
+      titulo={item.title as string}
+      chave={conversa}
+    />
+  ) : null;
+
   if (!isOwner) {
-    return <FriendBookView item={item} userId={userId} supabase={supabase} />;
+    return (
+      <>
+        {conversaBloco}
+        <FriendBookView item={item} userId={userId} supabase={supabase} />
+      </>
+    );
   }
 
   const [{ data: sessions }, { data: comments }, { data: myRating }, indicacao] =
@@ -159,6 +177,7 @@ export default async function BookPage({
 
   return (
     <div className="flex flex-1 flex-col bg-paper">
+      {conversaBloco}
       {/* Header mustard — Lovable style */}
       <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b-2 border-ink bg-mustard px-3 py-3">
         <div className="flex items-center gap-3">

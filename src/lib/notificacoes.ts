@@ -4,8 +4,10 @@ import { getReceivedRecommendations } from "@/lib/recommendations";
 import { todayLocalDateKey, addDaysToKey } from "@/lib/date-br";
 import { ACHIEVEMENTS_COM_AVATAR } from "@/lib/achievements";
 import { srcDoAvatarDeConquista } from "@/lib/avatares";
+import { acaoDaChave, parChave } from "@/lib/interacoes";
+import { nomeExibicao } from "@/lib/nome-exibicao";
 
-export type TipoNotificacao = "amizade" | "desafio" | "indicacao" | "conquista";
+export type TipoNotificacao = "amizade" | "desafio" | "indicacao" | "conquista" | "feed";
 
 export type Notificacao = {
   id: string;
@@ -29,6 +31,11 @@ export type Notificacao = {
   /** Conquista que liberou foto de perfil. */
   conquistaNome?: string;
   fotoSrc?: string;
+  /** Feed: curtida ou comentário numa atualização — texto pronto e destino. */
+  feedTipo?: "curtida" | "comentario";
+  feedTexto?: string;
+  feedTrecho?: string | null;
+  feedHref?: string;
 };
 
 /** "há 2h", "ontem" — o mesmo vocabulário que o resto do app usa. */
@@ -158,6 +165,8 @@ export async function getNotificacoes(
     });
   }
 
+  notas.push(...(await notificacoesDoFeed(supabase, userId)));
+
   // Limpar não apaga nada: o pedido de amizade continua pendente e segue
   // visível nos filtros por tipo. O que ela faz é tirar da aba "Todas", que
   // passa a ser "o que chegou desde a última vez que você olhou".
@@ -166,4 +175,109 @@ export async function getNotificacoes(
     .sort((a, b) => b.emMs - a.emMs);
 
   return { itens, novas: itens.filter((n) => n.nova).length };
+}
+
+/**
+ * Curtidas e comentários no feed (tabela `interacoes_feed`). Avisa todo mundo
+ * que interagiu com o cartão — o dono da atualização e quem já curtiu ou
+ * comentou nele —, sempre sobre o que OUTROS fizeram, e agrupado por cartão:
+ * "Maria e mais 2 curtiram". O dono vai pra Conversa na página do livro; quem
+ * só participou vai pro cartão no feed dos amigos.
+ */
+async function notificacoesDoFeed(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<Omit<Notificacao, "nova">[]> {
+  const desde = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  type Linha = {
+    item_id: string;
+    dono_id: string;
+    atualizacao: string;
+    user_id: string;
+    tipo: "curtida" | "comentario";
+    content: string | null;
+    created_at: string;
+  };
+  const campos = "item_id, dono_id, atualizacao, user_id, tipo, content, created_at";
+
+  const [doDono, minhas] = await Promise.all([
+    supabase.from("interacoes_feed").select(campos).eq("dono_id", userId).neq("user_id", userId).gte("created_at", desde),
+    supabase.from("interacoes_feed").select("item_id, dono_id, atualizacao, created_at").eq("user_id", userId),
+  ]);
+  if (doDono.error || minhas.error) return []; // tabela ainda não existe
+
+  // Cartões alheios em que eu interagi → desde quando (só avisa o que veio depois).
+  const participeiDesde = new Map<string, string>();
+  for (const m of minhas.data ?? []) {
+    if (m.dono_id === userId) continue;
+    const k = parChave(m.item_id as string, m.atualizacao as string);
+    const atual = participeiDesde.get(k);
+    if (!atual || (m.created_at as string) < atual) participeiDesde.set(k, m.created_at as string);
+  }
+  const itensParticipados = Array.from(new Set((minhas.data ?? []).filter((m) => m.dono_id !== userId).map((m) => m.item_id as string)));
+  const { data: deOutros } = itensParticipados.length
+    ? await supabase
+        .from("interacoes_feed")
+        .select(campos)
+        .in("item_id", itensParticipados)
+        .neq("user_id", userId)
+        .gte("created_at", desde)
+    : { data: [] };
+
+  const linhas: (Linha & { papel: "dono" | "participante" })[] = [
+    ...((doDono.data ?? []) as Linha[]).map((l) => ({ ...l, papel: "dono" as const })),
+    ...((deOutros ?? []) as Linha[])
+      .filter((l) => {
+        const desdeK = participeiDesde.get(parChave(l.item_id, l.atualizacao));
+        return l.dono_id !== userId && desdeK && l.created_at > desdeK;
+      })
+      .map((l) => ({ ...l, papel: "participante" as const })),
+  ];
+  if (linhas.length === 0) return [];
+
+  const pessoas = Array.from(new Set(linhas.flatMap((l) => [l.user_id, l.dono_id])));
+  const itens = Array.from(new Set(linhas.map((l) => l.item_id)));
+  const [{ data: perfis }, { data: livros }] = await Promise.all([
+    supabase.from("profiles").select("id, display_name, username").in("id", pessoas),
+    supabase.from("media_items").select("id, title").in("id", itens),
+  ]);
+  const nome = new Map(
+    (perfis ?? []).map((p) => [p.id as string, nomeExibicao(p.display_name as string | null, p.username as string | null)]),
+  );
+  const titulo = new Map((livros ?? []).map((l) => [l.id as string, l.title as string]));
+
+  // Um aviso por cartão + tipo (curtida / comentário).
+  const grupos = new Map<string, (typeof linhas)[number][]>();
+  for (const l of linhas) {
+    if (!titulo.has(l.item_id)) continue; // livro sumiu ou deixou de ser visível
+    const k = `${l.papel}|${l.tipo}|${parChave(l.item_id, l.atualizacao)}`;
+    grupos.set(k, [...(grupos.get(k) ?? []), l]);
+  }
+
+  const notas: Omit<Notificacao, "nova">[] = [];
+  for (const [k, ls] of grupos) {
+    ls.sort((a, b) => b.created_at.localeCompare(a.created_at));
+    const ultima = ls[0]!;
+    const autores = Array.from(new Set(ls.map((l) => l.user_id)));
+    const primeiro = nome.get(autores[0]!) ?? "Alguém";
+    const plural = autores.length > 1;
+    const quem = plural ? `${primeiro} e mais ${autores.length - 1}` : primeiro;
+    const verbo = ultima.tipo === "curtida" ? (plural ? "curtiram" : "curtiu") : plural ? "comentaram" : "comentou";
+    const sujeito = ultima.papel === "dono" ? "você" : (nome.get(ultima.dono_id) ?? "seu amigo");
+    const { texto, ms } = quandoRelativo(ultima.created_at);
+    notas.push({
+      id: `feed-${k}`,
+      tipo: "feed",
+      quando: texto,
+      emMs: ms,
+      feedTipo: ultima.tipo,
+      feedTexto: `${quem} ${verbo}: ${sujeito} ${acaoDaChave(ultima.atualizacao)} ${titulo.get(ultima.item_id)}`,
+      feedTrecho: ultima.tipo === "comentario" ? ultima.content : null,
+      feedHref:
+        ultima.papel === "dono"
+          ? `/books/${ultima.item_id}?conversa=${encodeURIComponent(ultima.atualizacao)}`
+          : `/estante?view=amigos&foco=${encodeURIComponent(parChave(ultima.item_id, ultima.atualizacao))}`,
+    });
+  }
+  return notas;
 }

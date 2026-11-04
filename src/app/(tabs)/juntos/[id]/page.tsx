@@ -304,6 +304,7 @@ export default async function DesafioDetalhePage({
         texto: (k.content as string | null) ?? null,
         gifUrl: (k.gif_url as string | null) ?? null,
         quando: formatQuando(k.created_at as string).toLowerCase(),
+        meu: k.user_id === userId,
       })),
     };
   });

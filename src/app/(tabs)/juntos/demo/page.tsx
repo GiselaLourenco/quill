@@ -172,6 +172,7 @@ export default function DesafioDemoPage() {
           texto: RESPOSTAS[Math.floor(rand() * RESPOSTAS.length)]!,
           gifUrl: null,
           quando: quando(c),
+          meu: quem.id === "voce",
         };
       }),
     };
