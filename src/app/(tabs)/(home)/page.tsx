@@ -21,7 +21,9 @@ import {
   segundosPorDiaDaSessao,
   fracaoDaSessaoEntre,
 } from "@/lib/date-br";
-import HomeClient, { type Meta, type SemanaDados, type MesCalendario } from "./home-client";
+import { Suspense } from "react";
+import { EsqueletoHomeResto } from "@/components/esqueletos";
+import { HomeTopo, HomeResto, type Meta, type SemanaDados, type MesCalendario } from "./home-client";
 
 const DIA_LABEL = ["D", "S", "T", "Q", "Q", "S", "S"];
 const SEMANAS_VISIVEIS = 5;
@@ -53,9 +55,14 @@ function paginasDa(s: SessionLite): number {
   return Math.max(0, (s.unit_end ?? 0) - (s.unit_start ?? 0));
 }
 
-export default async function HomePage() {
-  const userId = await requireUserId();
-  const supabase = await createClient();
+type Supabase = Awaited<ReturnType<typeof createClient>>;
+
+/**
+ * O que o topo da home precisa (saudação + metas), mais o que sai barato das
+ * mesmas sessões (pílulas, semanas, meses). O histórico inteiro vem junto e é
+ * reaproveitado pelas conquistas.
+ */
+async function carregarBase(supabase: Supabase, userId: string) {
 
   // `agora` fica ancorado ao meio-dia do dia local (Brasil), não ao instante
   // cru do servidor (Vercel roda em UTC) — sem isso, a virada de dia da grade
@@ -302,40 +309,92 @@ export default async function HomePage() {
     pillDisplay(chave, stats),
   );
 
-  const [desafiosAtivos, notificacoes] = await Promise.all([
-    getActiveChallenges(supabase, userId),
-    getNotificacoes(supabase, userId),
-  ]);
+  return {
+    nomeUsuario: nomeExibicao(profile?.display_name as string | null, profile?.username as string | null),
+    avatarUrl: (profile?.avatar_url as string | null) ?? null,
+    avatarZoom: (profile?.avatar_zoom as number | null) ?? 100,
+    avatarBg: (profile?.avatar_bg as string | null) ?? AVATAR_FUNDO_PADRAO,
+    semanas,
+    meses,
+    metas,
+    pilulas,
+    historico,
+  };
+}
 
-  // A coleção do ano — zera em janeiro.
+/** A coleção do ano — zera em janeiro. */
+async function carregarConquistas(
+  supabase: Supabase,
+  userId: string,
+  historico: Awaited<ReturnType<typeof carregarBase>>["historico"],
+) {
   const ano = anoDasConquistas();
   const ctxDoAno = historico.doAno(ano);
   const conquistasFeitas = evaluateAchievements(ctxDoAno)
     .filter((e) => e.met)
     .map((e) => e.achievement.key);
-  const conquistas = montarConquistas(
+  return montarConquistas(
     ctxDoAno,
     await datasDeDesbloqueio(supabase, userId, conquistasFeitas, ano),
     historico.ctx,
   );
+}
+
+export default async function HomePage() {
+  const userId = await requireUserId();
+  const supabase = await createClient();
+
+  // Tudo sai ao mesmo tempo: desafios e notificações não dependem da base, e
+  // as conquistas só esperam o histórico. Antes eram três rodadas seguidas.
+  const base = carregarBase(supabase, userId);
+  const desafios = getActiveChallenges(supabase, userId);
+  const notificacoes = getNotificacoes(supabase, userId).then((n) => n.novas);
+  const conquistas = base.then((b) => carregarConquistas(supabase, userId, b.historico));
+  // Se a base falhar a página quebra antes de alguém esperar estas — sem o
+  // catch, a falha delas vira "unhandled rejection" no log.
+  for (const p of [desafios, notificacoes, conquistas]) p.catch(() => {});
+
+  const b = await base;
 
   return (
-    <HomeClient
-      nomeUsuario={nomeExibicao(profile?.display_name as string | null, profile?.username as string | null)}
-      avatarUrl={(profile?.avatar_url as string | null) ?? null}
-      avatarZoom={(profile?.avatar_zoom as number | null) ?? 100}
-      avatarBg={(profile?.avatar_bg as string | null) ?? AVATAR_FUNDO_PADRAO}
-      semanas={semanas}
-      meses={meses}
-      metas={metas}
-      notificacoes={notificacoes.novas}
+    <div className="flex flex-col gap-5 px-5 pb-8 pt-6">
+      <HomeTopo
+        nomeUsuario={b.nomeUsuario}
+        avatarUrl={b.avatarUrl}
+        avatarZoom={b.avatarZoom}
+        avatarBg={b.avatarBg}
+        metas={b.metas}
+        notificacoes={notificacoes}
+      />
+      {/* O resto espera desafios e conquistas; até lá, esqueleto no lugar. */}
+      <Suspense fallback={<EsqueletoHomeResto />}>
+        <Resto base={b} desafios={desafios} conquistas={conquistas} />
+      </Suspense>
+    </div>
+  );
+}
+
+async function Resto({
+  base,
+  desafios,
+  conquistas,
+}: {
+  base: Awaited<ReturnType<typeof carregarBase>>;
+  desafios: ReturnType<typeof getActiveChallenges>;
+  conquistas: ReturnType<typeof carregarConquistas>;
+}) {
+  const [desafiosAtivos, conquistasView] = await Promise.all([desafios, conquistas]);
+  return (
+    <HomeResto
+      semanas={base.semanas}
+      meses={base.meses}
+      pilulas={base.pilulas}
+      conquistas={conquistasView}
       desafios={desafiosAtivos.map((d, i) => ({
         id: d.id,
         nome: d.name,
         tone: (["coral", "moss", "mustard"] as const)[i % 3]!,
       }))}
-      pilulas={pilulas}
-      conquistas={conquistas}
     />
   );
 }

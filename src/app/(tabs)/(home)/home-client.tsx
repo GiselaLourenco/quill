@@ -6,7 +6,7 @@ import { AppImage } from "@/components/app-image";
 import { ConquistasCard } from "@/components/conquistas";
 import type { ConquistaView } from "@/lib/conquistas-view";
 import { avatarDeExibicao, AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
-import { useMemo, useState } from "react";
+import { Suspense, use, useMemo, useState } from "react";
 import { DiaLeituraSheet } from "@/components/dia-leitura-sheet";
 import { todayLocalDateKey } from "@/lib/date-br";
 
@@ -66,31 +66,27 @@ const LABEL_TIPO: Record<MetaTipo, string> = {
   livros: "Livros",
 };
 
-export default function HomeClient({
+/**
+ * Topo da home: saudação, avatar e metas. Chega primeiro — o resto da home
+ * (`HomeResto`) vem num Suspense logo abaixo, com esqueleto no lugar.
+ */
+export function HomeTopo({
   nomeUsuario,
   avatarUrl,
   avatarZoom,
   avatarBg,
-  semanas,
-  meses,
   metas,
   notificacoes,
-  desafios,
-  pilulas,
-  conquistas,
 }: {
   nomeUsuario: string;
   avatarUrl: string | null;
   avatarZoom: number;
   avatarBg: string;
-  semanas: SemanaDados[];
-  meses: MesCalendario[];
   metas: Meta[];
-  /** Quantas notificações pendentes — vira o contador no avatar. */
-  notificacoes: number;
-  desafios: Desafio[];
-  pilulas: Pilula[];
-  conquistas: ConquistaView[];
+  /** Quantas notificações pendentes — vira o contador no avatar. Chega
+   *  depois do resto do topo: é a conta mais demorada da home, e a saudação
+   *  não precisa esperar por ela. */
+  notificacoes: Promise<number>;
 }) {
   const dataHoje = new Date();
   const dataStr = dataHoje.toLocaleDateString("pt-BR", {
@@ -101,10 +97,8 @@ export default function HomeClient({
 
   const avatarPerfil = avatarDeExibicao(avatarUrl);
 
-  const mesAtualIdx = Math.max(0, meses.findIndex((m) => m.hoje !== null));
-
   return (
-    <div className="flex flex-col gap-5 px-5 pb-8 pt-6">
+    <>
       {/* Header */}
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -129,7 +123,28 @@ export default function HomeClient({
 
       {/* Metas */}
       <MetasHero metas={metas} />
+    </>
+  );
+}
 
+/** Parte de baixo da home: pílulas, calendário, conquistas, desafios. */
+export function HomeResto({
+  semanas,
+  meses,
+  desafios,
+  pilulas,
+  conquistas,
+}: {
+  semanas: SemanaDados[];
+  meses: MesCalendario[];
+  desafios: Desafio[];
+  pilulas: Pilula[];
+  conquistas: ConquistaView[];
+}) {
+  const mesAtualIdx = Math.max(0, meses.findIndex((m) => m.hoje !== null));
+
+  return (
+    <div className="flex flex-col gap-5">
       {/* Pílulas */}
       <PilulasGrid pilulas={pilulas} />
 
@@ -148,6 +163,19 @@ export default function HomeClient({
   );
 }
 
+/** Lê o contador quando ele chegar. Até lá, não mostra nada. */
+function ContadorNotificacoes({
+  total,
+  className,
+}: {
+  total: Promise<number>;
+  className: string;
+}) {
+  const n = use(total);
+  if (n <= 0) return null;
+  return <span className={className}>{n}</span>;
+}
+
 function AvatarMenu({
   src,
   nome,
@@ -161,7 +189,7 @@ function AvatarMenu({
   foto?: boolean;
   bg: string;
   zoom: number;
-  notificacoes: number;
+  notificacoes: Promise<number>;
 }) {
   const [aberto, setAberto] = useState(false);
 
@@ -190,11 +218,12 @@ function AvatarMenu({
             draggable={false}
           />
         </div>
-        {notificacoes > 0 && (
-          <span className="absolute -right-1 -top-1 rounded-md border-2 border-ink bg-coral px-1.5 font-display text-[10px] leading-4 text-paper">
-            {notificacoes}
-          </span>
-        )}
+        <Suspense fallback={null}>
+          <ContadorNotificacoes
+            total={notificacoes}
+            className="absolute -right-1 -top-1 rounded-md border-2 border-ink bg-coral px-1.5 font-display text-[10px] leading-4 text-paper"
+          />
+        </Suspense>
       </button>
 
       {aberto && (
@@ -220,11 +249,12 @@ function AvatarMenu({
               className="flex items-center gap-2 border-t-2 border-ink px-3 py-2.5 font-display text-[11px] uppercase tracking-wider text-ink"
             >
               Notificações
-              {notificacoes > 0 && (
-                <span className="ml-auto rounded-md border-2 border-ink bg-coral px-1.5 text-[10px] leading-4 text-paper">
-                  {notificacoes}
-                </span>
-              )}
+              <Suspense fallback={null}>
+                <ContadorNotificacoes
+                  total={notificacoes}
+                  className="ml-auto rounded-md border-2 border-ink bg-coral px-1.5 text-[10px] leading-4 text-paper"
+                />
+              </Suspense>
             </Link>
           </div>
         </>
