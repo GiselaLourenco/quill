@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import Link from "next/link";
+import { EsqueletoAmigosCorpo, EsqueletoEstanteCorpo } from "@/components/esqueletos";
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 import { EstanteShelf, type ShelfBook, type DbStatus } from "@/components/estante-shelf";
@@ -70,13 +72,21 @@ export default async function EstantePage({
         )}
       </header>
 
-      {isFriends ? (
-        <FriendsShelf supabase={supabase} userId={userId} foco={foco} />
-      ) : isDiary ? (
-        <MyDiary supabase={supabase} userId={userId} />
-      ) : (
-        <MyShelf supabase={supabase} userId={userId} />
-      )}
+      {/* Trocar Minha ↔ Amigos só muda o ?view, e o loading.tsx não roda pra
+          isso — sem este Suspense a tela ficava parada até o feed inteiro
+          chegar. A `key` força o esqueleto a cada troca de aba. */}
+      <Suspense
+        key={isFriends ? "amigos" : isDiary ? "diario" : "minha"}
+        fallback={isFriends ? <EsqueletoAmigosCorpo /> : <EsqueletoEstanteCorpo />}
+      >
+        {isFriends ? (
+          <FriendsShelf supabase={supabase} userId={userId} foco={foco} />
+        ) : isDiary ? (
+          <MyDiary supabase={supabase} userId={userId} />
+        ) : (
+          <MyShelf supabase={supabase} userId={userId} />
+        )}
+      </Suspense>
     </div>
   );
 }
