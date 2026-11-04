@@ -640,6 +640,61 @@ function ListaNotas({
 /*  Tela de registro — modelo único (manual e pós-timer)               */
 /* ------------------------------------------------------------------ */
 
+/** Caixa de nota do registro: texto + "visível para", e apagar quando é uma
+ *  nota que veio do timer. */
+function CaixaNota({
+  texto,
+  onTexto,
+  publica,
+  onPublica,
+  onApagar,
+  placeholder = "Anota aquela frase ou sentimento…",
+}: {
+  texto: string;
+  onTexto: (t: string) => void;
+  publica: boolean;
+  onPublica: (p: boolean) => void;
+  onApagar?: () => void;
+  placeholder?: string;
+}) {
+  return (
+    <div className="mt-3 rounded-md border-2 border-ink bg-card p-3">
+      <textarea
+        value={texto}
+        onChange={(e) => onTexto(e.target.value)}
+        placeholder={placeholder}
+        className="min-h-[80px] w-full resize-y bg-transparent text-sm placeholder:text-ink-soft/60 focus:outline-none"
+      />
+      <div className="mt-2 flex items-center justify-between gap-2">
+        {onApagar ? (
+          <button
+            type="button"
+            onClick={onApagar}
+            className="text-[11px] font-semibold text-ink-soft underline underline-offset-2"
+          >
+            apagar nota
+          </button>
+        ) : (
+          <span />
+        )}
+        <label className="flex items-center gap-2 rounded-md border-2 border-ink bg-paper px-2 py-1">
+          <span className="font-display text-[10px] uppercase tracking-widest text-ink-soft">
+            visível para:
+          </span>
+          <select
+            value={publica ? "amigos" : "eu"}
+            onChange={(e) => onPublica(e.target.value === "amigos")}
+            className="bg-transparent text-xs font-medium focus:outline-none"
+          >
+            <option value="eu">só eu</option>
+            <option value="amigos">amigos</option>
+          </select>
+        </label>
+      </div>
+    </div>
+  );
+}
+
 function Passo({
   numero,
   titulo,
@@ -801,7 +856,9 @@ function TelaRegistro({
 
       if (livroId) {
         const paraSalvar = [
-          ...notasTimer.map((n) => ({ texto: n.texto, publica: n.publica })),
+          ...notasTimer
+            .filter((n) => n.texto.trim())
+            .map((n) => ({ texto: n.texto, publica: n.publica })),
           ...(nota.trim() ? [{ texto: nota, publica: visibilidade === "amigos" }] : []),
         ];
         // Em ordem, uma de cada vez: os comentários ficam na sequência em que
@@ -1127,42 +1184,36 @@ function TelaRegistro({
             })}
           </div>
 
-          {notasTimer.length > 0 && (
-            <ListaNotas
-              notas={notasTimer}
-              onRemover={(id) => setNotasTimer((n) => n.filter((x) => x.id !== id))}
-              className="mt-3"
+          {/* Notas do timer: cada uma numa caixa editável, com a própria
+              visibilidade. A última caixa (vazia) é pra mais uma. */}
+          {notasTimer.map((n) => (
+            <CaixaNota
+              key={n.id}
+              texto={n.texto}
+              onTexto={(t) =>
+                setNotasTimer((ns) => ns.map((x) => (x.id === n.id ? { ...x, texto: t } : x)))
+              }
+              publica={n.publica}
+              onPublica={(p) =>
+                setNotasTimer((ns) => ns.map((x) => (x.id === n.id ? { ...x, publica: p } : x)))
+              }
+              onApagar={() => setNotasTimer((ns) => ns.filter((x) => x.id !== n.id))}
             />
-          )}
+          ))}
 
-          <div className="mt-3 rounded-md border-2 border-ink bg-card p-3">
-            <textarea
-              value={nota}
-              onChange={(e) => setNota(e.target.value)}
-              placeholder={notasTimer.length > 0 ? "Mais uma nota…" : "Anota aquela frase ou sentimento…"}
-              className="min-h-[80px] w-full resize-y bg-transparent text-sm placeholder:text-ink-soft/60 focus:outline-none"
-            />
-            <div className="mt-2 flex justify-end">
-              <label className="flex items-center gap-2 rounded-md border-2 border-ink bg-paper px-2 py-1">
-                <span className="font-display text-[10px] uppercase tracking-widest text-ink-soft">
-                  visível para:
-                </span>
-                <select
-                  value={visibilidade}
-                  onChange={(e) => setVisibilidade(e.target.value as "eu" | "amigos")}
-                  className="bg-transparent text-xs font-medium focus:outline-none"
-                >
-                  <option value="eu">só eu</option>
-                  <option value="amigos">amigos</option>
-                </select>
-              </label>
-            </div>
-            {(nota.trim() || notasTimer.length > 0) && !livroId && (
-              <p className="mt-2 text-[11px] text-ink-soft">
-                Vincule um livro para a anotação virar comentário na página dele.
-              </p>
-            )}
-          </div>
+          <CaixaNota
+            texto={nota}
+            onTexto={setNota}
+            publica={visibilidade === "amigos"}
+            onPublica={(p) => setVisibilidade(p ? "amigos" : "eu")}
+            placeholder={notasTimer.length > 0 ? "Mais uma nota…" : "Anota aquela frase ou sentimento…"}
+          />
+
+          {(nota.trim() || notasTimer.some((n) => n.texto.trim())) && !livroId && (
+            <p className="mt-2 text-[11px] text-ink-soft">
+              Vincule um livro para a anotação virar comentário na página dele.
+            </p>
+          )}
         </Passo>
 
         {/* 05 — Desafios */}
