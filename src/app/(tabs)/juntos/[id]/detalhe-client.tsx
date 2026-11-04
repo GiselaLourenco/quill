@@ -423,11 +423,11 @@ export default function DesafioDetalheClient({
       {/* Ranking */}
       {ranking.length > 0 && (
         <section className="px-4 pt-6">
-          <div className="mb-3 flex items-baseline justify-between">
+          <div className="mb-8 flex items-baseline justify-between">
             <h2 className="font-display text-sm uppercase tracking-wider text-ink">RANKING</h2>
             <button onClick={() => setRankingAberto(true)} className="font-display text-[10px] uppercase tracking-widest text-ink underline decoration-2 underline-offset-2">VER TUDO</button>
           </div>
-          <div className="flex h-32 items-end justify-between gap-2">
+          <div className="flex items-end justify-between gap-2">
             {podio.length >= 2 && <PodioColuna membro={podio[1]} />}
             {podio.length >= 1 && <PodioColuna membro={podio[0]} />}
             {podio.length >= 3 && <PodioColuna membro={podio[2]} />}
@@ -613,7 +613,7 @@ function PodioColuna({ membro }: { membro: RankingItem }) {
   const tamanho = destaque ? 56 : 44;
   return (
     <div className="flex flex-1 flex-col items-center">
-      <div className="relative mb-1">
+      <div className="relative mb-3">
         <AvatarMembro
           nome={membro.nome}
           avatarUrl={membro.avatarUrl}

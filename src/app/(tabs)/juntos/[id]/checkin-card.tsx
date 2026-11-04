@@ -13,7 +13,7 @@ export type ComentarioCheckin = {
   texto: string | null;
   gifUrl: string | null;
   quando: string;
-  /** Seu comentário — vai pra direita, como num chat. */
+  /** Seu comentário — aparece como "Você". */
   meu?: boolean;
 };
 
@@ -160,18 +160,11 @@ export function CheckinConversa({
       {comentarios.length > 0 && (
         <ul className={`${ml} mt-3 space-y-2`}>
           {comentarios.map((k) => (
-            <li key={k.id} className={`flex ${k.meu ? "justify-end" : "justify-start"}`}>
+            <li key={k.id} className="flex justify-start">
               <div
-                className={`max-w-[85%] text-[12px] leading-snug text-ink ${
-                  k.meu ? "border-r-2 border-coral/40 pr-3 text-right" : "border-l-2 border-ink/15 pl-3"
-                }`}
+                className="max-w-[85%] border-l-2 border-ink/15 pl-3 text-[12px] leading-snug text-ink"
               >
-                {!k.meu && (
-                  <>
-                    <span className="mr-1.5 inline-block h-2 w-2 rounded-full border border-ink align-middle" style={{ backgroundColor: k.cor }} />
-                    <span className="font-semibold">{k.nome}</span>{" "}
-                  </>
-                )}
+<span className="font-semibold">{k.meu ? "Você" : k.nome}</span>{" "}
                 {k.texto && <span>{k.texto}</span>}
                 <span className="ml-1.5 text-[10px] text-ink-soft">{k.quando}</span>
                 {k.gifUrl && (
@@ -179,7 +172,7 @@ export function CheckinConversa({
                   <img
                     src={k.gifUrl}
                     alt="GIF"
-                    className={`mt-1.5 block max-h-28 rounded border-2 border-cover-border ${k.meu ? "ml-auto" : ""}`}
+                    className="mt-1.5 block max-h-28 rounded border-2 border-cover-border"
                   />
                 )}
               </div>

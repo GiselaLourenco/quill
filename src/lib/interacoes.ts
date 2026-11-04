@@ -47,7 +47,7 @@ export type ComentarioFeed = {
   texto: string | null;
   gifUrl: string | null;
   quando: string;
-  /** Seu comentário — vai pra direita, como num chat; o dos amigos fica à esquerda. */
+  /** Seu comentário — aparece como "Você". */
   meu?: boolean;
 };
 
