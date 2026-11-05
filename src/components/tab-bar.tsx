@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Portal } from "@/components/portal";
 import { useNavegacaoPendente } from "@/components/navegacao-pendente";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 type TabItem = {
   href: string;
@@ -66,6 +66,53 @@ const TABS: TabItem[] = [
 export function TabBar() {
   const pathname = usePathname();
   const { iniciar } = useNavegacaoPendente();
+  const navRef = useRef<HTMLElement>(null);
+
+  // Safari do iOS: depois que o teclado fecha (ou a barra de endereço/zoom
+  // mudam a área visível), ele às vezes não recalcula o `bottom: 0` de
+  // elementos fixos — a barra fica presa no meio da tela, na altura onde o
+  // teclado terminava. Tirar e devolver a barra do layout força o recálculo.
+  useEffect(() => {
+    const ios =
+      /iP(hone|ad|od)/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    if (!ios) return;
+
+    let raf = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const reposiciona = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const nav = navRef.current;
+        if (!nav) return;
+        nav.style.display = "none";
+        void nav.offsetHeight; // lê o layout pra aplicar o "sumiço" já
+        nav.style.display = "";
+      });
+    };
+    // O teclado leva ~300ms pra terminar de descer depois do blur.
+    const depoisDoTeclado = () => {
+      clearTimeout(timer);
+      reposiciona();
+      timer = setTimeout(reposiciona, 350);
+    };
+
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", reposiciona);
+    window.addEventListener("focusout", depoisDoTeclado);
+    window.addEventListener("orientationchange", depoisDoTeclado);
+    window.addEventListener("pageshow", reposiciona);
+    document.addEventListener("visibilitychange", reposiciona);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+      vv?.removeEventListener("resize", reposiciona);
+      window.removeEventListener("focusout", depoisDoTeclado);
+      window.removeEventListener("orientationchange", depoisDoTeclado);
+      window.removeEventListener("pageshow", reposiciona);
+      document.removeEventListener("visibilitychange", reposiciona);
+    };
+  }, []);
 
   return (
     // Portal pro body porque `fixed` não é garantia: basta um ancestral com
@@ -77,13 +124,16 @@ export function TabBar() {
     // folhas (z-30 pra cima), que precisam cobri-la.
     <Portal>
     <nav
+      ref={navRef}
       aria-label="Navegação principal"
       // `transform-gpu` força a barra pra própria camada de composição — no
       // Chrome Android, `position: fixed` sem isso pode "arrastar" um frame
       // atrás do conteúdo durante rolagem rápida ou quando a barra de
       // endereço do navegador recolhe/expande, especialmente em página bem
       // mais alta que a viewport (o perfil é a mais comprida do app).
-      className="fixed inset-x-0 bottom-0 z-20 transform-gpu border-t-2 border-ink bg-paper pb-[max(env(safe-area-inset-bottom),0.5rem)]"
+      // No iOS isso faz o contrário (a camada fica parada na posição antiga),
+      // então `.tab-bar` desliga o transform lá — ver globals.css.
+      className="tab-bar fixed inset-x-0 bottom-0 z-20 transform-gpu border-t-2 border-ink bg-paper pb-[max(env(safe-area-inset-bottom),0.5rem)]"
     >
       <ul className="mx-auto flex w-full max-w-[390px] items-stretch justify-between gap-1 px-2 py-1.5">
         {TABS.map((tab) => {

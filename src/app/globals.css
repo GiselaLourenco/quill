@@ -113,3 +113,13 @@ body {
   background: color-mix(in srgb, var(--cover-bg, var(--color-cover-1)) 70%, black);
   opacity: 0.7;
 }
+
+/* Só o Safari/WebKit do iOS tem -webkit-touch-callout. Lá o `transform-gpu`
+   da tab bar deixa a camada presa onde estava quando o teclado/barra de
+   endereço mexe na viewport — a barra aparece no meio da tela. */
+@supports (-webkit-touch-callout: none) {
+  .tab-bar {
+    transform: none !important;
+    will-change: auto !important;
+  }
+}
