@@ -88,6 +88,36 @@ async function todosOsItens(supabase: SupabaseClient, userId: string): Promise<I
   return itens;
 }
 
+/**
+ * Leituras anteriores de livros relidos, como itens "terminados" a mais: cada
+ * término conta no ano em que aconteceu (livros terminados, gêneros, meses
+ * seguidos…), mesmo com o livro de volta em "lendo".
+ */
+async function leiturasAnteriores(
+  supabase: SupabaseClient,
+  userId: string,
+  itens: ItemConquista[],
+): Promise<ItemConquista[]> {
+  const { data } = await supabase
+    .from("past_readings")
+    .select("item_id, started_at, finished_at")
+    .eq("user_id", userId);
+  const porId = new Map(itens.map((i) => [i.id, i]));
+  return (data ?? []).flatMap((p) => {
+    const item = porId.get(p.item_id as string);
+    return item
+      ? [
+          {
+            ...item,
+            status: "finished",
+            started_at: p.started_at as string | null,
+            finished_at: p.finished_at as string | null,
+          },
+        ]
+      : [];
+  });
+}
+
 /** "Fiction " e "fiction" são o mesmo gênero; vazio não é gênero nenhum. */
 function chave(texto: string | null): string | null {
   const t = texto?.trim().toLowerCase();
@@ -188,7 +218,12 @@ function calcularContexto(
   // Livro terminado no período soma as páginas que as sessões não cobriram
   // (ex.: cadastrado já lido, com data). As sessões são do histórico todo,
   // pra descontar o que já foi lido no app em qualquer ano.
-  totalPages += paginasDeLivrosTerminados(terminados, todasSessoes);
+  // Num livro relido, cada leitura desconta só as sessões do próprio período.
+  totalPages += paginasDeLivrosTerminados(
+    terminados,
+    todasSessoes,
+    itens.filter((i) => i.status === "finished"),
+  );
   const generos = new Set(terminados.map((i) => chave(i.genre)).filter(Boolean));
   const autores = new Set(terminados.map((i) => chave(i.creator)).filter(Boolean));
   const terminadosPorMes = new Map<string, number>();
@@ -256,12 +291,13 @@ export async function loadAchievementData(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<DadosConquistas> {
-  const [sessions, itens, { data: notas, error }] = await Promise.all([
+  const [sessions, itensAtuais, { data: notas, error }] = await Promise.all([
     todasAsSessoes(supabase, userId),
     todosOsItens(supabase, userId),
     supabase.from("ratings").select("created_at").eq("user_id", userId).eq("stars", 5),
   ]);
   if (error) throw error;
+  const itens = [...itensAtuais, ...(await leiturasAnteriores(supabase, userId, itensAtuais))];
   const cincoEstrelas = (notas ?? []).map((n) => n.created_at as string);
 
   const cache = new Map<number, AchievementContext>();

@@ -80,6 +80,22 @@ create index on public.sessions (user_id, started_at);
 create index on public.sessions (item_id);
 
 -- ------------------------------------------------------------
+-- PAST_READINGS (leituras já terminadas de um livro relido — o livro guarda
+-- só a leitura atual). Ver scripts/2026-11-04-releituras.sql, que também
+-- cria a view `finished_readings` (todo término: atual + anteriores).
+-- ------------------------------------------------------------
+create table public.past_readings (
+  id          uuid primary key default gen_random_uuid(),
+  item_id     uuid not null references public.media_items(id) on delete cascade,
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  started_at  date,
+  finished_at date,
+  created_at  timestamptz not null default now()
+);
+create index on public.past_readings (item_id);
+create index on public.past_readings (user_id, finished_at);
+
+-- ------------------------------------------------------------
 -- HIGHLIGHTS (fotos de trechos / prints de momentos)
 -- ------------------------------------------------------------
 create table public.highlights (

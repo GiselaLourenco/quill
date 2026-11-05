@@ -18,8 +18,8 @@ const DURACOES: { id: Exclude<Duracao, "custom">; label: string; hint: string; v
 
 const METRICAS: { id: Metrica; label: string; checkin: string }[] = [
   { id: "active_days", label: "DIAS", checkin: "Basta fazer check-in do dia" },
-  { id: "pages", label: "Páginas", checkin: "Vamos perguntar quantas páginas você leu" },
-  { id: "chapters", label: "Capítulos", checkin: "Vamos perguntar quantos capítulos você concluiu" },
+  { id: "pages", label: "Páginas", checkin: "Vamos perguntar em que página você parou e contar o que leu" },
+  { id: "chapters", label: "Capítulos", checkin: "Vamos perguntar em que capítulo você parou e contar o que leu" },
   { id: "check_ins", label: "Livros terminados", checkin: "Só marca ao terminar um livro" },
 ];
 

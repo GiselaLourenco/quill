@@ -1,4 +1,4 @@
-import { diasLidos } from "@/lib/date-br";
+import { diasLidos, localDateKey } from "@/lib/date-br";
 
 export type SessionForStats = {
   started_at: string;
@@ -76,6 +76,30 @@ export function posicaoAtualPorItem(
 }
 
 /**
+ * Como `posicaoAtualPorItem`, mas sem cair pra 0: null quando o livro nunca
+ * teve aquela posição registrada — é o que diferencia "primeira sessão do
+ * livro" de "voltou pra página 0" no registro de leitura.
+ */
+export function posicaoRegistradaPorItem(
+  sessions: (PositionSession & { item_id: string })[],
+): Map<string, { pagina: number | null; capitulo: number | null }> {
+  const out = new Map<string, { pagina: number | null; capitulo: number | null; pAt: string; cAt: string }>();
+  for (const s of sessions) {
+    const atual = out.get(s.item_id) ?? { pagina: null, capitulo: null, pAt: "", cAt: "" };
+    if (s.unit_end != null && s.created_at > atual.pAt) {
+      atual.pagina = s.unit_end;
+      atual.pAt = s.created_at;
+    }
+    if (s.chapter_end != null && s.created_at > atual.cAt) {
+      atual.capitulo = s.chapter_end;
+      atual.cAt = s.created_at;
+    }
+    out.set(s.item_id, atual);
+  }
+  return new Map([...out].map(([id, p]) => [id, { pagina: p.pagina, capitulo: p.capitulo }]));
+}
+
+/**
  * Livro terminado mostra o total cadastrado (páginas e capítulos), não a
  * última posição registrada — quem marca "terminei" sem ter anotado cada
  * sessão, ou importou a biblioteca do Kindle, não pode ver "pág. 0 de 320".
@@ -117,16 +141,51 @@ export function paginasLidas(
  * (média/dia, sequência), que depende de saber o dia da leitura.
  */
 export function paginasDeLivrosTerminados(
-  livros: { id: string; total_units: number | null }[],
-  sessoesReais: { item_id: string | null; unit_start: number | null; unit_end: number | null }[],
+  /** Leituras terminadas no período — o mesmo livro aparece uma vez por leitura. */
+  livros: { id: string; total_units: number | null; finished_at?: string | null }[],
+  sessoesReais: {
+    item_id: string | null;
+    unit_start: number | null;
+    unit_end: number | null;
+    started_at?: string;
+  }[],
+  /** Todas as leituras terminadas desses livros (de qualquer período). */
+  todosTerminos: { id: string; finished_at?: string | null }[] = livros,
 ): number {
-  const lidasNoApp = new Map<string, number>();
+  const sessoesPorItem = new Map<string, typeof sessoesReais>();
   for (const s of sessoesReais) {
     if (!s.item_id || s.unit_start == null || s.unit_end == null) continue;
-    lidasNoApp.set(s.item_id, (lidasNoApp.get(s.item_id) ?? 0) + Math.max(0, s.unit_end - s.unit_start));
+    const lista = sessoesPorItem.get(s.item_id);
+    if (lista) lista.push(s);
+    else sessoesPorItem.set(s.item_id, [s]);
   }
+  const terminosPorItem = new Map<string, string[]>();
+  for (const t of todosTerminos) {
+    const lista = terminosPorItem.get(t.id) ?? [];
+    if (t.finished_at) lista.push(t.finished_at);
+    terminosPorItem.set(t.id, lista);
+  }
+
+  // Livro relido: cada leitura só desconta as sessões dela — as do dia
+  // seguinte ao término anterior até o dia em que terminou. Livro lido uma
+  // vez desconta todas (regra de sempre).
+  const lidasNaLeitura = (id: string, fim: string | null | undefined) => {
+    const datas = terminosPorItem.get(id) ?? [];
+    const releu = datas.length > 1 && fim != null;
+    const anterior = releu ? (datas.filter((d) => d < fim).sort().at(-1) ?? null) : null;
+    let soma = 0;
+    for (const s of sessoesPorItem.get(id) ?? []) {
+      if (releu && s.started_at) {
+        const dia = localDateKey(s.started_at);
+        if (dia > fim || (anterior != null && dia <= anterior)) continue;
+      }
+      soma += Math.max(0, s.unit_end! - s.unit_start!);
+    }
+    return soma;
+  };
+
   return livros.reduce(
-    (soma, l) => soma + Math.max(0, (l.total_units ?? 0) - (lidasNoApp.get(l.id) ?? 0)),
+    (soma, l) => soma + Math.max(0, (l.total_units ?? 0) - lidasNaLeitura(l.id, l.finished_at)),
     0,
   );
 }

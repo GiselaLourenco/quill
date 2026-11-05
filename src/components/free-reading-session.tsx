@@ -15,7 +15,8 @@ import {
   saveSessionMemory,
   type SessionUnit,
 } from "@/app/actions/sessions";
-import { updateItemStatus } from "@/app/actions/media-items";
+import { iniciarReleitura, updateItemStatus } from "@/app/actions/media-items";
+import { CampoPosicao, ESTADO_POSICAO_VAZIO, type EstadoPosicao } from "@/components/campo-posicao";
 import type { ActiveChallenge } from "@/lib/challenges";
 import { ComSpinner } from "@/components/carregando";
 
@@ -23,8 +24,16 @@ export type BookOption = CoverFields & {
   id: string;
   author: string;
   status: string;
+  /** Posição registrada mais recente; null = o livro nunca teve. */
   paginaAtual: number | null;
+  capituloAtual: number | null;
+  totalPaginas: number | null;
+  totalCapitulos: number | null;
 };
+
+/** Quem só registra capítulos nesse livro já abre em capítulos. */
+const unidadeDoLivro = (l: BookOption | null): SessionUnit =>
+  l && l.paginaAtual == null && l.capituloAtual != null ? "chapters" : "pages";
 
 const TAG_OPTIONS: { value: string; label: string; positiva: boolean }[] = [
   { value: "flowed", label: "a leitura fluiu", positiva: true },
@@ -748,10 +757,16 @@ function TelaRegistro({
   const disponiveis = [...books.filter((b) => b.status === "reading"), ...recemMarcados];
 
   const [livroId, setLivroId] = useState<string | null>(disponiveis[0]?.id ?? null);
+  // Livros relidos nesta tela: a releitura zera a posição no servidor, então
+  // aqui também — senão o passo 02 abriria na última página da leitura antiga.
+  const [relidos, setRelidos] = useState<Set<string>>(new Set());
   const [buscaEstante, setBuscaEstante] = useState("");
-  const [, startMarcarLendo] = useTransition();
-  const [unidade, setUnidade] = useState<SessionUnit>("pages");
-  const [quantidade, setQuantidade] = useState(0);
+  // Enquanto marca "lendo"/começa a releitura no servidor, salvar espera — a
+  // sessão precisa partir da posição já zerada da releitura.
+  const [marcandoLendo, startMarcarLendo] = useTransition();
+  const [unidade, setUnidade] = useState<SessionUnit>(() => unidadeDoLivro(disponiveis[0] ?? null));
+  // O que o campo "Onde você parou?" calculou (posição, quanto conta, avisos).
+  const [posicao, setPosicao] = useState<EstadoPosicao>(ESTADO_POSICAO_VAZIO);
   // `total` é sempre minuto — é o que a sessão grava. A unidade só muda como o
   // número aparece e é digitado, igual ao check-in de desafio.
   const [total, setTotal] = useState(minutosIniciais);
@@ -775,7 +790,18 @@ function TelaRegistro({
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, startSave] = useTransition();
 
-  const livro = disponiveis.find((l) => l.id === livroId) ?? null;
+  const livroBase = disponiveis.find((l) => l.id === livroId) ?? null;
+  const livro =
+    livroBase && relidos.has(livroBase.id)
+      ? { ...livroBase, status: "reading", paginaAtual: 0, capituloAtual: 0 }
+      : livroBase;
+  const quantidade = livro ? posicao.delta : 0;
+
+  function escolherLivro(id: string | null) {
+    setLivroId(id);
+    setUnidade(unidadeDoLivro(disponiveis.find((l) => l.id === id) ?? null));
+    setPosicao(ESTADO_POSICAO_VAZIO);
+  }
 
   // Livros da estante que ainda não aparecem no passo 1 (qualquer status
   // menos "lendo" — "quero ler", "terminei" etc.) e batem com a busca.
@@ -795,11 +821,22 @@ function TelaRegistro({
   // Escolher na busca marca "lendo" de verdade (não só nesta tela) — assim o
   // livro passa a aparecer aqui de cara nas próximas sessões, sem precisar
   // buscar de novo toda vez.
+  // Livro terminado vira releitura (a leitura anterior fica guardada e
+  // continua contando); trocar só o status apagaria a data de término.
   function escolherDaEstante(escolhido: BookOption) {
+    const relendo = escolhido.status === "finished";
     setRecemMarcados((prev) => [...prev, escolhido]);
+    if (relendo) setRelidos((prev) => new Set(prev).add(escolhido.id));
     setLivroId(escolhido.id);
+    setUnidade(relendo ? "pages" : unidadeDoLivro(escolhido));
+    setPosicao(ESTADO_POSICAO_VAZIO);
     setBuscaEstante("");
-    if (!demo) startMarcarLendo(() => updateItemStatus(escolhido.id, "reading"));
+    if (!demo) {
+      startMarcarLendo(async () => {
+        if (relendo) await iniciarReleitura(escolhido.id);
+        else await updateItemStatus(escolhido.id, "reading");
+      });
+    }
   }
 
   function toggleTag(value: string) {
@@ -822,6 +859,10 @@ function TelaRegistro({
 
   function finalizar() {
     setErro(null);
+    if (livro && posicao.bloqueio) {
+      setErro(posicao.bloqueio);
+      return;
+    }
     startSave(async () => {
       if (demo) {
         onSalvo({ minutos: total, titulo: livro?.title ?? "Sem livro vinculado", quantidade, unidade });
@@ -831,8 +872,10 @@ function TelaRegistro({
         itemId: livroId,
         startedAt,
         durationSeconds: Math.max(60, total * 60),
-        unit: unidade,
-        quantity: quantidade > 0 ? quantidade : null,
+        pagina: livro && unidade === "pages" ? posicao.posicao : null,
+        capitulo: livro && unidade === "chapters" ? posicao.posicao : null,
+        paginaAntes: unidade === "pages" ? posicao.antes : null,
+        capituloAntes: unidade === "chapters" ? posicao.antes : null,
         tags: [...tags],
       });
 
@@ -850,7 +893,6 @@ function TelaRegistro({
           notasPorGrupo: Object.fromEntries(
             [...desafiosOn].map((id) => [id, comentariosDesafio[id]?.trim() || null]),
           ),
-          pagesExtra: null,
         });
       }
 
@@ -876,6 +918,10 @@ function TelaRegistro({
       });
     });
   }
+
+  // Sem livro o passo "Onde você parou?" some — a numeração acompanha.
+  const passos = ["livro", ...(livro ? ["posicao"] : []), "tempo", "como", "desafios"];
+  const numeroPasso = (id: string) => String(passos.indexOf(id) + 1).padStart(2, "0");
 
   return (
     <div className="min-h-full">
@@ -932,7 +978,7 @@ function TelaRegistro({
 
       <div className="px-5 pb-10 pt-4">
         {/* 01 — Livro */}
-        <Passo numero="01" titulo="Em qual livro?">
+        <Passo numero={numeroPasso("livro")} titulo="Em qual livro?">
           {disponiveis.length === 0 ? (
             <p className="rounded-md border-2 border-dashed border-ink bg-card p-4 text-center font-serif text-sm italic text-ink-soft">
               Você não tem nenhum livro marcado como “lendo” — busque um da
@@ -946,7 +992,7 @@ function TelaRegistro({
                   <button
                     key={l.id}
                     type="button"
-                    onClick={() => setLivroId(l.id)}
+                    onClick={() => escolherLivro(l.id)}
                     aria-pressed={on}
                     className={`w-[116px] shrink-0 rounded-md border-2 border-ink p-2 text-left ${
                       on ? "shadow-hard-sm bg-moss text-paper" : "bg-card text-ink"
@@ -957,14 +1003,20 @@ function TelaRegistro({
                       {l.title}
                     </span>
                     <span className={`mt-0.5 block text-[10px] ${on ? "text-paper/80" : "text-ink-soft"}`}>
-                      {l.paginaAtual ? `pág. ${l.paginaAtual}` : l.author || "sem autor"}
+                      {relidos.has(l.id)
+                        ? "relendo"
+                        : l.paginaAtual
+                          ? `pág. ${l.paginaAtual}`
+                          : l.capituloAtual
+                            ? `cap. ${l.capituloAtual}`
+                            : l.author || "sem autor"}
                     </span>
                   </button>
                 );
               })}
               <button
                 type="button"
-                onClick={() => setLivroId(null)}
+                onClick={() => escolherLivro(null)}
                 aria-pressed={livroId === null}
                 className={`w-[116px] shrink-0 rounded-md border-2 border-dashed border-ink p-2 text-left ${
                   livroId === null ? "shadow-hard-sm bg-ink text-paper" : "bg-card text-ink"
@@ -1010,7 +1062,7 @@ function TelaRegistro({
                           </span>
                         </span>
                         <span className="shrink-0 font-display text-[9px] uppercase tracking-wide text-moss-dark">
-                          marcar lendo
+                          {l.status === "finished" ? "reler" : "marcar lendo"}
                         </span>
                       </button>
                     </li>
@@ -1022,77 +1074,48 @@ function TelaRegistro({
           </div>
         </Passo>
 
-        {/* 02 — Quanto leu */}
-        <Passo numero="02" titulo="Quanto você leu?">
-          <div className="shadow-hard-sm rounded-md border-2 border-ink bg-mustard p-3">
-            <div className="flex justify-end">
-              <div className="grid grid-cols-2 overflow-hidden rounded-sm border-2 border-ink">
-                {(["pages", "chapters"] as const).map((m) => {
-                  const ativo = unidade === m;
-                  return (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => {
-                        setUnidade(m);
-                        setQuantidade(0);
-                      }}
-                      className={`px-4 py-1.5 font-display text-[11px] uppercase tracking-wide ${
-                        ativo ? "bg-ink text-paper" : "bg-card text-ink"
-                      }`}
-                    >
-                      {m === "pages" ? "Páginas" : "Caps"}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="mt-3 flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setQuantidade((q) => Math.max(0, q - (unidade === "pages" ? 5 : 1)))}
-                className="h-12 w-12 shrink-0 rounded-md border-2 border-ink bg-card font-display text-xl leading-none active:translate-y-0.5"
-                aria-label="diminuir"
-              >
-                −
-              </button>
-              <label className="shadow-hard-sm flex flex-1 cursor-text items-baseline justify-center gap-1 rounded-md border-2 border-ink bg-card py-2 transition-colors focus-within:bg-paper">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={quantidade}
-                  onChange={(e) => {
-                    const limpo = e.target.value.replace(/[^0-9]/g, "");
-                    setQuantidade(limpo ? Math.min(9999, Number(limpo)) : 0);
-                  }}
-                  aria-label={unidade === "pages" ? "Páginas lidas" : "Capítulos lidos"}
-                  className="w-16 bg-transparent text-center font-display text-3xl leading-none tabular-nums focus:outline-none"
-                />
-                <span className="text-xs uppercase text-ink-soft">
-                  {unidade === "pages" ? "pág" : "cap"}
-                </span>
-              </label>
-              <button
-                type="button"
-                onClick={() => setQuantidade((q) => q + (unidade === "pages" ? 5 : 1))}
-                className="h-12 w-12 shrink-0 rounded-md border-2 border-ink bg-card font-display text-xl leading-none active:translate-y-0.5"
-                aria-label="aumentar"
-              >
-                +
-              </button>
-            </div>
-          </div>
-          {livro && unidade === "pages" && quantidade > 0 && (
-            <p className="mt-2 text-[11px] text-ink-soft">
-              {livro.title} vai da pág. {livro.paginaAtual ?? 0} para{" "}
-              {(livro.paginaAtual ?? 0) + quantidade}
-            </p>
-          )}
-        </Passo>
+        {/* 02 — Onde parou: a pessoa diz a página/capítulo atual e o app faz
+            a conta com a posição anterior. Sem livro não tem posição. */}
+        {livro && (
+          <Passo numero={numeroPasso("posicao")} titulo="Onde você parou?">
+            <CampoPosicao
+              key={`${livro.id}:${unidade}:${relidos.has(livro.id)}`}
+              unidade={unidade}
+              anterior={unidade === "pages" ? livro.paginaAtual : livro.capituloAtual}
+              total={unidade === "pages" ? livro.totalPaginas : livro.totalCapitulos}
+              minutos={total}
+              variante="ler"
+              onChange={setPosicao}
+              topo={
+                <div className="flex justify-end">
+                  <div className="grid grid-cols-2 overflow-hidden rounded-sm border-2 border-ink">
+                    {(["pages", "chapters"] as const).map((m) => {
+                      const ativo = unidade === m;
+                      return (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => {
+                            setUnidade(m);
+                            setPosicao(ESTADO_POSICAO_VAZIO);
+                          }}
+                          className={`px-4 py-1.5 font-display text-[11px] uppercase tracking-wide ${
+                            ativo ? "bg-ink text-paper" : "bg-card text-ink"
+                          }`}
+                        >
+                          {m === "pages" ? "Páginas" : "Caps"}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              }
+            />
+          </Passo>
+        )}
 
         {/* 03 — Tempo */}
-        <Passo numero="03" titulo="Por quanto tempo?">
+        <Passo numero={numeroPasso("tempo")} titulo="Por quanto tempo?">
           <div className="grid grid-cols-4 gap-2">
             {(unidadeTempo === "h" ? PRESETS_H : PRESETS_MIN).map((p) => (
               <button
@@ -1158,7 +1181,7 @@ function TelaRegistro({
         </Passo>
 
         {/* 04 — Como foi */}
-        <Passo numero="04" titulo="Como foi hoje?">
+        <Passo numero={numeroPasso("como")} titulo="Como foi hoje?">
           <div className="flex flex-wrap gap-2">
             {TAG_OPTIONS.map((t) => {
               const on = tags.has(t.value);
@@ -1218,7 +1241,7 @@ function TelaRegistro({
 
         {/* 05 — Desafios */}
         {activeChallenges.length > 0 && (
-          <Passo numero="05" titulo="Publicar nos desafios">
+          <Passo numero={numeroPasso("desafios")} titulo="Publicar nos desafios">
             <ul className="space-y-2">
               {activeChallenges.map((d) => {
                 const on = desafiosOn.has(d.id);
@@ -1321,7 +1344,7 @@ function TelaRegistro({
         <button
           type="button"
           onClick={finalizar}
-          disabled={salvando}
+          disabled={salvando || marcandoLendo}
           className="shadow-hard mt-8 flex w-full items-center justify-center gap-2 rounded-md border-2 border-ink bg-coral py-4 font-display text-lg tracking-wide text-card transition hover:shadow-hard-hover active:translate-y-1 active:shadow-none disabled:opacity-60"
         >
           <ComSpinner ocupado={salvando}>{salvando ? "Salvando…" : "✓ Finalizar registro"}</ComSpinner>

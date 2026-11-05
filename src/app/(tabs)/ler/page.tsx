@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 import { FreeReadingSession, type BookOption } from "@/components/free-reading-session";
 import { getActiveChallenges } from "@/lib/challenges";
-import { posicaoAtualPorItem } from "@/lib/reading-stats";
+import { posicaoRegistradaPorItem } from "@/lib/reading-stats";
 
 export default async function LerPage() {
   const userId = await requireUserId();
@@ -13,29 +13,28 @@ export default async function LerPage() {
     // registro) precisa achar qualquer livro, não só os já "lendo"/"quero ler".
     supabase
       .from("media_items")
-      .select("id, title, creator, cover_kind, cover_url, cover_palette, status")
+      .select("id, title, creator, cover_kind, cover_url, cover_palette, status, total_units, total_chapters")
       .eq("user_id", userId)
       .order("created_at", { ascending: false }),
     supabase
       .from("sessions")
-      .select("item_id, unit_end, created_at")
+      .select("item_id, unit_end, chapter_end, created_at")
       .eq("user_id", userId)
-      .not("unit_end", "is", null)
+      .or("unit_end.not.is.null,chapter_end.not.is.null")
       .not("item_id", "is", null),
     getActiveChallenges(supabase, userId),
   ]);
 
-  // Posição atual de cada livro = unit_end da sessão mais recente (não o
-  // maior já visto — uma correção pra baixo precisa "pegar").
-  const posicaoPorItem = posicaoAtualPorItem(
+  // Posição atual de cada livro = a da sessão mais recente (não o maior já
+  // visto — uma correção pra baixo precisa "pegar"). null = nunca registrada:
+  // a primeira sessão pergunta se começou agora ou já vinha lendo.
+  const posicaoPorItem = posicaoRegistradaPorItem(
     (positions ?? []).map((p) => ({
       item_id: p.item_id as string,
       unit_end: p.unit_end as number | null,
+      chapter_end: p.chapter_end as number | null,
       created_at: p.created_at as string,
     })),
-  );
-  const paginaAtual = new Map(
-    [...posicaoPorItem.entries()].map(([id, pos]) => [id, pos.paginas]),
   );
 
   const bookOptions: BookOption[] = (books ?? []).map((b) => ({
@@ -46,7 +45,10 @@ export default async function LerPage() {
     cover_url: (b.cover_url as string | null) ?? null,
     cover_palette: (b.cover_palette as number) ?? 0,
     status: b.status as string,
-    paginaAtual: paginaAtual.get(b.id as string) ?? null,
+    paginaAtual: posicaoPorItem.get(b.id as string)?.pagina ?? null,
+    capituloAtual: posicaoPorItem.get(b.id as string)?.capitulo ?? null,
+    totalPaginas: (b.total_units as number | null) ?? null,
+    totalCapitulos: (b.total_chapters as number | null) ?? null,
   }));
 
   return (

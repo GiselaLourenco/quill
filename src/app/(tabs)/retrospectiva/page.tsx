@@ -115,36 +115,52 @@ export default async function RetrospectivaPage({
       .eq("cadastro", false)
       .gte("started_at", `${prevStart}T00:00:00`)
       .lte("started_at", `${end}T23:59:59`),
+    // Toda leitura terminada conta — a releitura também, no ano em que terminou.
     supabase
-      .from("media_items")
-      .select("id", { count: "exact", head: true })
+      .from("finished_readings")
+      .select("item_id", { count: "exact", head: true })
       .eq("user_id", userId)
-      .eq("status", "finished")
       .gte("finished_at", start)
       .lte("finished_at", end),
     // Terminados nos dois períodos (atual e anterior), pras páginas que
     // nenhuma sessão cobriu — ex.: livro cadastrado já lido, com data.
     supabase
-      .from("media_items")
-      .select("id, total_units, finished_at")
+      .from("finished_readings")
+      .select("item_id, total_units, finished_at")
       .eq("user_id", userId)
-      .eq("status", "finished")
       .gte("finished_at", prevStart)
       .lte("finished_at", end),
   ]);
 
-  const terminados = terminadosJanela ?? [];
-  const { data: sessoesDosTerminados } = terminados.length
-    ? await supabase
-        .from("sessions")
-        .select("item_id, unit_start, unit_end")
-        .in("item_id", terminados.map((t) => t.id))
-        .eq("cadastro", false)
-    : { data: [] };
+  const terminados = (terminadosJanela ?? []).map((t) => ({
+    id: t.item_id as string,
+    total_units: t.total_units as number | null,
+    finished_at: t.finished_at as string,
+  }));
+  const idsTerminados = [...new Set(terminados.map((t) => t.id))];
+  // Todas as leituras desses livros (não só as da janela) e as sessões deles:
+  // num livro relido, cada leitura desconta só as sessões do próprio período.
+  const [{ data: sessoesDosTerminados }, { data: todosTerminos }] = idsTerminados.length
+    ? await Promise.all([
+        supabase
+          .from("sessions")
+          .select("item_id, unit_start, unit_end, started_at")
+          .in("item_id", idsTerminados)
+          .eq("cadastro", false),
+        supabase
+          .from("finished_readings")
+          .select("item_id, finished_at")
+          .in("item_id", idsTerminados),
+      ])
+    : [{ data: [] }, { data: [] }];
   const paginasDosTerminados = (de: string, ate: string) =>
     paginasDeLivrosTerminados(
-      terminados.filter((t) => t.finished_at! >= de && t.finished_at! <= ate),
+      terminados.filter((t) => t.finished_at >= de && t.finished_at <= ate),
       sessoesDosTerminados ?? [],
+      (todosTerminos ?? []).map((t) => ({
+        id: t.item_id as string,
+        finished_at: t.finished_at as string | null,
+      })),
     );
 
   const sessionRows = (sessions ?? []) as SessionRow[];
