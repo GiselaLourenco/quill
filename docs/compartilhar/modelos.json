@@ -1,0 +1,86 @@
+{
+  "_leia": "Modelos de cartaz do Compartilhar. Imagens 9:16 sem texto em public/img/compartilhar/modelos/<id>.webp. Áreas em % da imagem (x, y, largura, altura a partir do canto superior esquerdo), medidas automaticamente nas áreas vazias e revisadas a olho — ajustar fino com um overlay de debug. 'tinta' = cor do texto: 'escura' sobre papel creme, 'clara' sobre fundo escuro. 'stats' segue a ordem: minutos, páginas, dias lidos, horário de ouro. 'destaque' é um cartão extra (ex.: livros terminados no mês, progresso da meta, frase do livro). 'margem_esq' = % da largura do cartão do livro ocupada por desenho à esquerda, onde o texto não deve entrar.",
+  "modelos": [
+    {
+      "id": "medalhao-real", "nome": "Medalhão real", "paleta": ["#4B2A7B", "#E2B34A", "#FDD493"],
+      "titulo": { "area": [23, 5.2, 55.2, 12], "tinta": "escura" },
+      "ano": { "area": [33, 43.6, 34, 4], "tinta": "clara" },
+      "stats": [[5.2, 50.3, 43.3, 10], [51.2, 50.2, 43.5, 10.1], [5.2, 62.1, 43.3, 10], [51.2, 62.1, 43.5, 10]],
+      "livro": { "area": [5.1, 75, 88.5, 18.2], "margem_esq": 26, "tinta": "escura" }
+    },
+    {
+      "id": "mesa-polaroid", "nome": "Mesa com polaroid", "paleta": ["#6B3A1E", "#F3E3C3", "#C98A3A"],
+      "titulo": { "area": [54.3, 10.7, 43.6, 19.4], "tinta": "escura" },
+      "stats_lista": { "area": [43, 29.8, 55.7, 29.5], "linhas": 4, "obs": "checklist: cada stat ao lado de um quadradinho já desenhado" },
+      "livro": { "area": [3.1, 58.7, 77.5, 31.5], "margem_esq": 28, "obs": "caneca invade o canto inferior direito; texto até ~y 76%", "tinta": "escura" }
+    },
+    {
+      "id": "medalhao-noturno", "nome": "Medalhão noturno", "paleta": ["#2E1A4F", "#E8A867", "#FBE3BE"],
+      "titulo": { "area": [10, 4, 80, 10], "tinta": "clara", "obs": "sem cartão: texto direto no roxo" },
+      "stats": [[4.1, 18.4, 20.3, 12.4], [75.7, 18.4, 20.2, 12.4], [4.1, 40.3, 22, 13.6], [74, 40.3, 21.9, 13.6]],
+      "livro": { "area": [10, 58.3, 80, 13], "margem_esq": 0, "tinta": "clara", "obs": "moldura só contorno, interior escuro" }
+    },
+    {
+      "id": "trilha-outono", "nome": "Trilha de outono", "paleta": ["#8A3B12", "#F2C14E", "#F9E2B3"],
+      "titulo": { "area": [32, 4.5, 41.8, 11.5], "tinta": "escura" },
+      "stats": [[50, 18.6, 40, 6], [51, 26.7, 44, 6], [50, 35, 42, 6], [53, 43.4, 41, 6]],
+      "extras": [[4.8, 55.2, 43.5, 9.3], [51.6, 55.2, 43.7, 9.3], [4.8, 66.4, 43.5, 10.1], [51.6, 66.4, 43.7, 10.2]],
+      "livro": { "area": [3, 79.1, 92, 16.3], "margem_esq": 28, "tinta": "escura" },
+      "obs": "stats nas 4 placas; os 4 cartões de baixo recebem dados extras (livros terminados, meta, nota média, sequência)"
+    },
+    {
+      "id": "lareira-aconchego", "nome": "Aconchego na janela", "paleta": ["#7A2E14", "#E9873A", "#FBE2B6"],
+      "titulo": { "area": [27.1, 5.7, 49.5, 13.3], "tinta": "escura" },
+      "destaque": { "area": [53, 25.9, 42.7, 24.2], "tinta": "escura" },
+      "stats": [[4.8, 53.9, 43.8, 9.5], [51.5, 53.9, 43.9, 9.5], [4.8, 65.1, 43.8, 10.2], [51.5, 65.1, 43.9, 10.3]],
+      "livro": { "area": [3, 77.7, 92, 16.2], "margem_esq": 27, "tinta": "escura" }
+    },
+    {
+      "id": "sofa-boston", "nome": "Sofá de outono", "paleta": ["#8B3A1A", "#E58A3A", "#F7E1BC"],
+      "titulo": { "area": [20.1, 10.5, 63.9, 18.1], "tinta": "escura" },
+      "stats": [[13.8, 31.5, 22.8, 13.6], [39.3, 31.5, 23, 13.8], [64.9, 31.5, 23.1, 13.7]],
+      "livro": { "area": [24, 47.7, 64.1, 15.6], "margem_esq": 0, "tinta": "escura" },
+      "obs": "só 3 stats: minutos, páginas, dias lidos (sem horário de ouro)"
+    },
+    {
+      "id": "placas-estreladas", "nome": "Placas sob as estrelas", "paleta": ["#1E2A5E", "#F3C552", "#F6DFB4"],
+      "titulo": { "area": [6, 4, 50, 11], "tinta": "clara", "obs": "sem cartão: texto direto no céu" },
+      "stats": [[52.5, 17, 36, 8.2], [50.6, 26.9, 36, 7.3], [51.9, 36, 34.3, 7.4], [51.1, 45.6, 31.9, 7.3]],
+      "livro": { "area": [5.4, 67, 86.1, 22.7], "margem_esq": 0, "obs": "livros invadem o canto inferior direito; texto até x ~62%", "tinta": "escura" }
+    },
+    {
+      "id": "sofa-boston-soneca", "nome": "Soneca com o Boston", "paleta": ["#8B3A1A", "#E58A3A", "#F7E1BC"],
+      "titulo": { "area": [26.1, 15.9, 61.7, 11.3], "tinta": "escura" },
+      "stats": [[26, 28.7, 32.7, 10.8], [62.3, 28.8, 33, 10.7], [26, 41.1, 32.6, 10.4], [62.3, 41.1, 32.9, 10.4]],
+      "livro": { "area": [26.5, 53.1, 67.3, 15.8], "margem_esq": 0, "tinta": "escura" }
+    },
+    {
+      "id": "escrivaninha-botanica", "nome": "Escrivaninha botânica", "paleta": ["#3E4A26", "#C9772E", "#F6E3BE"],
+      "titulo": { "area": [21.4, 5.4, 58.6, 11.7], "tinta": "escura" },
+      "destaque": { "area": [44.5, 23.4, 52.2, 28.1], "linhas": 3, "tinta": "escura", "obs": "papel pautado: bom para frase/nota do livro" },
+      "stats": [[5, 54.5, 43.1, 9.9], [51.2, 54.5, 43.8, 9.9], [5, 66.3, 43.3, 10.5], [51.3, 66.3, 43.8, 10.5]],
+      "livro": { "area": [2, 78.9, 95, 16.2], "margem_esq": 26, "tinta": "escura" }
+    },
+    {
+      "id": "biblioteca-noturna", "nome": "Biblioteca noturna", "paleta": ["#2B1C3D", "#E0A04A", "#F8E0B5"],
+      "titulo": { "area": [24, 8.2, 52.1, 10.3], "tinta": "escura" },
+      "destaque": { "area": [46.5, 23.7, 48, 28.2], "linhas": 3, "tinta": "escura" },
+      "stats": [[5.3, 54.9, 42.7, 10.5], [51, 54.9, 43.4, 10.5], [5.4, 66.9, 42.5, 10.5], [51, 66.9, 43.3, 10.5]],
+      "livro": { "area": [4.8, 79.4, 90, 13.9], "margem_esq": 24, "tinta": "escura" }
+    },
+    {
+      "id": "carta-botanica", "nome": "Carta botânica", "paleta": ["#5B4A2E", "#B5643A", "#F5E6CC"],
+      "titulo": { "area": [15, 9, 70, 9], "tinta": "escura", "obs": "sem cartão: texto direto no papel, acima do ornamento" },
+      "stats": [[7.1, 24.2, 41.8, 15.2], [52.5, 24.1, 41.6, 15.3], [7, 41.5, 41.9, 15.3], [52.5, 41.5, 41.6, 15.3]],
+      "livro": { "area": [5, 62, 66, 20], "margem_esq": 0, "tinta": "escura" }
+    },
+    {
+      "id": "madrugada-insone", "nome": "Madrugada lendo", "paleta": ["#22301F", "#E2A13B", "#F6DFB2"],
+      "titulo": { "area": [15.6, 4.7, 68.1, 10.8], "tinta": "escura" },
+      "ano": { "area": [32, 16.2, 34.6, 3.4], "tinta": "escura" },
+      "stats": [[12.5, 56.3, 36, 9.6], [52, 56.3, 36, 9.6], [12.5, 67.3, 36, 9.6], [52, 67.5, 36, 9.6]],
+      "livro": { "area": [4, 81.6, 85.3, 13.3], "margem_esq": 26, "tinta": "escura" },
+      "obs": "ótimo modelo para quem tem horário de ouro de madrugada"
+    }
+  ]
+}
