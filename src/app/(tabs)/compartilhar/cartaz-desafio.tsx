@@ -88,6 +88,7 @@ function Linha({
   base,
   className = "",
   alinhar,
+  vertical,
   clara,
   children,
 }: {
@@ -95,11 +96,13 @@ function Linha({
   base: number;
   className?: string;
   alinhar?: "centro" | "esquerda";
+  /** "baixo": senta sobre a linha desenhada no pé da área. */
+  vertical?: "centro" | "baixo";
   clara?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <Caixa area={area} tinta={clara ? "clara" : "escura"} base={base} minimo={0.6} alinhar={alinhar}>
+    <Caixa area={area} tinta={clara ? "clara" : "escura"} base={base} minimo={0.6} alinhar={alinhar} vertical={vertical}>
       <p className={`whitespace-nowrap leading-none ${className}`}>{children}</p>
     </Caixa>
   );
@@ -114,29 +117,21 @@ function Titulo({ area, base, giro, children }: { area: Area; base: number; giro
 }
 
 /** "Sua posição" pequeno + "3º lugar" grande, numa linha só. */
-function SuaPosicao({ area, base, eu, empilhado }: { area: Area; base: number; eu: MembroCartaz; empilhado?: boolean }) {
+function SuaPosicao({ area, base, eu }: { area: Area; base: number; eu: MembroCartaz }) {
   return (
     <Caixa area={area} tinta="escura" base={base} minimo={0.6} alinhar="esquerda">
-      {empilhado ? (
-        <>
-          <p className="whitespace-nowrap font-sans text-[0.45em] leading-tight">Sua posição</p>
-          <p className="whitespace-nowrap font-sans font-bold italic leading-none">{posicaoTexto(eu)}</p>
-        </>
-      ) : (
-        <p className="whitespace-nowrap leading-none">
-          <span className="font-sans text-[0.6em]">Sua posição </span>
-          <span className="font-sans font-bold italic">{posicaoTexto(eu)}</span>
-        </p>
-      )}
+      <p className="whitespace-nowrap font-sans text-[0.55em] font-medium leading-tight">Sua posição</p>
+      <p className="whitespace-nowrap font-sans font-extrabold italic leading-none">{posicaoTexto(eu)}</p>
     </Caixa>
   );
 }
 
 const LAYOUT_LISTA = {
   "desafio-placar": {
-    titulo: [15, 7.8, 54, 6.6] as Area,
+    titulo: [16, 8.1, 52, 5.9] as Area,
     datas: [20, 17.8, 27, 2.8] as Area,
     livro: [62.5, 17.8, 27.5, 2.8] as Area,
+    sobreLinha: false,
     faixa: null as Area | null,
     linhas: [31.2, 38.8, 46.4, 53.9, 61.6],
     avatar: { x: 25.5, d: 7.8 },
@@ -145,14 +140,14 @@ const LAYOUT_LISTA = {
     alturaLinha: 3,
     stats: [[8, 81.3, 25, 3], [38.5, 81.3, 24, 3], [68.5, 81.3, 23.5, 3]] as Area[],
     horas: false,
-    posicao: [19, 90.8, 29, 3.2] as Area,
-    posicaoEmpilhada: false,
+    posicao: [20.5, 90.95, 26, 2.75] as Area,
     restam: [64.5, 90.8, 29, 3.2] as Area,
   },
   "desafio-retro": {
     titulo: [16, 4.3, 70, 10] as Area,
-    datas: [19.5, 18.3, 18, 2.8] as Area,
-    livro: [51.5, 18.3, 37.5, 2.8] as Area,
+    datas: [19.5, 17.3, 18, 3] as Area,
+    livro: [51.5, 17.3, 37.5, 3] as Area,
+    sobreLinha: true,
     faixa: [15, 25.9, 37, 3] as Area,
     linhas: [34.8, 42.8, 50.9, 58.9, 66.9],
     avatar: { x: 26, d: 9.5 },
@@ -162,7 +157,6 @@ const LAYOUT_LISTA = {
     stats: [[5, 80.3, 28.5, 4.8], [37.5, 80.3, 26, 4.8], [67.5, 80.3, 28, 4.8]] as Area[],
     horas: true,
     posicao: [17, 89.4, 32, 5.4] as Area,
-    posicaoEmpilhada: true,
     restam: [53, 90, 37, 4] as Area,
   },
 };
@@ -235,7 +229,7 @@ function Podio({ d }: { d: DesafioCartaz }) {
         <Linha key={i} area={area} base={5} className="font-display">{valor}</Linha>
       ))}
       <Avatar membro={d.eu} estilo={circulo(16.7, 94.2, 12.4)} />
-      <SuaPosicao area={[29, 92.3, 36, 3.5]} base={3.6} eu={d.eu} />
+      <SuaPosicao area={[28.5, 91.9, 37, 4.4]} base={4.6} eu={d.eu} />
       <Linha area={[68, 92.3, 22, 3.6]} base={3} className="font-display uppercase">{d.metricaLida}</Linha>
     </>
   );
@@ -250,8 +244,8 @@ function Lista({ d, layout: L }: { d: DesafioCartaz; layout: (typeof LAYOUT_LIST
   return (
     <>
       <Titulo area={L.titulo} base={6.4} giro={-3}>{d.nome}</Titulo>
-      <Linha area={L.datas} base={3} alinhar="esquerda" className="font-sans font-bold">{d.periodo}</Linha>
-      <Linha area={L.livro} base={3.4} alinhar="esquerda" className="font-serif font-semibold italic">{d.livro}</Linha>
+      <Linha area={L.datas} base={3} alinhar="esquerda" vertical={L.sobreLinha ? "baixo" : "centro"} className="font-sans font-bold">{d.periodo}</Linha>
+      <Linha area={L.livro} base={3.4} alinhar="esquerda" vertical={L.sobreLinha ? "baixo" : "centro"} className="font-serif font-semibold italic">{d.livro}</Linha>
       {L.faixa && (
         <Linha area={L.faixa} base={3} alinhar="esquerda" clara className="font-display uppercase tracking-[0.1em]">
           Ranking · {d.metricaRotulo}
@@ -280,7 +274,7 @@ function Lista({ d, layout: L }: { d: DesafioCartaz; layout: (typeof LAYOUT_LIST
       {stats.map(([area, valor], i) => (
         <Linha key={i} area={area} base={5} className="font-display">{valor}</Linha>
       ))}
-      <SuaPosicao area={L.posicao} base={L.posicaoEmpilhada ? 4.6 : 3.4} eu={d.eu} empilhado={L.posicaoEmpilhada} />
+      <SuaPosicao area={L.posicao} base={4.8} eu={d.eu} />
       <Linha area={L.restam} base={3.2} className="font-sans font-bold">{d.restam}</Linha>
     </>
   );
