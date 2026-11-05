@@ -1166,7 +1166,7 @@ function TelaRegistro({
             {(() => {
               const seletor = (
                 <div className="flex justify-end">
-                  <div className="grid grid-cols-3 overflow-hidden rounded-sm border-2 border-ink">
+                  <div className="grid grid-cols-3 divide-x-2 divide-ink overflow-hidden rounded-sm border-2 border-ink">
                     {(["pages", "chapters", "percent"] as const).map((m) => {
                       const ativo = unidade === m;
                       const semBase = m === "percent" && !livro.totalPaginas;
