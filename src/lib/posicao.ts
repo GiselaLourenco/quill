@@ -63,3 +63,11 @@ export const paginaDoPercentual = (pct: number, totalPaginas: number) =>
 /** Página → % inteiro, pra abrir o campo em % a partir de uma posição em páginas. */
 export const percentualDaPagina = (pagina: number, totalPaginas: number) =>
   Math.min(100, Math.round((pagina / totalPaginas) * 100));
+
+/** Capítulo estimado pela página (pág. 48 de 686 num livro de 38 caps → cap. 3). */
+export const capituloDaPagina = (pagina: number, totalPaginas: number, totalCapitulos: number) =>
+  Math.min(totalCapitulos, Math.round((pagina / totalPaginas) * totalCapitulos));
+
+/** Página estimada pelo capítulo — a conta inversa da de cima. */
+export const paginaDoCapitulo = (cap: number, totalPaginas: number, totalCapitulos: number) =>
+  Math.min(totalPaginas, Math.round((cap / totalCapitulos) * totalPaginas));

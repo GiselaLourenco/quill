@@ -10,7 +10,13 @@ import {
   type UnidadeTempo,
 } from "@/lib/tempo";
 import { ComSpinner } from "@/components/carregando";
-import { CampoPosicao, ESTADO_POSICAO_VAZIO, type EstadoPosicao } from "@/components/campo-posicao";
+import {
+  CampoPosicao,
+  ESTADO_POSICAO_VAZIO,
+  type EstadoPosicao,
+  type UnidadeCampo,
+} from "@/components/campo-posicao";
+import { capituloDaPagina, paginaDoCapitulo, percentualDaPagina } from "@/lib/posicao";
 
 export type LivroLendo = {
   id: string;
@@ -18,9 +24,23 @@ export type LivroLendo = {
   /** Posição registrada mais recente; null = o livro nunca teve. */
   paginaAtual: number | null;
   capituloAtual: number | null;
+  /** % digitado na sessão mais recente em páginas (null = não foi em %). */
+  percentualAtual?: number | null;
+  /** A sessão mais recente do livro foi em capítulos. */
+  ultimaEmCapitulos?: boolean;
   totalPaginas: number | null;
   totalCapitulos: number | null;
 };
+
+/** Mesma regra da aba Ler: abre na última unidade usada nesse livro. */
+const unidadeDoLivro = (l: LivroLendo | null): UnidadeCampo =>
+  l && l.ultimaEmCapitulos && l.capituloAtual != null
+    ? "chapters"
+    : l && l.percentualAtual != null && l.totalPaginas
+      ? "percent"
+      : l && l.paginaAtual == null && l.capituloAtual != null
+        ? "chapters"
+        : "pages";
 
 // Atalhos por unidade. Em horas os passos são inteiros: quem pensa "li duas
 // horas" não quer marcar 120.
@@ -46,10 +66,10 @@ export function CheckinSheet({
   // unidade só muda como o número é mostrado e digitado.
   const [minutos, setMinutos] = useState(30);
   const [unidade, setUnidade] = useState<UnidadeTempo>("min");
-  // Página e capítulo ATUAIS (mesma regra da aba Ler): o app faz a conta com
-  // a posição anterior do livro.
-  const [pagina, setPagina] = useState<EstadoPosicao>(ESTADO_POSICAO_VAZIO);
-  const [capitulo, setCapitulo] = useState<EstadoPosicao>(ESTADO_POSICAO_VAZIO);
+  // "Onde você parou?" igual ao da aba Ler: uma posição só, em páginas,
+  // capítulos ou %, e o app faz a conta com a posição anterior do livro.
+  const [posicaoUnidade, setPosicaoUnidade] = useState<UnidadeCampo>(() => unidadeDoLivro(livros[0] ?? null));
+  const [posicao, setPosicao] = useState<EstadoPosicao>(ESTADO_POSICAO_VAZIO);
   const [comentario, setComentario] = useState("");
   // Sem seletor de visibilidade: check-in de desafio existe pra aparecer no
   // desafio. Quem quer anotar só pra si registra a leitura pela aba Ler, onde
@@ -73,12 +93,27 @@ export function CheckinSheet({
 
   const semLivro = livroId === "manual";
   const livro = livros.find((l) => l.id === livroId) ?? null;
+  const emCaps = posicaoUnidade === "chapters";
+  // Sessão em capítulos num livro com os dois totais: a página anda junto
+  // (só pra frente), igual à aba Ler.
+  const paginaEstimada =
+    livro &&
+    emCaps &&
+    posicao.posicao != null &&
+    posicao.delta > 0 &&
+    livro.totalPaginas &&
+    livro.totalCapitulos
+      ? (() => {
+          const p = paginaDoCapitulo(posicao.posicao, livro.totalPaginas, livro.totalCapitulos);
+          return p > (livro.paginaAtual ?? 0) ? p : null;
+        })()
+      : null;
   const podeSalvar = minutos > 0 && !salvando;
 
   function salvar() {
     if (!podeSalvar) return;
     setErro(null);
-    const bloqueio = semLivro ? null : (pagina.bloqueio ?? capitulo.bloqueio);
+    const bloqueio = semLivro ? null : posicao.bloqueio;
     if (bloqueio) {
       setErro(bloqueio);
       return;
@@ -89,10 +124,12 @@ export function CheckinSheet({
         itemId: semLivro ? null : livroId,
         startedAt: new Date().toISOString(),
         durationSeconds: minutos * 60,
-        pagina: semLivro ? null : pagina.posicao,
-        capitulo: semLivro ? null : capitulo.posicao,
-        paginaAntes: pagina.antes,
-        capituloAntes: capitulo.antes,
+        pagina: semLivro ? null : emCaps ? paginaEstimada : posicao.posicao,
+        capitulo: semLivro || !emCaps ? null : posicao.posicao,
+        paginaAntes: semLivro || emCaps ? null : posicao.antes,
+        capituloAntes: semLivro || !emCaps ? null : posicao.antes,
+        percentual: !semLivro && posicaoUnidade === "percent" ? (posicao.percentual ?? null) : null,
+        percentualAntes: !semLivro && posicaoUnidade === "percent" ? (posicao.percentualAntes ?? null) : null,
         tags: [],
       });
 
@@ -164,8 +201,8 @@ export function CheckinSheet({
                   value={livroId}
                   onChange={(e) => {
                     setLivroId(e.target.value);
-                    setPagina(ESTADO_POSICAO_VAZIO);
-                    setCapitulo(ESTADO_POSICAO_VAZIO);
+                    setPosicaoUnidade(unidadeDoLivro(livros.find((l) => l.id === e.target.value) ?? null));
+                    setPosicao(ESTADO_POSICAO_VAZIO);
                   }}
                   className="shadow-hard-sm w-full appearance-none rounded-md border-2 border-ink bg-card py-3 pl-3 pr-11 font-serif text-sm italic text-ink"
                 >
@@ -256,32 +293,83 @@ export function CheckinSheet({
               </div>
             </div>
 
-            {/* Onde parou — página e capítulo atuais, com a conta e os
-                avisos da aba Ler. Sem livro não tem posição. */}
+            {/* Onde você parou — o mesmo bloco da aba Ler (Páginas/Caps/%,
+                − e +, conta e avisos). Sem livro não tem posição. O % só
+                existe com total de páginas. */}
             {livro && (
-              <div className="space-y-4">
-                <CampoPosicao
-                  key={`${livro.id}:pages`}
-                  unidade="pages"
-                  anterior={livro.paginaAtual}
-                  total={livro.totalPaginas}
-                  livroJaRegistrado={livro.paginaAtual != null || livro.capituloAtual != null}
-                  minutos={minutos}
-                  variante="checkin"
-                  rotulo="Página atual"
-                  onChange={setPagina}
-                />
-                <CampoPosicao
-                  key={`${livro.id}:chapters`}
-                  unidade="chapters"
-                  anterior={livro.capituloAtual}
-                  total={livro.totalCapitulos}
-                  livroJaRegistrado={livro.paginaAtual != null || livro.capituloAtual != null}
-                  minutos={minutos}
-                  variante="checkin"
-                  rotulo="Capítulo atual"
-                  onChange={setCapitulo}
-                />
+              <div>
+                <p className="mb-2 block font-display text-[10px] uppercase tracking-widest text-ink">
+                  Onde você parou?
+                </p>
+                {(() => {
+                  const seletor = (
+                    <div className="flex justify-end">
+                      <div className="grid grid-cols-3 divide-x-2 divide-ink overflow-hidden rounded-sm border-2 border-ink">
+                        {(["pages", "chapters", "percent"] as const).map((m) => {
+                          const ativo = posicaoUnidade === m;
+                          const semBase = m === "percent" && !livro.totalPaginas;
+                          return (
+                            <button
+                              key={m}
+                              type="button"
+                              disabled={semBase}
+                              title={semBase ? "Cadastre o total de páginas do livro para registrar em %" : undefined}
+                              onClick={() => {
+                                setPosicaoUnidade(m);
+                                setPosicao(ESTADO_POSICAO_VAZIO);
+                              }}
+                              aria-pressed={ativo}
+                              className={`px-4 py-1.5 font-display text-[11px] uppercase tracking-wide ${
+                                ativo ? "bg-ink text-paper" : semBase ? "bg-card text-ink/35" : "bg-card text-ink"
+                              }`}
+                            >
+                              {m === "pages" ? "Páginas" : m === "chapters" ? "Caps" : "%"}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                  const sugestaoCap =
+                    emCaps &&
+                    livro.capituloAtual == null &&
+                    livro.paginaAtual != null &&
+                    livro.totalPaginas &&
+                    livro.totalCapitulos
+                      ? capituloDaPagina(livro.paginaAtual, livro.totalPaginas, livro.totalCapitulos)
+                      : null;
+                  const anteriorPct =
+                    posicaoUnidade !== "percent" || livro.paginaAtual == null || !livro.totalPaginas
+                      ? null
+                      : (livro.percentualAtual ?? percentualDaPagina(livro.paginaAtual, livro.totalPaginas));
+                  return (
+                    <CampoPosicao
+                      key={`${livro.id}:${posicaoUnidade}`}
+                      unidade={posicaoUnidade}
+                      anterior={emCaps ? livro.capituloAtual : livro.paginaAtual}
+                      percentualAnterior={anteriorPct}
+                      livroJaRegistrado={livro.paginaAtual != null || livro.capituloAtual != null}
+                      sugestaoAntes={
+                        sugestaoCap != null
+                          ? {
+                              valor: sugestaoCap,
+                              texto: `Pela pág. ${livro.paginaAtual}, você está por volta do cap. ${sugestaoCap} de ${livro.totalCapitulos}.`,
+                            }
+                          : null
+                      }
+                      rodape={
+                        paginaEstimada != null ? (
+                          <p className="text-right text-[11px] text-ink/70">a página vai para ≈ {paginaEstimada}</p>
+                        ) : null
+                      }
+                      total={emCaps ? livro.totalCapitulos : livro.totalPaginas}
+                      minutos={minutos}
+                      variante="ler"
+                      onChange={setPosicao}
+                      topo={seletor}
+                    />
+                  );
+                })()}
               </div>
             )}
 

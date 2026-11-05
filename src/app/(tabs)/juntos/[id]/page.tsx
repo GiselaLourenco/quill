@@ -328,7 +328,8 @@ export default async function DesafioDetalhePage({
   const { data: posicoesRows } = idsLendo.length
     ? await supabase
         .from("sessions")
-        .select("item_id, unit_end, chapter_end, created_at")
+        .select("item_id, unit_end, chapter_end, percent_end, created_at")
+        .eq("user_id", userId)
         .in("item_id", idsLendo)
         .or("unit_end.not.is.null,chapter_end.not.is.null")
     : { data: [] };
@@ -341,11 +342,27 @@ export default async function DesafioDetalhePage({
     })),
   );
 
+  // Mesmas regras da aba Ler: % digitado e unidade da sessão mais recente,
+  // pra o check-in abrir na unidade que a pessoa usou por último.
+  const ultimaLendo = new Map<string, { caps: boolean; at: string }>();
+  const pctLendo = new Map<string, { pct: number | null; at: string }>();
+  for (const p of posicoesRows ?? []) {
+    const id = p.item_id as string;
+    const at = p.created_at as string;
+    const u = ultimaLendo.get(id);
+    if (!u || at > u.at) ultimaLendo.set(id, { caps: p.chapter_end != null, at });
+    if (p.unit_end == null) continue;
+    const q = pctLendo.get(id);
+    if (!q || at > q.at) pctLendo.set(id, { pct: (p.percent_end as number | null) ?? null, at });
+  }
+
   const livrosLendo = (livrosRows ?? []).map((l) => ({
     id: l.id as string,
     titulo: (l.title as string) ?? "Sem título",
     paginaAtual: posicaoLendo.get(l.id as string)?.pagina ?? null,
     capituloAtual: posicaoLendo.get(l.id as string)?.capitulo ?? null,
+    percentualAtual: pctLendo.get(l.id as string)?.pct ?? null,
+    ultimaEmCapitulos: ultimaLendo.get(l.id as string)?.caps ?? false,
     totalPaginas: (l.total_units as number | null) ?? null,
     totalCapitulos: (l.total_chapters as number | null) ?? null,
   }));

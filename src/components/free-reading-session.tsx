@@ -22,7 +22,7 @@ import {
   type EstadoPosicao,
   type UnidadeCampo,
 } from "@/components/campo-posicao";
-import { percentualDaPagina } from "@/lib/posicao";
+import { capituloDaPagina, paginaDoCapitulo, percentualDaPagina } from "@/lib/posicao";
 import type { ActiveChallenge } from "@/lib/challenges";
 import { ComSpinner } from "@/components/carregando";
 
@@ -41,13 +41,6 @@ export type BookOption = CoverFields & {
   ultimaEmCapitulos?: boolean;
 };
 
-/** Capítulo estimado pela página (pág. 48 de 686 num livro de 38 caps → cap. 3). */
-const capituloDaPagina = (pagina: number, totalPaginas: number, totalCapitulos: number) =>
-  Math.min(totalCapitulos, Math.round((pagina / totalPaginas) * totalCapitulos));
-
-/** Página estimada pelo capítulo — a conta inversa da de cima. */
-const paginaDoCapitulo = (cap: number, totalPaginas: number, totalCapitulos: number) =>
-  Math.min(totalPaginas, Math.round((cap / totalCapitulos) * totalPaginas));
 
 /**
  * Abre na última unidade usada nesse livro: % se a sessão mais recente foi em
