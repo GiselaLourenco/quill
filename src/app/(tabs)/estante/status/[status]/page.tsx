@@ -77,7 +77,7 @@ export default async function StatusGridPage({
           ‹
         </Link>
         <span className={`h-3 w-3 rounded-sm border border-ink ${meta.corBg}`} />
-        <h1 className="font-display text-lg text-ink">{meta.label}</h1>
+        <h1 className="font-display text-lg uppercase leading-none tracking-tight text-ink">{meta.label}</h1>
         <span className="text-xs text-ink-soft">· {books.length}</span>
       </header>
 

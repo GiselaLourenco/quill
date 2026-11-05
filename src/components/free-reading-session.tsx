@@ -1126,11 +1126,7 @@ function TelaRegistro({
               </svg>
             </button>
 
-            <h1 className="font-display text-3xl uppercase leading-none tracking-tight text-ink">
-              Registrar
-              <br />
-              leitura
-            </h1>
+            <h1 className="font-display text-lg uppercase leading-none tracking-tight text-ink">Registrar leitura</h1>
           </div>
 
           <div className="relative shrink-0">

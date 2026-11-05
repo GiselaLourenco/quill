@@ -223,7 +223,7 @@ export default async function BookPage({
           >
             ‹
           </Link>
-          <h1 className="font-display text-lg uppercase tracking-tight text-ink">
+          <h1 className="font-display text-lg uppercase leading-none tracking-tight text-ink">
             Meu livro
           </h1>
         </div>
@@ -493,7 +493,7 @@ async function FriendBookView({
             <path d="M15 18l-6-6 6-6" />
           </svg>
         </BotaoVoltar>
-        <h1 className="font-display text-base uppercase tracking-tight text-ink">
+        <h1 className="font-display text-lg uppercase leading-none tracking-tight text-ink">
           Na estante de{" "}
           <span className="text-coral">{ownerName}</span>
         </h1>

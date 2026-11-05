@@ -73,7 +73,7 @@ export default function DiarioClient({ entradas }: { entradas: EntradaDiario[] }
             <span aria-hidden>‹</span> Estante
           </Link>
 
-          <h1 className="font-display text-xl uppercase leading-none tracking-tight text-ink">
+          <h1 className="font-display text-lg uppercase leading-none tracking-tight text-ink">
             Meu diário
           </h1>
 

@@ -357,7 +357,7 @@ export function ColecaoConquistas({
         >
           ←
         </Link>
-        <h1 className="font-display text-xl uppercase">Conquistas</h1>
+        <h1 className="font-display text-lg uppercase leading-none tracking-tight text-ink">Conquistas</h1>
         <span className="ml-auto text-[13px] font-bold tabular-nums">
           {feitas}/{conquistas.length}
         </span>

@@ -67,7 +67,7 @@ export default async function CalendarioPage({
         <Link href="/" aria-label="Voltar" className="text-lg">
           ←
         </Link>
-        <span className="font-serif text-lg">Calendário</span>
+        <h1 className="font-display text-lg uppercase leading-none tracking-tight text-ink">Calendário</h1>
       </header>
       <main className="mx-auto w-full max-w-sm flex-1 px-4 py-6">
         <div className="mb-4 flex items-center justify-between">

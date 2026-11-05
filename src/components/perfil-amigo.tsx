@@ -122,7 +122,7 @@ export function PerfilAmigo({
             >
               ‹
             </button>
-            <h1 className="min-w-0 truncate font-display text-base uppercase tracking-tight text-ink">
+            <h1 className="min-w-0 truncate font-display text-lg uppercase leading-none tracking-tight text-ink">
               Estante de {nome}
             </h1>
           </header>

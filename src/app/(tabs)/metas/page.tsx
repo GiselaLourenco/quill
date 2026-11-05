@@ -110,7 +110,7 @@ export default async function MetasPage({
         <Link href="/" aria-label="Voltar" className="text-lg">
           ←
         </Link>
-        <span className="font-serif text-lg">Metas</span>
+        <h1 className="font-display text-lg uppercase leading-none tracking-tight text-ink">Metas</h1>
       </header>
       <main className="mx-auto w-full max-w-sm flex-1 px-4 py-6">
         {error && <p className="mb-4 text-sm font-medium text-coral">{error}</p>}

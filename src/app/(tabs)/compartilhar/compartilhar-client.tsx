@@ -209,16 +209,16 @@ export default function CompartilharClient({
         <button
           type="button"
           onClick={() => setEscolhendoModelo(true)}
-          aria-label="Escolher modelo do cartaz"
           aria-haspopup="dialog"
-          className="shadow-hard-sm ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-md border-2 border-ink bg-mustard text-ink active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+          className="shadow-hard-sm ml-auto flex h-9 shrink-0 items-center gap-1.5 rounded-md border-2 border-ink bg-mustard px-2.5 text-xs font-bold text-ink active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
         >
           {/* camadas */}
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M12 3 2 8l10 5 10-5-10-5z" />
             <path d="m2 13 10 5 10-5" />
             <path d="m2 17.5 10 5 10-5" />
           </svg>
+          Modelo
         </button>
       </header>
 

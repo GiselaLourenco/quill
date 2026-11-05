@@ -60,13 +60,13 @@ export default async function EstantePage({
           <div className="flex items-center gap-2">
             <Link
               href="/estante/diario"
-              aria-label="Abrir diário"
-              className="flex h-10 w-10 items-center justify-center rounded-md border-2 border-ink bg-mustard text-ink shadow-hard-sm"
+              className="flex h-10 items-center gap-1.5 rounded-md border-2 border-ink bg-mustard px-3 text-xs font-bold text-ink shadow-hard-sm active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
             >
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
                 <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
               </svg>
+              Diário
             </Link>
           </div>
         )}

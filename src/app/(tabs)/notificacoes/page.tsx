@@ -19,7 +19,7 @@ export default async function NotificacoesPage() {
         >
           ‹
         </Link>
-        <h1 className="font-display text-2xl uppercase leading-none tracking-tight text-ink">
+        <h1 className="font-display text-lg uppercase leading-none tracking-tight text-ink">
           Notificações
         </h1>
         {novas > 0 && (

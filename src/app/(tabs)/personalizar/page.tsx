@@ -22,7 +22,7 @@ export default async function PersonalizarPage() {
         <Link href="/" aria-label="Voltar" className="text-lg">
           ←
         </Link>
-        <span className="font-serif text-lg">Personalizar painel</span>
+        <h1 className="font-display text-lg uppercase leading-none tracking-tight text-ink">Personalizar painel</h1>
       </header>
       <main className="mx-auto w-full max-w-sm flex-1 px-4 py-6">
         <p className="mb-4 text-sm text-ink/65">
