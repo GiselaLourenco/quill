@@ -72,6 +72,8 @@ create table public.sessions (
   unit_end         int,                       -- página/fase final (usado na trava de spoiler)
   chapter_start     int,                      -- capítulo anterior (p/ pílula capítulos/semana)
   chapter_end       int,                      -- capítulo informado nesta sessão (valor absoluto)
+  percent_start    smallint check (percent_start between 0 and 100), -- posição anterior em % (registro por %)
+  percent_end      smallint check (percent_end between 0 and 100),   -- % informado; unit_* guarda as páginas convertidas
   quality_tags     text[] not null default '{}', -- {'no_distractions','flowed','phone','hard'}
   cadastro         boolean not null default false, -- posição informada ao montar a estante (0 → X, sem leitura antes): vale pra página atual, não pras métricas
   created_at       timestamptz not null default now()

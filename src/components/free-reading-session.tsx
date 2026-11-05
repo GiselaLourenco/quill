@@ -8,15 +8,21 @@ import {
 } from "@/lib/tempo";
 import { BookThumb } from "@/components/book-thumb";
 import { BookCover, type CoverFields } from "@/components/book-cover";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import {
   createSession,
   publishSession,
   saveSessionMemory,
   type SessionUnit,
 } from "@/app/actions/sessions";
-import { iniciarReleitura, updateItemStatus } from "@/app/actions/media-items";
-import { CampoPosicao, ESTADO_POSICAO_VAZIO, type EstadoPosicao } from "@/components/campo-posicao";
+import { atualizarCampoLivro, iniciarReleitura, updateItemStatus } from "@/app/actions/media-items";
+import {
+  CampoPosicao,
+  ESTADO_POSICAO_VAZIO,
+  type EstadoPosicao,
+  type UnidadeCampo,
+} from "@/components/campo-posicao";
+import { percentualDaPagina } from "@/lib/posicao";
 import type { ActiveChallenge } from "@/lib/challenges";
 import { ComSpinner } from "@/components/carregando";
 
@@ -27,13 +33,22 @@ export type BookOption = CoverFields & {
   /** Posição registrada mais recente; null = o livro nunca teve. */
   paginaAtual: number | null;
   capituloAtual: number | null;
+  /** % digitado na sessão mais recente em páginas; null = ela não foi em %. */
+  percentualAtual?: number | null;
   totalPaginas: number | null;
   totalCapitulos: number | null;
 };
 
-/** Quem só registra capítulos nesse livro já abre em capítulos. */
-const unidadeDoLivro = (l: BookOption | null): SessionUnit =>
-  l && l.paginaAtual == null && l.capituloAtual != null ? "chapters" : "pages";
+/**
+ * Abre na última unidade usada nesse livro: % se a sessão mais recente foi em
+ * %; capítulos se o livro só tem capítulos; senão páginas.
+ */
+const unidadeDoLivro = (l: BookOption | null): UnidadeCampo =>
+  l && l.percentualAtual != null && l.totalPaginas
+    ? "percent"
+    : l && l.paginaAtual == null && l.capituloAtual != null
+      ? "chapters"
+      : "pages";
 
 const TAG_OPTIONS: { value: string; label: string; positiva: boolean }[] = [
   { value: "flowed", label: "a leitura fluiu", positiva: true },
@@ -704,6 +719,58 @@ function CaixaNota({
   );
 }
 
+/**
+ * Modo % sem total de páginas: o % precisa de uma base, então a caixa pede o
+ * total ali mesmo (e grava no livro) em vez de mandar a pessoa pra ficha.
+ */
+function PedirTotalPaginas({
+  topo,
+  onSalvar,
+}: {
+  topo: ReactNode;
+  onSalvar: (total: number) => Promise<string | null>;
+}) {
+  const [valor, setValor] = useState("");
+  const [erro, setErro] = useState<string | null>(null);
+  const [salvando, startSalvar] = useTransition();
+  const n = Number(valor);
+  const valido = Number.isInteger(n) && n > 0;
+  return (
+    <div className="shadow-hard-sm rounded-md border-2 border-ink bg-mustard p-3">
+      {topo}
+      <p className="mt-3 text-[13px] font-semibold text-ink">Quantas páginas tem esse livro?</p>
+      <p className="mt-0.5 text-[12px] text-ink/70">Pra registrar em %, a gente precisa do total de páginas.</p>
+      <div className="mt-2 flex gap-2">
+        <input
+          type="text"
+          inputMode="numeric"
+          value={valor}
+          placeholder="ex.: 320"
+          autoFocus
+          onChange={(e) => setValor(e.target.value.replace(/[^0-9]/g, "").slice(0, 5))}
+          aria-label="Total de páginas do livro"
+          className="shadow-hard-sm min-w-0 flex-1 rounded-md border-2 border-ink bg-card px-3 py-2 font-display text-lg tabular-nums text-ink focus:outline-none"
+        />
+        <button
+          type="button"
+          disabled={!valido || salvando}
+          onClick={() =>
+            startSalvar(async () => {
+              setErro(null);
+              const e = await onSalvar(n);
+              if (e) setErro(e);
+            })
+          }
+          className="shadow-hard-sm rounded-md border-2 border-ink bg-ink px-4 font-display text-[12px] uppercase tracking-wide text-paper disabled:opacity-40"
+        >
+          <ComSpinner ocupado={salvando}>Salvar</ComSpinner>
+        </button>
+      </div>
+      {erro && <p className="mt-2 text-[12px] font-medium text-coral">{erro}</p>}
+    </div>
+  );
+}
+
 function Passo({
   numero,
   titulo,
@@ -764,7 +831,11 @@ function TelaRegistro({
   // Enquanto marca "lendo"/começa a releitura no servidor, salvar espera — a
   // sessão precisa partir da posição já zerada da releitura.
   const [marcandoLendo, startMarcarLendo] = useTransition();
-  const [unidade, setUnidade] = useState<SessionUnit>(() => unidadeDoLivro(disponiveis[0] ?? null));
+  const [unidade, setUnidade] = useState<UnidadeCampo>(() => unidadeDoLivro(disponiveis[0] ?? null));
+  // A métrica gravada: % vira páginas.
+  const unidadeMetrica: SessionUnit = unidade === "chapters" ? "chapters" : "pages";
+  // Total de páginas informado aqui mesmo (pra liberar o %) — vale já nesta tela.
+  const [totaisInformados, setTotaisInformados] = useState<Record<string, number>>({});
   // O que o campo "Onde você parou?" calculou (posição, quanto conta, avisos).
   const [posicao, setPosicao] = useState<EstadoPosicao>(ESTADO_POSICAO_VAZIO);
   // `total` é sempre minuto — é o que a sessão grava. A unidade só muda como o
@@ -790,10 +861,14 @@ function TelaRegistro({
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, startSave] = useTransition();
 
-  const livroBase = disponiveis.find((l) => l.id === livroId) ?? null;
+  const livroAchado = disponiveis.find((l) => l.id === livroId) ?? null;
+  const livroBase =
+    livroAchado && totaisInformados[livroAchado.id]
+      ? { ...livroAchado, totalPaginas: totaisInformados[livroAchado.id] }
+      : livroAchado;
   const livro =
     livroBase && relidos.has(livroBase.id)
-      ? { ...livroBase, status: "reading", paginaAtual: 0, capituloAtual: 0 }
+      ? { ...livroBase, status: "reading", paginaAtual: 0, capituloAtual: 0, percentualAtual: null }
       : livroBase;
   const quantidade = livro ? posicao.delta : 0;
 
@@ -865,17 +940,24 @@ function TelaRegistro({
     }
     startSave(async () => {
       if (demo) {
-        onSalvo({ minutos: total, titulo: livro?.title ?? "Sem livro vinculado", quantidade, unidade });
+        onSalvo({
+          minutos: total,
+          titulo: livro?.title ?? "Sem livro vinculado",
+          quantidade,
+          unidade: unidadeMetrica,
+        });
         return;
       }
       const resultado = await createSession({
         itemId: livroId,
         startedAt,
         durationSeconds: Math.max(60, total * 60),
-        pagina: livro && unidade === "pages" ? posicao.posicao : null,
+        pagina: livro && unidadeMetrica === "pages" ? posicao.posicao : null,
         capitulo: livro && unidade === "chapters" ? posicao.posicao : null,
-        paginaAntes: unidade === "pages" ? posicao.antes : null,
+        paginaAntes: unidadeMetrica === "pages" ? posicao.antes : null,
         capituloAntes: unidade === "chapters" ? posicao.antes : null,
+        percentual: livro && unidade === "percent" ? (posicao.percentual ?? null) : null,
+        percentualAntes: unidade === "percent" ? (posicao.percentualAntes ?? null) : null,
         tags: [...tags],
       });
 
@@ -914,7 +996,7 @@ function TelaRegistro({
         minutos: total,
         titulo: livro?.title ?? "Sem livro vinculado",
         quantidade,
-        unidade,
+        unidade: unidadeMetrica,
       });
     });
   }
@@ -1005,7 +1087,9 @@ function TelaRegistro({
                     <span className={`mt-0.5 block text-[10px] ${on ? "text-paper/80" : "text-ink-soft"}`}>
                       {relidos.has(l.id)
                         ? "relendo"
-                        : l.paginaAtual
+                        : l.percentualAtual != null
+                          ? `${l.percentualAtual}%`
+                          : l.paginaAtual
                           ? `pág. ${l.paginaAtual}`
                           : l.capituloAtual
                             ? `cap. ${l.capituloAtual}`
@@ -1074,23 +1158,18 @@ function TelaRegistro({
           </div>
         </Passo>
 
-        {/* 02 — Onde parou: a pessoa diz a página/capítulo atual e o app faz
-            a conta com a posição anterior. Sem livro não tem posição. */}
+        {/* 02 — Onde parou: a pessoa diz a página/capítulo/% atual e o app faz
+            a conta com a posição anterior. Sem livro não tem posição. O % só
+            funciona com total de páginas — sem ele, pede o total ali mesmo. */}
         {livro && (
           <Passo numero={numeroPasso("posicao")} titulo="Onde você parou?">
-            <CampoPosicao
-              key={`${livro.id}:${unidade}:${relidos.has(livro.id)}`}
-              unidade={unidade}
-              anterior={unidade === "pages" ? livro.paginaAtual : livro.capituloAtual}
-              total={unidade === "pages" ? livro.totalPaginas : livro.totalCapitulos}
-              minutos={total}
-              variante="ler"
-              onChange={setPosicao}
-              topo={
+            {(() => {
+              const seletor = (
                 <div className="flex justify-end">
-                  <div className="grid grid-cols-2 overflow-hidden rounded-sm border-2 border-ink">
-                    {(["pages", "chapters"] as const).map((m) => {
+                  <div className="grid grid-cols-3 overflow-hidden rounded-sm border-2 border-ink">
+                    {(["pages", "chapters", "percent"] as const).map((m) => {
                       const ativo = unidade === m;
+                      const semBase = m === "percent" && !livro.totalPaginas;
                       return (
                         <button
                           key={m}
@@ -1099,18 +1178,52 @@ function TelaRegistro({
                             setUnidade(m);
                             setPosicao(ESTADO_POSICAO_VAZIO);
                           }}
+                          aria-pressed={ativo}
                           className={`px-4 py-1.5 font-display text-[11px] uppercase tracking-wide ${
-                            ativo ? "bg-ink text-paper" : "bg-card text-ink"
+                            ativo ? "bg-ink text-paper" : semBase ? "bg-card text-ink/35" : "bg-card text-ink"
                           }`}
                         >
-                          {m === "pages" ? "Páginas" : "Caps"}
+                          {m === "pages" ? "Páginas" : m === "chapters" ? "Caps" : "%"}
                         </button>
                       );
                     })}
                   </div>
                 </div>
+              );
+              if (unidade === "percent" && !livro.totalPaginas) {
+                return (
+                  <PedirTotalPaginas
+                    key={livro.id}
+                    topo={seletor}
+                    onSalvar={async (n) => {
+                      if (!demo) {
+                        const r = await atualizarCampoLivro(livro.id, "paginas", String(n));
+                        if (r.error) return r.error;
+                      }
+                      setTotaisInformados((prev) => ({ ...prev, [livro.id]: n }));
+                      return null;
+                    }}
+                  />
+                );
               }
-            />
+              const anteriorPct =
+                unidade !== "percent" || livro.paginaAtual == null
+                  ? null
+                  : (livro.percentualAtual ?? percentualDaPagina(livro.paginaAtual, livro.totalPaginas!));
+              return (
+                <CampoPosicao
+                  key={`${livro.id}:${unidade}:${relidos.has(livro.id)}:${livro.totalPaginas ?? ""}`}
+                  unidade={unidade}
+                  anterior={unidade === "chapters" ? livro.capituloAtual : livro.paginaAtual}
+                  percentualAnterior={anteriorPct}
+                  total={unidade === "chapters" ? livro.totalCapitulos : livro.totalPaginas}
+                  minutos={total}
+                  variante="ler"
+                  onChange={setPosicao}
+                  topo={seletor}
+                />
+              );
+            })()}
           </Passo>
         )}
 
@@ -1251,7 +1364,7 @@ function TelaRegistro({
                     : d.scoring_metric === "minutes"
                       ? `+${total} min`
                       : d.scoring_metric === "pages"
-                        ? `+${unidade === "pages" ? quantidade : 0} pág`
+                        ? `+${unidadeMetrica === "pages" ? quantidade : 0} pág`
                         : `+${unidade === "chapters" ? quantidade : 0} cap`;
                 return (
                   <li

@@ -51,3 +51,15 @@ export function rotuloUnidade(unidade: UnidadePosicao, n: number): string {
 }
 
 export const abrevUnidade = (unidade: UnidadePosicao) => (unidade === "pages" ? "pág." : "cap.");
+
+// ---- Registro por % (2026-11-05) -------------------------------------------
+// O % sempre se apoia no total de páginas (capítulos não servem de base). As
+// métricas continuam em páginas: o % vira página na hora de gravar.
+
+/** % → página do livro (arredondado). */
+export const paginaDoPercentual = (pct: number, totalPaginas: number) =>
+  Math.round((Math.min(100, Math.max(0, pct)) * totalPaginas) / 100);
+
+/** Página → % inteiro, pra abrir o campo em % a partir de uma posição em páginas. */
+export const percentualDaPagina = (pagina: number, totalPaginas: number) =>
+  Math.min(100, Math.round((pagina / totalPaginas) * 100));

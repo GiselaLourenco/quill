@@ -38,6 +38,11 @@ async function talvezMarcarTerminado(
 // corrige (conta 0); a tela já pediu confirmação. `paginaAntes`/`capituloAntes`
 // = "já vinha lendo, estava na X" na primeira sessão do livro: vira uma
 // sessão de cadastro (fora das métricas) antes desta.
+//
+// Registro por %: `pagina`/`paginaAntes` chegam já convertidas pelo cliente
+// (a mesma conta que a tela mostrou); `percentual`/`percentualAntes` guardam o
+// que a pessoa digitou, pra tela voltar a abrir em % e pra recalcular as
+// páginas se o total do livro mudar.
 export async function createSession(input: {
   itemId: string | null;
   startedAt: string;
@@ -46,6 +51,8 @@ export async function createSession(input: {
   capitulo?: number | null;
   paginaAntes?: number | null;
   capituloAntes?: number | null;
+  percentual?: number | null;
+  percentualAntes?: number | null;
   tags: string[];
 }): Promise<{ sessionId: string | null; error: string | null }> {
   // Sem redirect: a sessão de leitura (tempo, livro, desafios) continua na
@@ -64,14 +71,28 @@ export async function createSession(input: {
     n != null && Number.isFinite(n) && n >= 0 ? Math.round(n) : null;
   const pagina = numero(input.pagina);
   const capitulo = numero(input.capitulo);
+  const pct = (n: number | null | undefined) => {
+    const v = numero(n);
+    return v == null ? null : Math.min(100, v);
+  };
+  const percentual = pagina != null ? pct(input.percentual) : null;
 
   let posicao: {
     unit_start: number | null;
     unit_end: number | null;
     chapter_start: number | null;
     chapter_end: number | null;
+    percent_start?: number | null;
+    percent_end?: number | null;
   } = { unit_start: null, unit_end: null, chapter_start: null, chapter_end: null };
-  const cadastro: { unit_start?: number; unit_end?: number; chapter_start?: number; chapter_end?: number } = {};
+  const cadastro: {
+    unit_start?: number;
+    unit_end?: number;
+    chapter_start?: number;
+    chapter_end?: number;
+    percent_start?: number;
+    percent_end?: number;
+  } = {};
 
   // Posição só ancora quando há livro vinculado — sem vínculo, a sessão vale
   // pelo tempo (mesma regra de antes).
@@ -106,6 +127,31 @@ export async function createSession(input: {
         cadastro.unit_end = inicio;
       }
       posicao = { ...posicao, unit_start: inicio ?? 0, unit_end: limite(livro?.total_units, pagina) };
+
+      const total = livro?.total_units;
+      if (percentual != null && total != null && total > 0) {
+        // De onde partiu, em %: o digitado na sessão anterior, se foi em %;
+        // senão, a página anterior convertida.
+        let pctInicio = 0;
+        const pctAntes = pct(input.percentualAntes);
+        if (cadastro.unit_end != null) {
+          pctInicio = pctAntes ?? Math.min(100, Math.round((cadastro.unit_end / total) * 100));
+          cadastro.percent_start = 0;
+          cadastro.percent_end = pctInicio;
+        } else if (inicio != null) {
+          const { data: ant } = await supabase
+            .from("sessions")
+            .select("percent_end")
+            .eq("item_id", itemId)
+            .not("unit_end", "is", null)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          pctInicio =
+            (ant?.percent_end as number | null) ?? Math.min(100, Math.round((inicio / total) * 100));
+        }
+        posicao = { ...posicao, percent_start: pctInicio, percent_end: percentual };
+      }
     }
     if (capitulo != null) {
       let inicio = await ultima("chapter_end");

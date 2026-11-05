@@ -9,6 +9,7 @@ import { paletteIndexForTitle } from "@/lib/covers";
 import { chaveTitulo } from "@/lib/titulo";
 import { todayLocalDateKey } from "@/lib/date-br";
 import { sincronizarLivroTerminadoNosDesafios } from "@/lib/challenges";
+import { recalcularPaginasDoPercentual } from "@/lib/posicao-percentual";
 
 /** Livro da estante com o mesmo título (ver `chaveTitulo`), ignorando `excetoId`. */
 async function livroComMesmoTitulo(
@@ -433,6 +434,12 @@ export async function atualizarCampoLivro(
     .eq("id", itemId)
     .eq("user_id", userId);
   if (error) return { error: "Não foi possível salvar." };
+
+  if (campo === "paginas" && typeof updates.total_units === "number") {
+    await recalcularPaginasDoPercentual(supabase, itemId, updates.total_units);
+    revalidatePath("/");
+    revalidatePath("/ler");
+  }
 
   revalidatePath(`/books/${itemId}`);
   revalidatePath("/estante");

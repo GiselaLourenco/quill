@@ -18,7 +18,7 @@ export default async function LerPage() {
       .order("created_at", { ascending: false }),
     supabase
       .from("sessions")
-      .select("item_id, unit_end, chapter_end, created_at")
+      .select("item_id, unit_end, chapter_end, percent_end, created_at")
       .eq("user_id", userId)
       .or("unit_end.not.is.null,chapter_end.not.is.null")
       .not("item_id", "is", null),
@@ -37,6 +37,20 @@ export default async function LerPage() {
     })),
   );
 
+  // Registro por %: o % digitado na sessão mais recente em páginas — se ela
+  // foi em %, o livro volta a abrir em % (preferência por livro).
+  const percentualPorItem = new Map<string, { pct: number | null; at: string }>();
+  for (const p of positions ?? []) {
+    if (p.unit_end == null) continue;
+    const atual = percentualPorItem.get(p.item_id as string);
+    if (!atual || (p.created_at as string) > atual.at) {
+      percentualPorItem.set(p.item_id as string, {
+        pct: (p.percent_end as number | null) ?? null,
+        at: p.created_at as string,
+      });
+    }
+  }
+
   const bookOptions: BookOption[] = (books ?? []).map((b) => ({
     id: b.id as string,
     title: (b.title as string) ?? "Sem título",
@@ -47,6 +61,7 @@ export default async function LerPage() {
     status: b.status as string,
     paginaAtual: posicaoPorItem.get(b.id as string)?.pagina ?? null,
     capituloAtual: posicaoPorItem.get(b.id as string)?.capitulo ?? null,
+    percentualAtual: percentualPorItem.get(b.id as string)?.pct ?? null,
     totalPaginas: (b.total_units as number | null) ?? null,
     totalCapitulos: (b.total_chapters as number | null) ?? null,
   }));

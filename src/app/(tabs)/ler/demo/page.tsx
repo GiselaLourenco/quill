@@ -37,7 +37,7 @@ export default function LerDemoPage() {
   // terminado (a busca da estante oferece "reler").
   const books: BookOption[] = [
     livro("mistborn", "Mistborn", "Brandon Sanderson", 3, 214, { totalPaginas: 640 }),
-    livro("circe", "Circe", "Madeline Miller", 1, 87, { totalPaginas: 400 }),
+    livro("circe", "Circe", "Madeline Miller", 1, 87, { totalPaginas: 400, percentualAtual: 22 }),
     livro("duna", "Duna", "Frank Herbert", 2, null),
     livro("torto", "Torto Arado", "Itamar Vieira Junior", 0, null, { capituloAtual: 12, totalCapitulos: 40 }),
     livro("hobbit", "O Hobbit", "J.R.R. Tolkien", 2, 310, { status: "finished", totalPaginas: 310 }),
