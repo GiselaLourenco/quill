@@ -8,7 +8,7 @@ import type { Atividade, FriendItem, FriendShelf } from "@/lib/friends";
 import { CaixaComentario } from "@/components/caixa-comentario";
 import { comentarAtualizacao, curtirAtualizacao } from "@/app/actions/interacoes";
 import { SEM_INTERACOES, type InteracoesCartao } from "@/lib/interacoes";
-import { ModalPerfilAmigo } from "@/components/perfil-amigo";
+import { ModalPerfilAmigo, useAmigoNaUrl } from "@/components/perfil-amigo";
 
 
 const STATUS_LABEL: Record<string, string> = {
@@ -39,7 +39,8 @@ export function AmigosEstantes({
   demo?: boolean;
 }) {
   const [busca, setBusca] = useState("");
-  const [selecionado, setSelecionado] = useState<string | null>(null);
+  const { amigoId: selecionado, grade, definir: setAmigoUrl } = useAmigoNaUrl();
+  const setSelecionado = (id: string | null) => setAmigoUrl(id);
 
   const feed = useMemo(() => {
     const termo = busca.trim().toLowerCase();
@@ -64,6 +65,8 @@ export function AmigosEstantes({
         <ModalPerfilAmigo
           nome={aberta.name}
           livros={aberta.items}
+          grade={grade}
+          onGrade={(g) => setAmigoUrl(aberta.friendId, g)}
           onClose={() => setSelecionado(null)}
         />
       )}

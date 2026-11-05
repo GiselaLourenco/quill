@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BotaoVoltar } from "@/components/botao-voltar";
 import { ConversaAtualizacao } from "@/components/conversa-atualizacao";
 import { NotaItem } from "@/components/nota-item";
 import { notFound } from "next/navigation";
@@ -484,15 +485,14 @@ async function FriendBookView({
     <div className="flex flex-1 flex-col bg-paper">
       {/* Header */}
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b-2 border-ink bg-paper px-3 py-3">
-        <Link
-          href="/estante?view=amigos"
-          aria-label="Voltar"
+        <BotaoVoltar
+          fallback="/estante?view=amigos"
           className="flex h-9 w-9 items-center justify-center border-2 border-ink bg-paper shadow-hard-sm"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="square">
             <path d="M15 18l-6-6 6-6" />
           </svg>
-        </Link>
+        </BotaoVoltar>
         <h1 className="font-display text-base uppercase tracking-tight text-ink">
           Na estante de{" "}
           <span className="text-coral">{ownerName}</span>

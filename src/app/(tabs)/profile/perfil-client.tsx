@@ -10,7 +10,7 @@ import { AdicionarAmigo, Avatar } from "@/components/adicionar-amigo";
 import { aceitarPedido, recusarPedido } from "@/app/actions/friends";
 import type { PedidoRecebido } from "@/lib/friends";
 import { AppImage } from "@/components/app-image";
-import { DialogShell, PerfilAmigo } from "@/components/perfil-amigo";
+import { DialogShell, PerfilAmigo, useAmigoNaUrl } from "@/components/perfil-amigo";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useActionState, useState, useTransition } from "react";
@@ -103,7 +103,13 @@ export function PerfilClient({
   deleteAccountAction,
   toggleCompeteAction,
 }: Props) {
-  const [aberto, setAberto] = useState<DialogId>(null);
+  const amigoUrl = useAmigoNaUrl();
+  // Voltando de um livro de amigo: reabre o diálogo de amigos onde estava.
+  const [aberto, setAberto] = useState<DialogId>(amigoUrl.amigoId ? "amigos" : null);
+  const fecharDialog = () => {
+    setAberto(null);
+    if (amigoUrl.amigoId) amigoUrl.definir(null);
+  };
   const { admin } = useImagens();
   // `avatarPorSrc` responde "houve escolha?" — é o que o rascunho do editor
   // precisa saber. `avatarDeExibicao` responde "o que desenhar?", e aí o
@@ -391,14 +397,14 @@ export function PerfilClient({
       {aberto && (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-ink/50 px-4 pb-6"
-          onClick={() => setAberto(null)}
+          onClick={fecharDialog}
         >
           <div
             className="shadow-hard max-h-[85vh] w-full max-w-[390px] overflow-y-auto rounded-md border-2 border-ink bg-paper"
             onClick={(e) => e.stopPropagation()}
           >
             {aberto === "amigos" && (
-              <AmigosDialog amigos={amigos} estantes={estantes} pedidos={pedidos} onClose={() => setAberto(null)} />
+              <AmigosDialog amigos={amigos} estantes={estantes} pedidos={pedidos} onClose={fecharDialog} />
             )}
             {aberto === "foto" && (
               <EditarPerfilDialog
@@ -581,7 +587,8 @@ function AmigosDialog({
   onClose: () => void;
 }) {
   const [busca, setBusca] = useState("");
-  const [abertoId, setAbertoId] = useState<string | null>(null);
+  const { amigoId: abertoId, grade, definir } = useAmigoNaUrl();
+  const setAbertoId = (id: string | null) => definir(id);
 
   const filtrados = amigos.filter((a) =>
     a.name.toLowerCase().includes(busca.trim().toLowerCase()),
@@ -595,6 +602,8 @@ function AmigosDialog({
       <PerfilAmigo
         nome={selecionado.name}
         livros={estante?.items ?? []}
+        grade={grade}
+        onGrade={(g) => definir(selecionado.id, g)}
         onVoltar={() => setAbertoId(null)}
         onClose={onClose}
       />

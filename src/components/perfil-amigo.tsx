@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { BookThumb } from "@/components/book-thumb";
 import { BotaoAddLivroAmigo } from "@/components/botao-add-livro-amigo";
 import { EmptyState } from "@/components/empty-state";
@@ -36,6 +36,27 @@ export function DialogShell({
   );
 }
 
+/**
+ * Qual amigo está aberto (e se na estante completa) mora na URL — `?amigo=…`
+ * e `&grade=1` —, não em estado do React. Assim, abrir um livro e voltar
+ * devolve a pessoa exatamente onde estava, em vez do feed ou do Perfil zerados.
+ * `replaceState` pra não empilhar uma entrada no histórico a cada toque.
+ */
+export function useAmigoNaUrl() {
+  const params = useSearchParams();
+  const amigoId = params.get("amigo");
+  const grade = !!amigoId && params.get("grade") === "1";
+  const definir = (id: string | null, comGrade = false) => {
+    const url = new URL(window.location.href);
+    if (id) url.searchParams.set("amigo", id);
+    else url.searchParams.delete("amigo");
+    if (id && comGrade) url.searchParams.set("grade", "1");
+    else url.searchParams.delete("grade");
+    window.history.replaceState(null, "", url);
+  };
+  return { amigoId, grade, definir };
+}
+
 const STATUS_AMIGO: Record<string, string> = {
   want: "quero ler",
   reading: "lendo",
@@ -52,20 +73,22 @@ const STATUS_AMIGO: Record<string, string> = {
 export function PerfilAmigo({
   nome,
   livros,
+  grade: modoGrade,
+  onGrade: setModoGrade,
   onVoltar,
   voltarLabel = "Amigos",
   onClose,
 }: {
   nome: string;
   livros: FriendItem[];
+  /** Estante completa aberta (tela cheia) — controlado pela URL. */
+  grade: boolean;
+  onGrade: (grade: boolean) => void;
   /** Botão "‹ Amigos" acima do cabeçalho. */
   onVoltar: () => void;
   voltarLabel?: string;
   onClose: () => void;
 }) {
-  // Visão em grade (capa + %) sobre a lista padrão.
-  const [modoGrade, setModoGrade] = useState(false);
-
   if (modoGrade) {
     // Mesma estante que a sua — grade, busca, filtros, paginação, % de
     // progresso — só travada pra leitura (sem editar nota, sem "adicionar
@@ -197,10 +220,14 @@ export function PerfilAmigo({
 export function ModalPerfilAmigo({
   nome,
   livros,
+  grade,
+  onGrade,
   onClose,
 }: {
   nome: string;
   livros: FriendItem[];
+  grade: boolean;
+  onGrade: (grade: boolean) => void;
   onClose: () => void;
 }) {
   return (
@@ -216,6 +243,8 @@ export function ModalPerfilAmigo({
           <PerfilAmigo
             nome={nome}
             livros={livros}
+            grade={grade}
+            onGrade={onGrade}
             onVoltar={onClose}
             voltarLabel="Feed"
             onClose={onClose}
