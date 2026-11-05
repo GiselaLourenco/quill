@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { toPng } from "html-to-image";
 import { ComSpinner } from "@/components/carregando";
 import { Portal } from "@/components/portal";
@@ -95,6 +95,14 @@ const prefModelo = criarPreferencia("quill:compartilhar:modelo", MODELO_PADRAO);
 const prefModeloDesafio = criarPreferencia("quill:compartilhar:modelo-desafio", MODELOS_DESAFIO[0]!.id);
 const prefAba = criarPreferencia("quill:compartilhar:aba", "mes");
 
+/** Safari ou qualquer navegador no iPhone/iPad (todos usam o WebKit lá). */
+function ehWebKit() {
+  const ua = navigator.userAgent;
+  const ios = /iP(hone|ad|od)/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const safari = /Safari/.test(ua) && !/Chrome|Chromium|CriOS|FxiOS|Edg|Android/.test(ua);
+  return ios || safari;
+}
+
 /** Sem acento e sem caixa — "machado" acha "Machado de Assis". */
 const normalizar = (t: string) =>
   t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -147,6 +155,30 @@ export default function CompartilharClient({
       : [];
   const listaPainel = termoBusca.length > 0 ? resultadosBusca : periodo.livros;
 
+  // Safari: gera o PNG em segundo plano assim que o cartaz muda, pra
+  // ilustração já estar "aquecida" quando a pessoa tocar em compartilhar.
+  useEffect(() => {
+    if (!ehWebKit()) return;
+    let cancelado = false;
+    const t = setTimeout(async () => {
+      const no = cartazRef.current;
+      if (!no) return;
+      try {
+        const imagens = [...no.querySelectorAll("img")];
+        await Promise.all(imagens.map((img) => img.decode().catch(() => undefined)));
+        for (let i = 0; i < 2 && !cancelado; i++) {
+          await toPng(no, { width: LARGURA_STORY, height: ALTURA_STORY, pixelRatio: 1 });
+        }
+      } catch {
+        // Aquecimento é só preparo; se falhar, o toque gera normalmente.
+      }
+    }, 600);
+    return () => {
+      cancelado = true;
+      clearTimeout(t);
+    };
+  }, [modelo, modeloDesafio, periodo, livro, noDesafio, desafio]);
+
   async function salvarImagem() {
     if (!cartazRef.current) return;
     setSalvando(true);
@@ -156,12 +188,26 @@ export default function CompartilharClient({
       const imagens = [...cartazRef.current.querySelectorAll("img")];
       await Promise.all(imagens.map((img) => img.decode().catch(() => undefined)));
       await document.fonts?.ready;
-      const dataUrl = await toPng(cartazRef.current, {
+      const opcoes = {
         width: LARGURA_STORY,
         height: ALTURA_STORY,
         pixelRatio: 1,
         cacheBust: true,
-      });
+      };
+      // Safari (e todo navegador no iPhone, que usa o motor dele): nas
+      // primeiras passadas o html-to-image desenha o cartaz antes de a
+      // ilustração de fundo estar decodificada dentro do SVG — o PNG sai só
+      // com textos e números, sem a arte do Quill. No Chrome/Android isso não
+      // acontece, então lá continua uma passada só.
+      // O "aquecimento" (efeito abaixo) já fez as passadas iniciais em
+      // segundo plano; aqui basta mais uma e ficar com a maior (a que tem a
+      // arte). Poucas passadas no toque porque o Safari só deixa abrir a
+      // bandeja de compartilhar logo depois do toque.
+      let dataUrl = await toPng(cartazRef.current, opcoes);
+      if (ehWebKit()) {
+        const nova = await toPng(cartazRef.current, opcoes);
+        if (nova.length > dataUrl.length) dataUrl = nova;
+      }
 
       // Web Share API com arquivo (celular): abre a bandeja nativa → Stories.
       const blob = await (await fetch(dataUrl)).blob();
