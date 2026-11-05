@@ -9,6 +9,7 @@ import { paletteIndexForTitle } from "@/lib/covers";
 import { chaveTitulo } from "@/lib/titulo";
 import { buscarLivros, type LivroEncontrado } from "@/lib/open-library";
 import { buscarLivrosGoogleBooks } from "@/lib/google-books";
+import { completarCapas } from "@/lib/capa-irma";
 
 export type LivroImportado = { title: string; creator: string | null };
 export type UsuarioImportacao = { id: string; nome: string };
@@ -100,9 +101,15 @@ async function enriquecerLivros(
       const daOpenLibrary = await buscarLivros(termo, TIMEOUT_BUSCA_MS).catch(() => []);
       let match = melhorCorrespondencia(tituloBusca, livro.creator, daOpenLibrary);
 
-      if (!match) {
+      // Achou o livro mas sem imagem: o Google ainda pode ter a capa dele.
+      if (!match || !match.capaGrande) {
         const doGoogle = await buscarLivrosGoogleBooks(termo, TIMEOUT_BUSCA_MS).catch(() => []);
-        match = melhorCorrespondencia(tituloBusca, livro.creator, doGoogle);
+        if (match) {
+          match = completarCapas([match], [...daOpenLibrary, ...doGoogle])[0]!;
+        } else {
+          const doG = melhorCorrespondencia(tituloBusca, livro.creator, doGoogle);
+          match = doG ? completarCapas([doG], [...doGoogle, ...daOpenLibrary])[0]! : null;
+        }
       }
 
       if (match) encontrados.set(i, match);

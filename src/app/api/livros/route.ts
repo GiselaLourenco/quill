@@ -3,6 +3,7 @@ import { unstable_cache } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { buscarLivros, MIN_CARACTERES } from "@/lib/open-library";
 import { buscarLivrosGoogleBooks } from "@/lib/google-books";
+import { completarCapas } from "@/lib/capa-irma";
 
 /**
  * Proxy da busca de livro pro cadastro/edição.
@@ -18,17 +19,26 @@ import { buscarLivrosGoogleBooks } from "@/lib/google-books";
  * do Google (coletâneas, edição estrangeira) não é problema, e a cobertura
  * de livro brasileiro/traduzido é bem melhor. Só cai pra Open Library sem
  * `GOOGLE_BOOKS_API_KEY` configurada ou sem nenhum resultado.
+ *
+ * A Open Library roda junto mesmo quando o Google acha algo: muita edição do
+ * Google vem sem imagem, e aí a capa sai de uma edição irmã (ver
+ * `completarCapas`). Antes ela só era consultada com o Google vazio, e quem
+ * escolhia uma edição sem imagem ficava com a capa ilustrada.
  */
 
 // Um dia de cache por termo: ficha de livro não muda, e a segunda busca por
 // "dom casmurro" — sua ou de qualquer pessoa — volta instantânea.
 const buscaCacheada = unstable_cache(
   async (termo: string) => {
-    const doGoogle = await buscarLivrosGoogleBooks(termo);
-    if (doGoogle.length > 0) return doGoogle;
-    return buscarLivros(termo);
+    const [doGoogle, daOpenLibrary] = await Promise.all([
+      buscarLivrosGoogleBooks(termo),
+      buscarLivros(termo),
+    ]);
+    if (doGoogle.length === 0) return completarCapas(daOpenLibrary, daOpenLibrary);
+    return completarCapas(doGoogle, [...doGoogle, ...daOpenLibrary]);
   },
-  ["livros-busca"],
+  // Chave nova: o cache antigo guardou resultados sem a capa emprestada.
+  ["livros-busca-v2"],
   { revalidate: 86_400 },
 );
 
