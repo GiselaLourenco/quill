@@ -26,9 +26,11 @@ export default async function EstantePage({
 
   return (
     <div className="flex flex-1 flex-col bg-paper">
+      {/* z-30: acima do texto do hero e da % nas capas (ambos z-10), que
+          senão passavam por cima do cabeçalho ao rolar. */}
       {/* Cabeçalho: toggle Minha/Amigos + diário. Adicionar livro virou botão
           flutuante no canto inferior direito (BotaoAdicionarLivro). */}
-      <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b-2 border-ink bg-paper px-4 py-3">
+      <header className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b-2 border-ink bg-paper px-4 py-3">
         <div
           role="tablist"
           aria-label="Alternar entre minha estante e amigos"

@@ -68,7 +68,7 @@ export default async function StatusGridPage({
 
   return (
     <div className="flex flex-1 flex-col bg-paper">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b-2 border-ink bg-paper px-3 py-3">
+      <header className="sticky top-0 z-30 flex items-center gap-3 border-b-2 border-ink bg-paper px-3 py-3">
         <Link
           href="/estante"
           aria-label="Voltar"

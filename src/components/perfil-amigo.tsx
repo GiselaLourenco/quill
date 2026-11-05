@@ -113,7 +113,7 @@ export function PerfilAmigo({
     return (
       <Portal>
         <div className="fixed inset-0 z-[60] flex flex-col overflow-y-auto bg-paper">
-          <header className="sticky top-0 z-10 flex items-center gap-3 border-b-2 border-ink bg-paper px-4 py-3">
+          <header className="sticky top-0 z-30 flex items-center gap-3 border-b-2 border-ink bg-paper px-4 py-3">
             <button
               type="button"
               onClick={() => setModoGrade(false)}
