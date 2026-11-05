@@ -4,7 +4,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { EsqueletoCartaz } from "@/components/esqueletos";
 import { avatarDeExibicao, AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
 import { srcModelo, type Area, type ModeloDesafio } from "@/lib/compartilhar-modelos";
-import { Caixa } from "./cartaz-ilustrado";
+import { Caixa, pos } from "./cartaz-ilustrado";
 
 export type MembroCartaz = {
   nome: string;
@@ -225,9 +225,9 @@ function Podio({ d }: { d: DesafioCartaz }) {
   const nomes = nomesCurtos(top.map((m) => m.nome));
   // 1º no meio (mais alto), 2º à esquerda, 3º à direita.
   const lugares = [
-    { circulo: circulo(50, 40.4, 23), nome: [42, 49.7, 16, 2.8] as Area, pontos: [37, 52.7, 26, 5.8] as Area, base: 5.6 },
-    { circulo: circulo(21.5, 44.3, 19), nome: [14, 51.8, 14.5, 2.6] as Area, pontos: [9, 54.8, 23, 4.7] as Area, base: 4.6 },
-    { circulo: circulo(78, 46.6, 20), nome: [72.5, 53.8, 13.5, 2.3] as Area, pontos: [67.5, 56.4, 24.5, 5.4] as Area, base: 4.6 },
+    { circulo: circulo(50, 40.4, 23), nome: [42, 49.25, 15.5, 2.4] as Area, pontos: [37, 52.7, 26, 5.8] as Area, base: 5.6 },
+    { circulo: circulo(21.5, 44.3, 19), nome: [14, 51.4, 14.3, 2.2] as Area, pontos: [9, 54.8, 23, 4.7] as Area, base: 4.6 },
+    { circulo: circulo(78, 46.6, 20), nome: [72.3, 53.3, 14.3, 2.2] as Area, pontos: [67.5, 56.4, 24.5, 5.4] as Area, base: 4.6 },
   ];
   const stats: [Area, string, string][] = [
     [[7.5, 81.2, 19, 4.4], numero(d.totais.paginas), "Páginas"],
@@ -244,6 +244,12 @@ function Podio({ d }: { d: DesafioCartaz }) {
       {lugares.map((l, i) => (
         <div key={i}>
           <Avatar membro={top[i]} estilo={l.circulo} />
+          {/* Pílula do nome desenhada aqui (a da arte foi apagada) pra ter respiro até o total. */}
+          <div
+            className="absolute rounded-[1.2cqw] border-[0.45cqw] border-ink bg-[#F8E6C7] shadow-[0.5cqw_0.5cqw_0_0_#1d1d1b]"
+            style={pos(l.nome)}
+            aria-hidden
+          />
           <Linha area={l.nome} base={i === 0 ? 3.4 : 3} className="font-sans font-bold">{nomes[i] ?? "—"}</Linha>
           <Caixa area={l.pontos} tinta="escura" base={l.base} minimo={0.6}>
             <p className="whitespace-nowrap font-display leading-none">{top[i] ? numero(top[i].pontos) : "—"}</p>
