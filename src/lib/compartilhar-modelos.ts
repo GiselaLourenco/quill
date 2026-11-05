@@ -101,16 +101,6 @@ export const MODELOS_CARTAZ: readonly ModeloCartaz[] = [
   },
   {
     tipo: "ilustrado",
-    id: "lareira-aconchego",
-    nome: "Aconchego na janela",
-    paleta: ["#7A2E14", "#E9873A", "#FBE2B6"],
-    titulo: { area: [27.1, 5.7, 49.5, 13.3], tinta: "escura" },
-    destaque: { area: [53, 25.9, 42.7, 24.2], tinta: "escura" },
-    stats: [[4.8, 53.9, 43.8, 9.5], [51.5, 53.9, 43.9, 9.5], [4.8, 65.1, 43.8, 10.2], [51.5, 65.1, 43.9, 10.3]],
-    livro: { area: [3, 77.7, 92, 16.2], margemEsq: 27, tinta: "escura" },
-  },
-  {
-    tipo: "ilustrado",
     id: "sofa-boston",
     nome: "Sofá de outono",
     paleta: ["#8B3A1A", "#E58A3A", "#F7E1BC"],
@@ -127,15 +117,6 @@ export const MODELOS_CARTAZ: readonly ModeloCartaz[] = [
     stats: [[52.5, 17, 37, 8.2], [55, 27, 40, 7], [52, 36, 40, 7.4], [54.5, 45.8, 41, 7.2]],
     // Os livros invadem o canto inferior direito: texto só na faixa de cima.
     livro: { area: [5.4, 67, 86.1, 13.5], margemEsq: 0, tinta: "escura" },
-  },
-  {
-    tipo: "ilustrado",
-    id: "sofa-boston-soneca",
-    nome: "Soneca com o Boston",
-    paleta: ["#8B3A1A", "#E58A3A", "#F7E1BC"],
-    titulo: { area: [26.1, 15.9, 61.7, 11.3], tinta: "escura" },
-    stats: [[26, 28.7, 32.7, 10.8], [62.3, 28.8, 33, 10.7], [26, 41.1, 32.6, 10.4], [62.3, 41.1, 32.9, 10.4]],
-    livro: { area: [26.5, 53.1, 67.3, 15.8], margemEsq: 0, tinta: "escura" },
   },
   {
     tipo: "ilustrado",
