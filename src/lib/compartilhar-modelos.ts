@@ -95,9 +95,10 @@ export const MODELOS_CARTAZ: readonly ModeloCartaz[] = [
     paleta: ["#8A3B12", "#F2C14E", "#F9E2B3"],
     titulo: { area: [24, 6, 52, 9.5], tinta: "escura" },
     // Só o corpo das placas, sem as pontas de seta.
-    stats: [[53.5, 19, 37, 5.4], [52.5, 27, 39, 5.6], [53.5, 35.3, 37.5, 5.4], [54.5, 43.7, 37, 5.4]],
-    extras: [[4.8, 55.2, 43.5, 9.3], [51.6, 55.2, 43.7, 9.3], [4.8, 66.4, 43.5, 10.1], [51.6, 66.4, 43.7, 10.2]],
-    livro: { area: [3, 79.1, 92, 16.3], margemEsq: 28, tinta: "escura" },
+    stats: [[57.5, 21.1, 29.5, 4.1], [57, 28.8, 33, 4.2], [58, 37.2, 32, 4.2], [60, 45.1, 31.5, 4]],
+    extras: [[6.5, 55.4, 39.5, 6.9], [52.5, 55.4, 39.5, 6.9], [6.5, 65, 39.5, 7], [52.5, 65, 39.5, 7]],
+    // À direita dos livros e da folha.
+    livro: { area: [33, 80.6, 58, 13.2], margemEsq: 0, tinta: "escura" },
   },
   {
     tipo: "ilustrado",
@@ -106,7 +107,8 @@ export const MODELOS_CARTAZ: readonly ModeloCartaz[] = [
     paleta: ["#8B3A1A", "#E58A3A", "#F7E1BC"],
     titulo: { area: [20.1, 10.5, 63.9, 18.1], tinta: "escura" },
     stats: [[13.8, 31.5, 22.8, 13.6], [39.3, 31.5, 23, 13.8], [64.9, 31.5, 23.1, 13.7]],
-    livro: { area: [24, 47.7, 64.1, 15.6], margemEsq: 0, tinta: "escura" },
+    // Dentro do papel, sem encostar nas folhas nem nas folhinhas do Quill.
+    livro: { area: [27, 49.3, 52.5, 13], margemEsq: 0, tinta: "escura" },
   },
   {
     tipo: "ilustrado",
@@ -115,8 +117,8 @@ export const MODELOS_CARTAZ: readonly ModeloCartaz[] = [
     paleta: ["#1E2A5E", "#F3C552", "#F6DFB4"],
     titulo: { area: [6, 4, 50, 11], tinta: "clara" },
     stats: [[52.5, 17, 37, 8.2], [55, 27, 40, 7], [52, 36, 40, 7.4], [54.5, 45.8, 41, 7.2]],
-    // Os livros invadem o canto inferior direito: texto só na faixa de cima.
-    livro: { area: [5.4, 67, 86.1, 13.5], margemEsq: 0, tinta: "escura" },
+    // Coluna à esquerda dos livros, longe da borda recortada do papel.
+    livro: { area: [8.5, 68.6, 52, 18.2], margemEsq: 0, tinta: "escura" },
   },
   {
     tipo: "ilustrado",
