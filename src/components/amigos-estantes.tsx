@@ -8,6 +8,7 @@ import type { Atividade, FriendItem, FriendShelf } from "@/lib/friends";
 import { CaixaComentario } from "@/components/caixa-comentario";
 import { comentarAtualizacao, curtirAtualizacao } from "@/app/actions/interacoes";
 import { SEM_INTERACOES, type InteracoesCartao } from "@/lib/interacoes";
+import { ModalPerfilAmigo } from "@/components/perfil-amigo";
 
 
 const STATUS_LABEL: Record<string, string> = {
@@ -21,7 +22,7 @@ const STATUS_LABEL: Record<string, string> = {
 /**
  * Feed dos amigos: os livros de todos, do mais recentemente mexido pro mais
  * antigo (status, nota, comentário público ou sessão de leitura), com busca
- * por nome. Escolhido um amigo, a tela passa a ser a estante dele.
+ * por nome. Tocar num amigo abre o mesmo modal "Perfil do amigo" do Perfil.
  *
  * Cada livro tem o "adicionar" aqui mesmo. Antes ele só existia depois de abrir
  * o livro, então quem estava passeando pela estante do amigo perdia o fluxo.
@@ -50,21 +51,6 @@ export function AmigosEstantes({
 
   const aberta = selecionado ? shelves.find((s) => s.friendId === selecionado) : null;
 
-  if (aberta) {
-    return (
-      <div className="flex flex-col gap-3">
-        <button
-          type="button"
-          onClick={() => setSelecionado(null)}
-          className="shadow-hard-sm self-start rounded-md border-2 border-ink bg-paper px-3 py-1.5 font-display text-[10px] uppercase tracking-widest active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
-        >
-          ‹ todos os amigos
-        </button>
-        <Estante shelf={aberta} demo={demo} />
-      </div>
-    );
-  }
-
   // Veio do sino mas o cartão não está mais no feed (o amigo já fez outra
   // atualização nesse livro): a conversa continua na página do livro.
   const [focoItem, focoChave] = foco?.split("|") ?? [];
@@ -74,6 +60,13 @@ export function AmigosEstantes({
 
   return (
     <div className="flex flex-col gap-4">
+      {aberta && (
+        <ModalPerfilAmigo
+          nome={aberta.name}
+          livros={aberta.items}
+          onClose={() => setSelecionado(null)}
+        />
+      )}
       {focoSumiu && (
         <Link
           href={`/books/${focoItem}?conversa=${encodeURIComponent(focoChave ?? "")}`}
@@ -278,41 +271,6 @@ function Adicionados({
         </button>
       )}
     </div>
-  );
-}
-
-function Estante({
-  shelf,
-  onAbrir,
-  demo = false,
-}: {
-  shelf: FriendShelf;
-  onAbrir?: () => void;
-  demo?: boolean;
-}) {
-  return (
-    <section>
-      <div className="mb-2 flex items-center gap-2">
-        <span className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-ink bg-mustard text-xs font-semibold uppercase">
-          {shelf.name.charAt(0)}
-        </span>
-        <span className="flex-1 text-sm font-semibold">{shelf.name}</span>
-        {onAbrir && (
-          <button
-            type="button"
-            onClick={onAbrir}
-            className="text-[11px] font-semibold text-ink-soft underline underline-offset-2"
-          >
-            só a estante dele ›
-          </button>
-        )}
-      </div>
-      <div className="flex flex-col gap-2">
-        {shelf.items.map((it) => (
-          <LivroDoAmigo key={it.id} item={it} comAcoes demo={demo} />
-        ))}
-      </div>
-    </section>
   );
 }
 
