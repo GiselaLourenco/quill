@@ -18,6 +18,7 @@ const NOMES_MES = [
  * recolhido numa faixa (total de dias + os últimos 7 em quadradinhos); tocar
  * nela abre o mês. Vai do mês do primeiro dia até hoje (ou até o último dia,
  * se já terminou); tocar num dia abre o painel da home, filtrado pro livro.
+ * Livro relido recebe `marcas` com o início e o fim de cada leitura.
  */
 export function CalendarioLivro({
   itemId,
@@ -26,6 +27,7 @@ export function CalendarioLivro({
   hoje,
   terminado,
   totalPaginas,
+  marcas,
 }: {
   itemId: string;
   /** YYYY-MM-DD → minutos lidos nesse livro (já com a regra de virar a noite). */
@@ -35,16 +37,23 @@ export function CalendarioLivro({
   hoje: string;
   terminado: boolean;
   totalPaginas: number | null;
+  /** YYYY-MM-DD → etiqueta ("início", "fim", "fim/início"). Sem isso, marca
+   * o primeiro dia lido e (se terminou) o último. */
+  marcas?: Record<string, string>;
 }) {
   const dias = useMemo(() => Object.keys(minutosPorDia).sort(), [minutosPorDia]);
   const primeiroDia = dias[0]!;
   const fimDaLeitura = dias[dias.length - 1]!;
+  const diasMarcados = marcas ? Object.keys(marcas).sort() : [];
+  const inicioRange = diasMarcados[0] && diasMarcados[0] < primeiroDia ? diasMarcados[0] : primeiroDia;
+  const ultimaMarca = diasMarcados.at(-1);
+  const fimRange = ultimaMarca && ultimaMarca > ultimoDia ? ultimaMarca : ultimoDia;
 
-  // Meses "YYYY-MM" do primeiro dia lido até `ultimoDia`.
+  // Meses "YYYY-MM" do primeiro dia (lido ou marcado) até o último.
   const meses = useMemo(() => {
     const lista: string[] = [];
-    let [y, m] = primeiroDia.slice(0, 7).split("-").map(Number) as [number, number];
-    const fim = ultimoDia.slice(0, 7);
+    let [y, m] = inicioRange.slice(0, 7).split("-").map(Number) as [number, number];
+    const fim = fimRange.slice(0, 7);
     for (;;) {
       const p = `${y}-${String(m).padStart(2, "0")}`;
       lista.push(p);
@@ -56,7 +65,7 @@ export function CalendarioLivro({
       }
     }
     return lista;
-  }, [primeiroDia, ultimoDia]);
+  }, [inicioRange, fimRange]);
 
   const [aberto, setAberto] = useState(false);
   const [mesIdx, setMesIdx] = useState(meses.length - 1);
@@ -149,8 +158,13 @@ export function CalendarioLivro({
             const chave = `${prefixo}-${String(d).padStart(2, "0")}`;
             const min = minutosPorDia[chave];
             const leu = min !== undefined;
-            const marca =
-              chave === primeiroDia ? "início" : terminado && chave === fimDaLeitura ? "fim" : null;
+            const marca = marcas
+              ? (marcas[chave] ?? null)
+              : chave === primeiroDia
+                ? "início"
+                : terminado && chave === fimDaLeitura
+                  ? "fim"
+                  : null;
             return (
               <button
                 type="button"

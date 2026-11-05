@@ -100,7 +100,7 @@ export default async function BookPage({
     );
   }
 
-  const [{ data: sessions }, { data: comments }, { data: myRating }, indicacao] =
+  const [{ data: sessions }, { data: comments }, { data: myRating }, indicacao, { data: anteriores }] =
     await Promise.all([
       supabase
         .from("sessions")
@@ -119,7 +119,14 @@ export default async function BookPage({
         .eq("user_id", userId)
         .maybeSingle(),
       getIndicacao(supabase, item.recommendation_id as string | null),
+      // Leituras já terminadas de um livro relido (a atual fica no livro).
+      supabase
+        .from("past_readings")
+        .select("started_at, finished_at")
+        .eq("item_id", id)
+        .order("created_at", { ascending: true }),
     ]);
+  const leiturasAnteriores = (anteriores ?? []) as { started_at: string | null; finished_at: string | null }[];
 
   const recomendado = item.is_recommended || item.status === "recomendado";
 
@@ -172,8 +179,35 @@ export default async function BookPage({
           : `Terminado em ${dataBR(item.finished_at)}`
         : "Sem data de término"
       : item.started_at && (item.status === "reading" || item.status === "abandoned")
-        ? `Comecei em ${dataBR(item.started_at)}`
+        ? `${leiturasAnteriores.length > 0 ? "Relendo desde" : "Comecei em"} ${dataBR(item.started_at)}`
         : null;
+  const periodoLeitura = (l: { started_at: string | null; finished_at: string | null }) =>
+    l.started_at && l.finished_at
+      ? `${dataBR(l.started_at)} a ${dataBR(l.finished_at)}`
+      : l.finished_at
+        ? `terminada em ${dataBR(l.finished_at)}`
+        : "sem data";
+
+  // Calendário de livro relido: início e fim de cada leitura nas datas
+  // gravadas. Livro lido uma vez segue com as marcas do primeiro/último dia
+  // lido (ver CalendarioLivro).
+  const marcasCalendario: Record<string, string> | undefined =
+    leiturasAnteriores.length > 0
+      ? (() => {
+          const marcas: Record<string, string[]> = {};
+          const marcar = (dia: string | null, rotulo: string) => {
+            if (dia) (marcas[dia] ??= []).push(rotulo);
+          };
+          for (const l of [
+            ...leiturasAnteriores,
+            { started_at: item.started_at, finished_at: terminado ? item.finished_at : null },
+          ]) {
+            marcar(l.finished_at, "fim");
+            marcar(l.started_at, "início");
+          }
+          return Object.fromEntries(Object.entries(marcas).map(([d, r]) => [d, r.join("/")]));
+        })()
+      : undefined;
 
   return (
     <div className="flex flex-1 flex-col bg-paper">
@@ -228,6 +262,15 @@ export default async function BookPage({
               <RatingStars itemId={item.id} initialStars={myRating?.stars ?? 0} />
             </div>
             {resumoDatas && <p className="text-xs text-ink-soft">{resumoDatas}</p>}
+            {leiturasAnteriores.length > 0 && (
+              <ul className="text-[11px] text-ink-soft">
+                {leiturasAnteriores.map((l, i) => (
+                  <li key={i}>
+                    {i + 1}ª leitura: {periodoLeitura(l)}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </section>
 
@@ -299,6 +342,7 @@ export default async function BookPage({
                   hoje={hoje}
                   terminado={terminado}
                   totalPaginas={item.total_units}
+                  marcas={marcasCalendario}
                 />
               )}
 

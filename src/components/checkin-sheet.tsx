@@ -10,8 +10,17 @@ import {
   type UnidadeTempo,
 } from "@/lib/tempo";
 import { ComSpinner } from "@/components/carregando";
+import { CampoPosicao, ESTADO_POSICAO_VAZIO, type EstadoPosicao } from "@/components/campo-posicao";
 
-export type LivroLendo = { id: string; titulo: string };
+export type LivroLendo = {
+  id: string;
+  titulo: string;
+  /** Posição registrada mais recente; null = o livro nunca teve. */
+  paginaAtual: number | null;
+  capituloAtual: number | null;
+  totalPaginas: number | null;
+  totalCapitulos: number | null;
+};
 
 // Atalhos por unidade. Em horas os passos são inteiros: quem pensa "li duas
 // horas" não quer marcar 120.
@@ -37,8 +46,10 @@ export function CheckinSheet({
   // unidade só muda como o número é mostrado e digitado.
   const [minutos, setMinutos] = useState(30);
   const [unidade, setUnidade] = useState<UnidadeTempo>("min");
-  const [paginas, setPaginas] = useState("");
-  const [capitulos, setCapitulos] = useState("");
+  // Página e capítulo ATUAIS (mesma regra da aba Ler): o app faz a conta com
+  // a posição anterior do livro.
+  const [pagina, setPagina] = useState<EstadoPosicao>(ESTADO_POSICAO_VAZIO);
+  const [capitulo, setCapitulo] = useState<EstadoPosicao>(ESTADO_POSICAO_VAZIO);
   const [comentario, setComentario] = useState("");
   // Sem seletor de visibilidade: check-in de desafio existe pra aparecer no
   // desafio. Quem quer anotar só pra si registra a leitura pela aba Ler, onde
@@ -61,25 +72,27 @@ export function CheckinSheet({
   }
 
   const semLivro = livroId === "manual";
+  const livro = livros.find((l) => l.id === livroId) ?? null;
   const podeSalvar = minutos > 0 && !salvando;
 
   function salvar() {
     if (!podeSalvar) return;
     setErro(null);
+    const bloqueio = semLivro ? null : (pagina.bloqueio ?? capitulo.bloqueio);
+    if (bloqueio) {
+      setErro(bloqueio);
+      return;
+    }
 
     startSave(async () => {
-      // Páginas têm prioridade sobre capítulos na hora de ancorar a posição.
-      const qtdPaginas = Number(paginas) || 0;
-      const qtdCapitulos = Number(capitulos) || 0;
-      const unidade = qtdPaginas > 0 ? "pages" : "chapters";
-      const quantidade = qtdPaginas > 0 ? qtdPaginas : qtdCapitulos;
-
       const resultado = await createSession({
         itemId: semLivro ? null : livroId,
         startedAt: new Date().toISOString(),
         durationSeconds: minutos * 60,
-        unit: unidade,
-        quantity: quantidade > 0 ? quantidade : null,
+        pagina: semLivro ? null : pagina.posicao,
+        capitulo: semLivro ? null : capitulo.posicao,
+        paginaAntes: pagina.antes,
+        capituloAntes: capitulo.antes,
         tags: [],
       });
 
@@ -93,7 +106,6 @@ export function CheckinSheet({
         itemId: semLivro ? null : livroId,
         groupIds: [groupId],
         note: publico && comentario.trim() ? comentario.trim() : null,
-        pagesExtra: null,
       });
 
       setSalvo(true);
@@ -150,7 +162,11 @@ export function CheckinSheet({
                 <select
                   id="checkin-livro"
                   value={livroId}
-                  onChange={(e) => setLivroId(e.target.value)}
+                  onChange={(e) => {
+                    setLivroId(e.target.value);
+                    setPagina(ESTADO_POSICAO_VAZIO);
+                    setCapitulo(ESTADO_POSICAO_VAZIO);
+                  }}
                   className="shadow-hard-sm w-full appearance-none rounded-md border-2 border-ink bg-card py-3 pl-3 pr-11 font-serif text-sm italic text-ink"
                 >
                   {livros.map((l) => (
@@ -240,43 +256,32 @@ export function CheckinSheet({
               </div>
             </div>
 
-            {/* Páginas e capítulos */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label
-                  htmlFor="checkin-paginas"
-                  className="mb-2 block font-display text-[10px] uppercase tracking-widest text-ink"
-                >
-                  Páginas
-                </label>
-                <input
-                  id="checkin-paginas"
-                  type="number"
-                  min={0}
-                  value={paginas}
-                  onChange={(e) => setPaginas(e.target.value)}
-                  placeholder="0"
-                  className="shadow-hard-sm w-full rounded-md border-2 border-ink bg-card px-3 py-3 font-display text-lg text-ink"
+            {/* Onde parou — página e capítulo atuais, com a conta e os
+                avisos da aba Ler. Sem livro não tem posição. */}
+            {livro && (
+              <div className="space-y-4">
+                <CampoPosicao
+                  key={`${livro.id}:pages`}
+                  unidade="pages"
+                  anterior={livro.paginaAtual}
+                  total={livro.totalPaginas}
+                  minutos={minutos}
+                  variante="checkin"
+                  rotulo="Página atual"
+                  onChange={setPagina}
+                />
+                <CampoPosicao
+                  key={`${livro.id}:chapters`}
+                  unidade="chapters"
+                  anterior={livro.capituloAtual}
+                  total={livro.totalCapitulos}
+                  minutos={minutos}
+                  variante="checkin"
+                  rotulo="Capítulo atual"
+                  onChange={setCapitulo}
                 />
               </div>
-              <div>
-                <label
-                  htmlFor="checkin-capitulos"
-                  className="mb-2 block font-display text-[10px] uppercase tracking-widest text-ink"
-                >
-                  Capítulos
-                </label>
-                <input
-                  id="checkin-capitulos"
-                  type="number"
-                  min={0}
-                  value={capitulos}
-                  onChange={(e) => setCapitulos(e.target.value)}
-                  placeholder="0"
-                  className="shadow-hard-sm w-full rounded-md border-2 border-ink bg-card px-3 py-3 font-display text-lg text-ink"
-                />
-              </div>
-            </div>
+            )}
 
             {/* Comentário */}
             <div>

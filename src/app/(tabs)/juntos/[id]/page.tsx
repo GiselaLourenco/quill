@@ -5,6 +5,7 @@ import { requireUserId } from "@/lib/supabase/auth";
 import { computeScores, daysRemaining, periodProgress, type ScoringMetric, SCORING_METRIC_OPTIONS, SCORING_METRIC_UNIT } from "@/lib/challenges";
 import DesafioDetalheClient from "./detalhe-client";
 import { nomeExibicao } from "@/lib/nome-exibicao";
+import { posicaoRegistradaPorItem } from "@/lib/reading-stats";
 import { AVATAR_FUNDO_PADRAO } from "@/lib/avatares";
 import {
   localDateKey,
@@ -315,17 +316,38 @@ export default async function DesafioDetalhePage({
 
   const codigoConvite = (group.invite_code as string | null) ?? group.id.slice(0, 8).toUpperCase();
 
-  // Livros "lendo" para o select do check-in
+  // Livros "lendo" para o select do check-in, com a posição atual de cada
+  // um — o check-in pede página/capítulo atuais e faz a conta.
   const { data: livrosRows } = await supabase
     .from("media_items")
-    .select("id, title")
+    .select("id, title, total_units, total_chapters")
     .eq("user_id", userId)
     .eq("status", "reading")
     .order("created_at", { ascending: false });
+  const idsLendo = (livrosRows ?? []).map((l) => l.id as string);
+  const { data: posicoesRows } = idsLendo.length
+    ? await supabase
+        .from("sessions")
+        .select("item_id, unit_end, chapter_end, created_at")
+        .in("item_id", idsLendo)
+        .or("unit_end.not.is.null,chapter_end.not.is.null")
+    : { data: [] };
+  const posicaoLendo = posicaoRegistradaPorItem(
+    (posicoesRows ?? []).map((p) => ({
+      item_id: p.item_id as string,
+      unit_end: p.unit_end as number | null,
+      chapter_end: p.chapter_end as number | null,
+      created_at: p.created_at as string,
+    })),
+  );
 
   const livrosLendo = (livrosRows ?? []).map((l) => ({
     id: l.id as string,
     titulo: (l.title as string) ?? "Sem título",
+    paginaAtual: posicaoLendo.get(l.id as string)?.pagina ?? null,
+    capituloAtual: posicaoLendo.get(l.id as string)?.capitulo ?? null,
+    totalPaginas: (l.total_units as number | null) ?? null,
+    totalCapitulos: (l.total_chapters as number | null) ?? null,
   }));
 
   return (

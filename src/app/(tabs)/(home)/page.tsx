@@ -110,18 +110,16 @@ async function carregarBase(supabase: Supabase, userId: string) {
       // Livros terminados no ano corrente — mesma conta da tela de Metas.
       // Livro sem finished_at não entra (não dá pra saber o ano).
       supabase
-        .from("media_items")
-        .select("id", { count: "exact", head: true })
+        .from("finished_readings")
+        .select("item_id", { count: "exact", head: true })
         .eq("user_id", userId)
-        .eq("status", "finished")
         .gte("finished_at", `${anoAtual}-01-01`)
         .lte("finished_at", `${anoAtual}-12-31`),
       // Livros terminados dentro do mês corrente — a pílula "Livros/mês".
       supabase
-        .from("media_items")
-        .select("id", { count: "exact", head: true })
+        .from("finished_readings")
+        .select("item_id", { count: "exact", head: true })
         .eq("user_id", userId)
-        .eq("status", "finished")
         .gte("finished_at", `${anoAtual}-${String(agora.getMonth() + 1).padStart(2, "0")}-01`)
         .lte(
           "finished_at",

@@ -31,12 +31,21 @@ async function talvezMarcarTerminado(
 
 // Passo 1 do fluxo (modal essencial): grava a sessão e devolve o id pro
 // pós-sessão do cliente — sem redirect, os extras vêm depois (opcionais).
+//
+// A pessoa informa onde PAROU (página/capítulo atual), não quanto leu: o
+// início é a posição anterior do livro (a mais recente por `created_at`) e a
+// métrica é fim − início, como sempre foi. Posição menor que a anterior
+// corrige (conta 0); a tela já pediu confirmação. `paginaAntes`/`capituloAntes`
+// = "já vinha lendo, estava na X" na primeira sessão do livro: vira uma
+// sessão de cadastro (fora das métricas) antes desta.
 export async function createSession(input: {
   itemId: string | null;
   startedAt: string;
   durationSeconds: number;
-  unit: SessionUnit;
-  quantity: number | null;
+  pagina?: number | null;
+  capitulo?: number | null;
+  paginaAntes?: number | null;
+  capituloAntes?: number | null;
   tags: string[];
 }): Promise<{ sessionId: string | null; error: string | null }> {
   // Sem redirect: a sessão de leitura (tempo, livro, desafios) continua na
@@ -51,54 +60,81 @@ export async function createSession(input: {
   const supabase = await createClient();
 
   const itemId = input.itemId || null;
-  const quantity =
-    input.quantity != null && Number.isFinite(input.quantity) && input.quantity > 0
-      ? Math.round(input.quantity)
-      : null;
+  const numero = (n: number | null | undefined) =>
+    n != null && Number.isFinite(n) && n >= 0 ? Math.round(n) : null;
+  const pagina = numero(input.pagina);
+  const capitulo = numero(input.capitulo);
 
-  let unitStart: number | null = null;
-  let unitEnd: number | null = null;
-  let chapterStart: number | null = null;
-  let chapterEnd: number | null = null;
+  let posicao: {
+    unit_start: number | null;
+    unit_end: number | null;
+    chapter_start: number | null;
+    chapter_end: number | null;
+  } = { unit_start: null, unit_end: null, chapter_start: null, chapter_end: null };
+  const cadastro: { unit_start?: number; unit_end?: number; chapter_start?: number; chapter_end?: number } = {};
 
-  // Quantidade só ancora numa posição de leitura quando há livro vinculado —
-  // sem vínculo, a sessão vale pelo tempo (mesma regra de antes).
-  if (itemId && quantity != null) {
-    // A posição nunca passa do total cadastrado: em 290 de 300, "li 20"
-    // termina o livro e conta 10 páginas (no desafio também), não 20.
+  // Posição só ancora quando há livro vinculado — sem vínculo, a sessão vale
+  // pelo tempo (mesma regra de antes).
+  if (itemId && (pagina != null || capitulo != null)) {
     const { data: livro } = await supabase
       .from("media_items")
       .select("total_units, total_chapters")
       .eq("id", itemId)
       .maybeSingle();
-    const limite = (total: number | null | undefined, start: number) =>
-      total != null && total > start ? Math.min(start + quantity, total) : start + quantity;
+    // A posição nunca passa do total cadastrado (no desafio também).
+    const limite = (total: number | null | undefined, valor: number) =>
+      total != null && total > 0 ? Math.min(valor, total) : valor;
 
-    if (input.unit === "pages") {
-      const { data: last } = await supabase
+    const ultima = async (campo: "unit_end" | "chapter_end") => {
+      const { data } = await supabase
         .from("sessions")
-        .select("unit_end")
+        .select(campo)
         .eq("item_id", itemId)
-        .not("unit_end", "is", null)
+        .not(campo, "is", null)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      const start = last?.unit_end ?? 0;
-      unitStart = start;
-      unitEnd = limite(livro?.total_units, start);
-    } else {
-      const { data: last } = await supabase
-        .from("sessions")
-        .select("chapter_end")
-        .eq("item_id", itemId)
-        .not("chapter_end", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      const start = last?.chapter_end ?? 0;
-      chapterStart = start;
-      chapterEnd = limite(livro?.total_chapters, start);
+      return ((data as Record<string, number> | null)?.[campo] ?? null) as number | null;
+    };
+
+    if (pagina != null) {
+      let inicio = await ultima("unit_end");
+      const antes = numero(input.paginaAntes);
+      if (inicio == null && antes != null && antes > 0) {
+        inicio = limite(livro?.total_units, antes);
+        cadastro.unit_start = 0;
+        cadastro.unit_end = inicio;
+      }
+      posicao = { ...posicao, unit_start: inicio ?? 0, unit_end: limite(livro?.total_units, pagina) };
     }
+    if (capitulo != null) {
+      let inicio = await ultima("chapter_end");
+      const antes = numero(input.capituloAntes);
+      if (inicio == null && antes != null && antes > 0) {
+        inicio = limite(livro?.total_chapters, antes);
+        cadastro.chapter_start = 0;
+        cadastro.chapter_end = inicio;
+      }
+      posicao = {
+        ...posicao,
+        chapter_start: inicio ?? 0,
+        chapter_end: limite(livro?.total_chapters, capitulo),
+      };
+    }
+  }
+
+  // "Já vinha lendo": a posição de antes entra primeiro, como cadastro — vale
+  // pra posição do livro, não pras métricas.
+  if (itemId && Object.keys(cadastro).length > 0) {
+    await supabase.from("sessions").insert({
+      item_id: itemId,
+      user_id: userId,
+      started_at: input.startedAt,
+      ended_at: input.startedAt,
+      duration_seconds: 0,
+      cadastro: true,
+      ...cadastro,
+    });
   }
 
   const { data: newSession, error } = await supabase
@@ -109,10 +145,7 @@ export async function createSession(input: {
       started_at: input.startedAt,
       ended_at: new Date().toISOString(),
       duration_seconds: input.durationSeconds,
-      unit_start: unitStart,
-      unit_end: unitEnd,
-      chapter_start: chapterStart,
-      chapter_end: chapterEnd,
+      ...posicao,
       quality_tags: input.tags,
     })
     .select("id")
@@ -123,8 +156,10 @@ export async function createSession(input: {
   }
 
   if (itemId) {
-    const valorFinal = input.unit === "pages" ? unitEnd : chapterEnd;
-    if (valorFinal != null) await talvezMarcarTerminado(supabase, itemId, input.unit, valorFinal);
+    if (posicao.unit_end != null) await talvezMarcarTerminado(supabase, itemId, "pages", posicao.unit_end);
+    if (posicao.chapter_end != null) {
+      await talvezMarcarTerminado(supabase, itemId, "chapters", posicao.chapter_end);
+    }
   }
 
   revalidatePath("/");
@@ -266,8 +301,7 @@ export async function definirTotalEPosicao(input: {
 }
 
 // Pós-sessão: publica o registro nos desafios marcados (multi, pré-selecionados
-// no cliente). `pagesExtra` cobre o caso "marquei capítulos, desafio pontua
-// páginas" — completa a posição de páginas da mesma sessão.
+// no cliente).
 export async function publishSession(input: {
   sessionId: string;
   itemId: string | null;
@@ -275,45 +309,9 @@ export async function publishSession(input: {
   note: string | null;
   /** Comentário diferente por desafio (aba Ler); sem entrada, vale `note`. */
   notasPorGrupo?: Record<string, string | null>;
-  pagesExtra: number | null;
 }) {
   const userId = await requireUserId();
   const supabase = await createClient();
-
-  if (
-    input.pagesExtra != null &&
-    Number.isFinite(input.pagesExtra) &&
-    input.pagesExtra > 0 &&
-    input.itemId
-  ) {
-    const { data: last } = await supabase
-      .from("sessions")
-      .select("unit_end")
-      .eq("item_id", input.itemId)
-      .not("unit_end", "is", null)
-      .neq("id", input.sessionId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const start = last?.unit_end ?? 0;
-    const { data: livro } = await supabase
-      .from("media_items")
-      .select("total_units")
-      .eq("id", input.itemId)
-      .maybeSingle();
-    const total = livro?.total_units as number | null | undefined;
-    // Mesma trava do createSession: a posição não passa do total.
-    const unitEnd =
-      total != null && total > start
-        ? Math.min(start + Math.round(input.pagesExtra), total)
-        : start + Math.round(input.pagesExtra);
-    await supabase
-      .from("sessions")
-      .update({ unit_start: start, unit_end: unitEnd })
-      .eq("id", input.sessionId)
-      .eq("user_id", userId);
-    await talvezMarcarTerminado(supabase, input.itemId, "pages", unitEnd);
-  }
 
   const note = input.note?.trim() || null;
   if (input.groupIds.length > 0) {

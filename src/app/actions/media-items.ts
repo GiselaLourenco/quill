@@ -195,6 +195,74 @@ export async function updateItemStatus(itemId: string, status: string) {
 }
 
 /**
+ * Releitura: a leitura terminada vai pra `past_readings` (continua contando
+ * no ano em que terminou, nos desafios e nas conquistas) e o livro volta pra
+ * "lendo" com uma leitura nova — começo hoje, posição zerada. Diferente de
+ * trocar o status pra "lendo", que é corrigir um "terminei" marcado por
+ * engano e apaga a data.
+ */
+export async function iniciarReleitura(itemId: string): Promise<{ error: string | null }> {
+  const userId = await requireUserId();
+  const supabase = await createClient();
+
+  const { data: item } = await supabase
+    .from("media_items")
+    .select("user_id, status, started_at, finished_at")
+    .eq("id", itemId)
+    .maybeSingle();
+  if (!item || item.user_id !== userId) return { error: "Livro não encontrado." };
+  if (item.status !== "finished") return { error: "Só dá pra reler um livro terminado." };
+
+  const { error: erroLeitura } = await supabase.from("past_readings").insert({
+    item_id: itemId,
+    user_id: userId,
+    started_at: item.started_at,
+    finished_at: item.finished_at,
+  });
+  if (erroLeitura) return { error: "Não foi possível começar a releitura." };
+
+  await supabase
+    .from("media_items")
+    .update({ status: "reading", started_at: todayLocalDateKey(), finished_at: null })
+    .eq("id", itemId);
+
+  // Posição volta pro começo: uma sessão de cadastro (fora das métricas) em
+  // 0, igual à correção manual de posição. Sem os check-ins de "Livros
+  // terminados" mexidos — a primeira leitura continua valendo neles.
+  const ultima = async (campo: "unit_end" | "chapter_end") => {
+    const { data } = await supabase
+      .from("sessions")
+      .select(campo)
+      .eq("item_id", itemId)
+      .not(campo, "is", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return ((data as Record<string, number> | null)?.[campo] ?? 0) as number;
+  };
+  const [pagina, capitulo] = await Promise.all([ultima("unit_end"), ultima("chapter_end")]);
+  const agora = new Date().toISOString();
+  await supabase.from("sessions").insert({
+    item_id: itemId,
+    user_id: userId,
+    started_at: agora,
+    ended_at: agora,
+    duration_seconds: 0,
+    cadastro: true,
+    unit_start: pagina,
+    unit_end: 0,
+    chapter_start: capitulo,
+    chapter_end: 0,
+  });
+
+  revalidatePath(`/books/${itemId}`);
+  revalidatePath("/estante");
+  revalidatePath("/ler");
+  revalidatePath("/");
+  return { error: null };
+}
+
+/**
  * Terminar um livro que tem conquista própria (Trono de Vidro → foto) grava
  * o momento em `user_achievements`. O desbloqueio em si não depende disso — é
  * calculado da estante, por isso quem terminou antes já ganha. A linha existe

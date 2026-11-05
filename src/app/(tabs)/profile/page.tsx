@@ -54,10 +54,9 @@ export default async function ProfilePage() {
       .limit(1)
       .maybeSingle(),
     supabase
-      .from("media_items")
-      .select("id", { count: "exact", head: true })
+      .from("finished_readings")
+      .select("item_id", { count: "exact", head: true })
       .eq("user_id", userId)
-      .eq("status", "finished")
       .gte("finished_at", `${year}-01-01`)
       .lte("finished_at", `${year}-12-31`),
     supabase.from("media_items").select("id", { count: "exact", head: true }).eq("user_id", userId),
