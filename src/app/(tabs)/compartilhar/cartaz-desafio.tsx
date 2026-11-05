@@ -53,6 +53,33 @@ function nomesCurtos(nomes: string[]): string[] {
   });
 }
 
+/**
+ * Na lista cabe o nome inteiro até 18 letras; mais que isso vira primeiro +
+ * último nome ou, se ainda passar, primeiro + inicial do último.
+ */
+function nomeDaLista(nome: string): string {
+  const n = nome.trim();
+  if (n.length <= 18) return n;
+  const p = n.split(/\s+/);
+  if (p.length < 2) return n;
+  const ultimo = p[p.length - 1]!;
+  const curto = `${p[0]} ${ultimo}`;
+  return curto.length <= 18 ? curto : `${p[0]} ${ultimo[0]}.`;
+}
+
+/** "1 – 30 nov" numa linha; "30 dez 2026 – 30 dez 2027" em duas. */
+function Datas({ texto }: { texto: string }) {
+  const partes = /\d{4}/.test(texto) ? texto.split(" – ") : [texto];
+  return partes.length === 2 ? (
+    <>
+      <p className="whitespace-nowrap leading-[1.05]">{partes[0]} –</p>
+      <p className="whitespace-nowrap leading-[1.05]">{partes[1]}</p>
+    </>
+  ) : (
+    <p className="whitespace-nowrap leading-none">{texto}</p>
+  );
+}
+
 /** "páginas", ou "página" quando o número é 1. */
 const unidadeDe = (d: DesafioCartaz, n: number) => (n === 1 ? d.unidade[0] : d.unidade[1]);
 
@@ -143,8 +170,10 @@ function SuaPosicao({ area, base, eu, clara }: { area: Area; base: number; eu: M
 
 const LAYOUT_LISTA = {
   "desafio-placar": {
-    titulo: [16, 8.1, 52, 5.9] as Area,
-    datas: [20, 17.8, 27, 2.8] as Area,
+    // Respiro até a borda de baixo da faixa (título de 3 linhas encostava).
+    titulo: [17, 8.4, 50, 5.4] as Area,
+    // Altura da pílula toda: datas em dois anos vão em duas linhas.
+    datas: [20, 17.3, 27, 4] as Area,
     livro: [62.5, 17.8, 27.5, 2.8] as Area,
     sobreLinha: false,
     faixa: null as Area | null,
@@ -165,7 +194,7 @@ const LAYOUT_LISTA = {
   },
   "desafio-retro": {
     titulo: [21, 5.2, 58, 7.4] as Area,
-    datas: [19.5, 18.4, 18, 2.8] as Area,
+    datas: [19.5, 17.6, 18, 4.2] as Area,
     livro: [51.5, 18.1, 37, 2.8] as Area,
     sobreLinha: false,
     faixa: [15, 25.9, 37, 3] as Area,
@@ -284,7 +313,9 @@ function Lista({ d, layout: L }: { d: DesafioCartaz; layout: (typeof LAYOUT_LIST
   return (
     <>
       <Titulo area={L.titulo} base={6.4} giro={-3}>{d.nome}</Titulo>
-      <Linha area={L.datas} base={3} alinhar="esquerda" vertical={L.sobreLinha ? "baixo" : "centro"} className="font-sans font-bold">{d.periodo}</Linha>
+      <Caixa area={L.datas} tinta="escura" base={3} minimo={0.6} alinhar="esquerda" vertical={L.sobreLinha ? "baixo" : "centro"} className="font-sans font-bold">
+        <Datas texto={d.periodo} />
+      </Caixa>
       <Linha area={L.livro} base={3.4} alinhar="esquerda" vertical={L.sobreLinha ? "baixo" : "centro"} className="font-sans font-bold">{d.restam}</Linha>
       {L.faixa && (
         <Linha area={L.faixa} base={3} alinhar="esquerda" clara className="font-display uppercase tracking-[0.1em]">
@@ -303,7 +334,7 @@ function Lista({ d, layout: L }: { d: DesafioCartaz; layout: (typeof LAYOUT_LIST
               alinhar="esquerda"
               className={`font-sans font-bold ${m?.eu ? "underline underline-offset-[0.2em]" : ""}`}
             >
-              {m ? m.nome : "—"}
+              {m ? nomeDaLista(m.nome) : "—"}
             </Linha>
             <Linha area={[L.pontos.x, topo, L.pontos.w, L.alturaLinha]} base={3.6} className="font-display">
               {m ? numero(m.pontos) : "—"}

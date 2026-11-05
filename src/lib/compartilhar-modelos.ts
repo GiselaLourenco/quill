@@ -62,7 +62,8 @@ export const MODELOS_CARTAZ: readonly ModeloCartaz[] = [
     titulo: { area: [23, 5.2, 55.2, 12], tinta: "escura" },
     ano: { area: [33, 43.6, 34, 4], tinta: "clara" },
     stats: [[5.2, 50.3, 43.3, 10], [51.2, 50.2, 43.5, 10.1], [5.2, 62.1, 43.3, 10], [51.2, 62.1, 43.5, 10]],
-    livro: { area: [5.1, 75, 88.5, 18.2], margemEsq: 26, tinta: "escura" },
+    // Termina antes das folhas douradas do canto direito.
+    livro: { area: [5.1, 75, 81, 18.2], margemEsq: 28.5, tinta: "escura" },
   },
   {
     tipo: "ilustrado",
@@ -96,7 +97,8 @@ export const MODELOS_CARTAZ: readonly ModeloCartaz[] = [
     titulo: { area: [24, 6, 52, 9.5], tinta: "escura" },
     // Só o corpo das placas, sem as pontas de seta.
     stats: [[57.5, 21.1, 29.5, 4.1], [57, 28.8, 33, 4.2], [58, 37.2, 32, 4.2], [60, 45.1, 31.5, 4]],
-    extras: [[6.5, 55.4, 39.5, 6.9], [52.5, 55.4, 39.5, 6.9], [6.5, 65, 39.5, 7], [52.5, 65, 39.5, 7]],
+    // Centralizados em cada cartão (a 2ª fileira começa em ~66%).
+    extras: [[6.5, 56, 39.5, 7.8], [52.5, 56, 39.5, 7.8], [6.5, 67.4, 39.5, 8], [52.5, 67.4, 39.5, 8]],
     // À direita dos livros e da folha.
     livro: { area: [33, 80.6, 58, 13.2], margemEsq: 0, tinta: "escura" },
   },
@@ -126,9 +128,10 @@ export const MODELOS_CARTAZ: readonly ModeloCartaz[] = [
     nome: "Escrivaninha botânica",
     paleta: ["#3E4A26", "#C9772E", "#F6E3BE"],
     titulo: { area: [21.4, 5.4, 58.6, 11.7], tinta: "escura" },
-    destaque: { area: [44.5, 23.4, 52.2, 28.1], tinta: "escura", pautas: [31.1, 37.2, 43.6] },
+    // Sem chegar nas flores do canto direito do cartão.
+    destaque: { area: [44.5, 23.4, 44, 28.1], tinta: "escura", pautas: [31.1, 37.2, 43.6] },
     stats: [[5, 54.5, 43.1, 9.9], [51.2, 54.5, 43.8, 9.9], [5, 66.3, 43.3, 10.5], [51.3, 66.3, 43.8, 10.5]],
-    livro: { area: [2, 78.9, 95, 16.2], margemEsq: 26, tinta: "escura" },
+    livro: { area: [2, 78.9, 80, 16.2], margemEsq: 31, tinta: "escura" },
   },
   {
     tipo: "ilustrado",
@@ -148,7 +151,8 @@ export const MODELOS_CARTAZ: readonly ModeloCartaz[] = [
     // Abaixo do selo, acima do ornamento.
     titulo: { area: [15, 11.5, 70, 6.8], tinta: "escura" },
     stats: [[7.1, 24.2, 41.8, 15.2], [52.5, 24.1, 41.6, 15.3], [7, 41.5, 41.9, 15.3], [52.5, 41.5, 41.6, 15.3]],
-    livro: { area: [5, 62, 66, 20], margemEsq: 0, tinta: "escura" },
+    // Termina antes do Quill dormindo nos livros.
+    livro: { area: [5, 62, 59, 20], margemEsq: 0, tinta: "escura" },
   },
   {
     tipo: "ilustrado",

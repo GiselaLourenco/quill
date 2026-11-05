@@ -186,7 +186,7 @@ export async function carregarDesafiosDoCartaz(
         livros: livrosTerminados,
         dias,
         checkins: doGrupo.length,
-        horas: `${Math.round(minutos / 60)}h`,
+        horas: `${Math.round(minutos / 60).toLocaleString("pt-BR")}h`,
       },
     };
     return {
