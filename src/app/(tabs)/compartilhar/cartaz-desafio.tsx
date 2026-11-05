@@ -230,7 +230,10 @@ function Podio({ d }: { d: DesafioCartaz }) {
       ))}
       <Avatar membro={d.eu} estilo={circulo(16.7, 94.2, 12.4)} />
       <SuaPosicao area={[28.5, 91.9, 37, 4.4]} base={4.6} eu={d.eu} />
-      <Linha area={[68, 92.3, 22, 3.6]} base={3} className="font-display uppercase">{d.metricaLida}</Linha>
+      <Caixa area={[69.8, 92.3, 19.6, 3.5]} tinta="escura" base={3.6} minimo={0.6}>
+        <p className="whitespace-nowrap font-sans text-[0.9em] font-semibold leading-tight">Meta</p>
+        <p className="whitespace-nowrap font-display uppercase leading-none">{d.metricaLida}</p>
+      </Caixa>
     </>
   );
 }
