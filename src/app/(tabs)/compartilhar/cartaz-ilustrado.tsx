@@ -240,11 +240,20 @@ function useAutoAjuste(base: number, minimo: number) {
       }
     };
     ajustar();
-    // A fonte de display pode chegar depois: mede de novo com ela.
-    let vivo = true;
-    document.fonts?.ready.then(() => vivo && ajustar());
+    // A fonte de display (ou uma imagem) pode chegar depois e alargar o texto.
+    // `document.fonts.ready` não basta: resolve antes de a fonte começar a
+    // carregar. Observar o conteúdo pega a mudança de verdade.
+    // O filho fica preso à largura da caixa, então crescer o texto nem sempre
+    // muda o tamanho dele: por isso também os eventos de fonte e de imagem.
+    const observador = new ResizeObserver(ajustar);
+    for (const filho of el.children) observador.observe(filho);
+    document.fonts?.addEventListener("loadingdone", ajustar);
+    const imagens = [...el.querySelectorAll("img")];
+    for (const img of imagens) img.addEventListener("load", ajustar);
     return () => {
-      vivo = false;
+      observador.disconnect();
+      document.fonts?.removeEventListener("loadingdone", ajustar);
+      for (const img of imagens) img.removeEventListener("load", ajustar);
     };
   });
   return ref;

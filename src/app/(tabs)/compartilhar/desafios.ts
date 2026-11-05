@@ -8,12 +8,12 @@ import type { DesafioCartaz, MembroCartaz } from "./cartaz-desafio";
 const MESES_CURTOS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
 /** Como a métrica do ranking aparece no cartaz. */
-const METRICA: Record<ScoringMetric, { rotulo: string; lida: string }> = {
-  pages: { rotulo: "Páginas", lida: "Páginas lidas" },
-  chapters: { rotulo: "Capítulos", lida: "Capítulos lidos" },
-  active_days: { rotulo: "Dias ativos", lida: "Dias lidos" },
-  check_ins: { rotulo: "Livros terminados", lida: "Livros lidos" },
-  minutes: { rotulo: "Minutos", lida: "Minutos lidos" },
+const METRICA: Record<ScoringMetric, { rotulo: string; lida: string; unidade: [string, string] }> = {
+  pages: { rotulo: "Páginas", lida: "Páginas lidas", unidade: ["página", "páginas"] },
+  chapters: { rotulo: "Capítulos", lida: "Capítulos lidos", unidade: ["capítulo", "capítulos"] },
+  active_days: { rotulo: "Dias ativos", lida: "Dias lidos", unidade: ["dia", "dias"] },
+  check_ins: { rotulo: "Livros terminados", lida: "Livros lidos", unidade: ["livro", "livros"] },
+  minutes: { rotulo: "Minutos", lida: "Minutos lidos", unidade: ["minuto", "minutos"] },
 };
 
 const diaMes = (chave: string, comAno: boolean) =>
@@ -177,6 +177,7 @@ export async function carregarDesafiosDoCartaz(
       livro: g.item_id ? tituloCurto(tituloLivro.get(g.item_id) ?? "Livro único") : "Livro livre",
       metricaRotulo: METRICA[metric].rotulo,
       metricaLida: METRICA[metric].lida,
+      unidade: METRICA[metric].unidade,
       pessoas: new Set(doGrupo.map((c) => c.user_id as string)).size,
       ranking,
       eu: eu ?? { ...perfilDe(userId), pontos: 0, posicao: 0, eu: true },
