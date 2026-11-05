@@ -209,6 +209,26 @@ export const MODELOS_CARTAZ: readonly ModeloCartaz[] = [
   },
 ];
 
+/**
+ * Modelos do cartaz de desafio (aba "Desafio" do Compartilhar). As áreas de
+ * texto de cada um ficam em `cartaz-desafio.tsx`, junto do desenho.
+ */
+export type ModeloDesafio = {
+  tipo: "desafio";
+  id: "desafio-podio" | "desafio-placar" | "desafio-retro";
+  nome: string;
+};
+
+export const MODELOS_DESAFIO: readonly ModeloDesafio[] = [
+  { tipo: "desafio", id: "desafio-podio", nome: "Pódio" },
+  { tipo: "desafio", id: "desafio-placar", nome: "Placar" },
+  { tipo: "desafio", id: "desafio-retro", nome: "Ranking retrô" },
+];
+
+export function acharModeloDesafio(id: string | null | undefined): ModeloDesafio {
+  return MODELOS_DESAFIO.find((m) => m.id === id) ?? MODELOS_DESAFIO[0]!;
+}
+
 export function acharModelo(id: string | null | undefined): ModeloCartaz {
   return MODELOS_CARTAZ.find((m) => m.id === id) ?? MODELOS_CARTAZ[0]!;
 }

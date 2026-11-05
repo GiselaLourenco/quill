@@ -163,7 +163,7 @@ export function CartazIlustrado({
   );
 }
 
-const pos = ([x, y, w, h]: Area): React.CSSProperties => ({
+export const pos = ([x, y, w, h]: Area): React.CSSProperties => ({
   left: `${x}%`,
   top: `${y}%`,
   width: `${w}%`,
@@ -175,7 +175,7 @@ const pos = ([x, y, w, h]: Area): React.CSSProperties => ({
  * (sem estourar largura nem altura). Os filhos medem em `em`, então tudo
  * encolhe junto.
  */
-function Caixa({
+export function Caixa({
   area,
   tinta,
   base,
@@ -184,6 +184,7 @@ function Caixa({
   vertical = "centro",
   contorno,
   className = "",
+  estilo,
   children,
 }: {
   area: Area;
@@ -195,6 +196,8 @@ function Caixa({
   vertical?: "centro" | "baixo";
   contorno?: boolean;
   className?: string;
+  /** Estilo extra (ex.: girar junto com a faixa desenhada). */
+  estilo?: React.CSSProperties;
   children: React.ReactNode;
 }) {
   const ref = useAutoAjuste(base, minimo);
@@ -215,6 +218,7 @@ function Caixa({
         outline: contorno ? "2px solid red" : undefined,
         outlineOffset: -2,
         textShadow: tinta === "clara" ? "0 1px 3px rgba(0,0,0,0.45)" : undefined,
+        ...estilo,
       }}
     >
       {children}

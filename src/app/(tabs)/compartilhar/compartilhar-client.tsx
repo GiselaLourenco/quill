@@ -5,8 +5,17 @@ import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { toPng } from "html-to-image";
 import { ComSpinner } from "@/components/carregando";
 import { Portal } from "@/components/portal";
-import { MODELOS_CARTAZ, MODELO_PADRAO, acharModelo, srcModelo, type ModeloCartaz } from "@/lib/compartilhar-modelos";
+import {
+  MODELOS_CARTAZ,
+  MODELOS_DESAFIO,
+  MODELO_PADRAO,
+  acharModelo,
+  acharModeloDesafio,
+  srcModelo,
+  type ModeloCartaz,
+} from "@/lib/compartilhar-modelos";
 import { CartazIlustrado } from "./cartaz-ilustrado";
+import { CartazDesafio, type DesafioCartaz } from "./cartaz-desafio";
 
 /** Formato Stories/Reels — o que o Instagram espera. */
 const LARGURA_STORY = 1080;
@@ -45,38 +54,44 @@ export type LivroCartaz = {
 };
 
 /**
- * Último modelo escolhido, no localStorage — reabre a tela nele. Lido por
+ * Última escolha (modelo, aba), no localStorage — reabre a tela nela. Lida por
  * `useSyncExternalStore` (o servidor renderiza o padrão).
  */
-const CHAVE_MODELO = "quill:compartilhar:modelo";
-const ouvintesModelo = new Set<() => void>();
-/** Fallback quando o storage falha — senão a troca não teria efeito. */
-let memoriaModelo: string | null = null;
-
-function assinarModelo(aviso: () => void) {
-  ouvintesModelo.add(aviso);
-  return () => {
-    ouvintesModelo.delete(aviso);
+function criarPreferencia(chave: string, padrao: string) {
+  const ouvintes = new Set<() => void>();
+  /** Fallback quando o storage falha — senão a troca não teria efeito. */
+  let memoria: string | null = null;
+  const assinar = (aviso: () => void) => {
+    ouvintes.add(aviso);
+    return () => {
+      ouvintes.delete(aviso);
+    };
+  };
+  const ler = () => {
+    if (memoria != null) return memoria;
+    try {
+      return window.localStorage.getItem(chave) ?? padrao;
+    } catch {
+      return padrao;
+    }
+  };
+  return {
+    useValor: () => useSyncExternalStore(assinar, ler, () => padrao),
+    salvar: (valor: string) => {
+      try {
+        window.localStorage.setItem(chave, valor);
+      } catch {
+        // Sem storage (aba anônima, bloqueado): vale só nesta visita.
+      }
+      memoria = valor;
+      for (const aviso of ouvintes) aviso();
+    },
   };
 }
 
-function lerModelo() {
-  try {
-    return window.localStorage.getItem(CHAVE_MODELO) ?? MODELO_PADRAO;
-  } catch {
-    return MODELO_PADRAO;
-  }
-}
-
-function salvarModelo(id: string) {
-  try {
-    window.localStorage.setItem(CHAVE_MODELO, id);
-  } catch {
-    // Sem storage (aba anônima, bloqueado): vale só nesta visita.
-  }
-  memoriaModelo = id;
-  for (const aviso of ouvintesModelo) aviso();
-}
+const prefModelo = criarPreferencia("quill:compartilhar:modelo", MODELO_PADRAO);
+const prefModeloDesafio = criarPreferencia("quill:compartilhar:modelo-desafio", MODELOS_DESAFIO[0]!.id);
+const prefAba = criarPreferencia("quill:compartilhar:aba", "mes");
 
 /** Sem acento e sem caixa — "machado" acha "Machado de Assis". */
 const normalizar = (t: string) =>
@@ -85,9 +100,11 @@ const normalizar = (t: string) =>
 export default function CompartilharClient({
   periodos,
   todosLivros,
+  desafios,
 }: {
   periodos: PeriodoStats[];
   todosLivros: LivroCartaz[];
+  desafios: DesafioCartaz[];
 }) {
   const [indice, setIndice] = useState(periodos.length - 1);
   const periodo = periodos[indice]!;
@@ -98,12 +115,13 @@ export default function CompartilharClient({
   const [erro, setErro] = useState<string | null>(null);
   const cartazRef = useRef<HTMLDivElement>(null);
   const [escolhendoModelo, setEscolhendoModelo] = useState(false);
-  const modeloId = useSyncExternalStore(
-    assinarModelo,
-    () => memoriaModelo ?? lerModelo(),
-    () => MODELO_PADRAO,
-  );
-  const modelo = acharModelo(modeloId);
+  const [escolhendoDesafio, setEscolhendoDesafio] = useState(false);
+  const modelo = acharModelo(prefModelo.useValor());
+  const modeloDesafio = acharModeloDesafio(prefModeloDesafio.useValor());
+  const noDesafio = prefAba.useValor() === "desafio";
+  // Abre no desafio mais recente em andamento (a lista já vem nessa ordem).
+  const [desafioId, setDesafioId] = useState(desafios[0]?.id ?? "");
+  const desafio = desafios.find((d) => d.id === desafioId);
 
   // Trocar de período troca a lista sugerida — o livro escolhido some do
   // painel se não pertencer mais a ela, então volta pro 1º da nova lista.
@@ -145,16 +163,17 @@ export default function CompartilharClient({
 
       // Web Share API com arquivo (celular): abre a bandeja nativa → Stories.
       const blob = await (await fetch(dataUrl)).blob();
-      const file = new File([blob], `quill-${periodo.id}.png`, { type: "image/png" });
+      const nomeArquivo = noDesafio && desafio ? `quill-desafio-${desafio.id.slice(0, 8)}.png` : `quill-${periodo.id}.png`;
+      const file = new File([blob], nomeArquivo, { type: "image/png" });
       if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: `Quill · ${periodo.rotulo}` });
+        await navigator.share({ files: [file], title: `Quill · ${noDesafio && desafio ? desafio.nome : periodo.rotulo}` });
         return;
       }
 
       // Fallback (desktop): baixa o PNG.
       const a = document.createElement("a");
       a.href = dataUrl;
-      a.download = `quill-${periodo.id}.png`;
+      a.download = nomeArquivo;
       a.click();
     } catch (e) {
       // Cancelar o compartilhamento nativo não é erro.
@@ -183,7 +202,7 @@ export default function CompartilharClient({
           ‹
         </Link>
         <h1 className="font-display text-lg uppercase leading-none tracking-tight text-ink">
-          Compartilhar metas
+          Compartilhar
         </h1>
         <button
           type="button"
@@ -203,9 +222,10 @@ export default function CompartilharClient({
 
       {escolhendoModelo && (
         <SheetModelos
-          atual={modelo.id}
+          modelos={noDesafio ? MODELOS_DESAFIO : MODELOS_CARTAZ}
+          atual={noDesafio ? modeloDesafio.id : modelo.id}
           onEscolher={(id) => {
-            salvarModelo(id);
+            (noDesafio ? prefModeloDesafio : prefModelo).salvar(id);
             setEscolhendoModelo(false);
           }}
           onFechar={() => setEscolhendoModelo(false)}
@@ -216,6 +236,71 @@ export default function CompartilharClient({
         />
       )}
 
+      {escolhendoDesafio && (
+        <SheetDesafios
+          desafios={desafios}
+          atual={desafioId}
+          onEscolher={(id) => {
+            setDesafioId(id);
+            setEscolhendoDesafio(false);
+          }}
+          onFechar={() => setEscolhendoDesafio(false)}
+        />
+      )}
+
+      {/* Meu mês | Desafio */}
+      <div className="shadow-hard-sm mb-4 grid grid-cols-2 overflow-hidden rounded-md border-2 border-ink" role="group" aria-label="O que compartilhar">
+        {(["mes", "desafio"] as const).map((aba) => {
+          const on = (aba === "desafio") === noDesafio;
+          return (
+            <button
+              key={aba}
+              type="button"
+              onClick={() => prefAba.salvar(aba)}
+              aria-pressed={on}
+              className={`py-2.5 font-display text-[11px] uppercase tracking-widest ${on ? "bg-ink text-paper" : "bg-card text-ink"}`}
+            >
+              {aba === "mes" ? "Meu mês" : "Desafio"}
+            </button>
+          );
+        })}
+      </div>
+
+      {noDesafio ? (
+        desafio ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setEscolhendoDesafio(true)}
+              aria-haspopup="dialog"
+              className="shadow-hard-sm mb-5 flex w-full items-center gap-3 rounded-md border-2 border-ink bg-card px-4 py-2.5 text-left"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block font-display text-[9px] uppercase tracking-[0.2em] text-ink-soft">Desafio</span>
+                <span className="block truncate font-serif text-base font-semibold italic text-ink">{desafio.nome}</span>
+                <span className="block truncate text-[11px] text-ink-soft">{resumoDesafio(desafio)}</span>
+              </span>
+              <span className="font-display text-xs text-ink-soft" aria-hidden>▾</span>
+            </button>
+            <div className="shadow-hard mx-auto w-full max-w-sm overflow-hidden rounded-2xl border-2 border-ink">
+              <div key={`${modeloDesafio.id}:${desafio.id}`} className="animate-cartaz-entra">
+                <CartazDesafio modelo={modeloDesafio} desafio={desafio} />
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="rounded-md border-2 border-dashed border-ink bg-card p-5 text-center">
+            <p className="font-serif text-sm italic text-ink-soft">Você ainda não está em nenhum desafio.</p>
+            <Link
+              href="/juntos/novo"
+              className="shadow-hard-sm mt-3 inline-block rounded-md border-2 border-ink bg-mustard px-4 py-2 font-display text-[11px] uppercase tracking-widest text-ink"
+            >
+              Criar um desafio
+            </Link>
+          </div>
+        )
+      ) : (
+      <>
       {/* seletor de período */}
       <div className="mb-5 flex items-center justify-between rounded-md border-2 border-ink bg-card px-2 py-2 shadow-hard-sm">
         <button
@@ -248,6 +333,8 @@ export default function CompartilharClient({
           <CartazDoModelo modelo={modelo} periodo={periodo} livro={livro} mes={mes} ano={ano} />
         </div>
       </div>
+      </>
+      )}
 
       {/*
         Nó oculto em 1080×1920 (formato Stories), fora da tela: é ele que o
@@ -257,7 +344,9 @@ export default function CompartilharClient({
       */}
       <div aria-hidden className="pointer-events-none fixed left-[-20000px] top-0 h-0 overflow-hidden">
         <div ref={cartazRef} style={{ width: LARGURA_STORY, height: ALTURA_STORY }}>
-          {modelo.tipo === "ilustrado" ? (
+          {noDesafio ? (
+            desafio && <CartazDesafio modelo={modeloDesafio} desafio={desafio} />
+          ) : modelo.tipo === "ilustrado" ? (
             // Fontes em `cqw`: desenhado direto em 1080 de largura, sem ampliar.
             <CartazIlustrado modelo={modelo} periodo={periodo} livro={livro} mes={mes} ano={ano} />
           ) : (
@@ -275,13 +364,14 @@ export default function CompartilharClient({
         </div>
       </div>
 
-      {!periodo.temDados && (
+      {!noDesafio && !periodo.temDados && (
         <p className="mt-4 rounded-md border-2 border-dashed border-ink bg-card p-3 text-center font-serif text-sm italic text-ink-soft">
           Sem sessões registradas em {periodo.rotulo} — o cartaz sai zerado.
         </p>
       )}
 
       {/* escolher livro */}
+      {!noDesafio && (
       <div className="mt-5">
         <button
           type="button"
@@ -368,6 +458,7 @@ export default function CompartilharClient({
           </ul>
         )}
       </div>
+      )}
 
       {erro && <p className="mt-3 text-center text-sm font-medium text-coral">{erro}</p>}
 
@@ -375,7 +466,7 @@ export default function CompartilharClient({
       <button
         type="button"
         onClick={salvarImagem}
-        disabled={salvando}
+        disabled={salvando || (noDesafio && !desafio)}
         className="shadow-hard mt-6 flex w-full items-center justify-center gap-3 rounded-xl border-2 border-ink bg-coral py-4 text-paper transition-transform active:translate-x-1 active:translate-y-1 active:shadow-none disabled:opacity-60"
       >
         <span className="font-display text-xs uppercase tracking-widest">
@@ -404,13 +495,87 @@ function CartazDoModelo({
   return modelo.tipo === "ilustrado" ? <CartazIlustrado modelo={modelo} {...dados} /> : <Cartaz {...dados} />;
 }
 
+/** "5 pessoas · ranking por páginas · faltam 25 dias" */
+function resumoDesafio(d: DesafioCartaz): string {
+  const pessoas = d.pessoas === 1 ? "1 pessoa" : `${d.pessoas} pessoas`;
+  return `${pessoas} · ${d.metricaRotulo.toLowerCase()} · ${d.restam}`;
+}
+
+/** Bottom sheet "Escolher desafio": em andamento em cima, encerrados embaixo. */
+function SheetDesafios({
+  desafios,
+  atual,
+  onEscolher,
+  onFechar,
+}: {
+  desafios: DesafioCartaz[];
+  atual: string;
+  onEscolher: (id: string) => void;
+  onFechar: () => void;
+}) {
+  const grupos = [
+    { titulo: "Em andamento", itens: desafios.filter((d) => !d.encerrado) },
+    { titulo: "Encerrados", itens: desafios.filter((d) => d.encerrado) },
+  ].filter((g) => g.itens.length > 0);
+  return (
+    <Portal>
+      <div className="fixed inset-0 z-40 flex justify-center" role="dialog" aria-modal="true" aria-label="Escolher desafio">
+        <button type="button" aria-label="Fechar" onClick={onFechar} className="absolute inset-0 bg-ink/40" />
+        <div className="shadow-hard relative mt-auto max-h-[80dvh] w-full max-w-[390px] overflow-y-auto border-x-2 border-t-2 border-ink bg-paper p-5 pb-8">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h2 className="font-display text-lg uppercase leading-none tracking-tight text-ink">Escolher desafio</h2>
+            <button
+              type="button"
+              onClick={onFechar}
+              aria-label="Fechar"
+              className="shadow-hard-sm flex h-8 w-8 items-center justify-center border-2 border-ink bg-card font-display text-sm text-ink active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+            >
+              ✕
+            </button>
+          </div>
+          {grupos.map((g) => (
+            <section key={g.titulo}>
+              <h3 className="mb-2 mt-4 font-display text-[10px] uppercase tracking-[0.2em] text-ink-soft">{g.titulo}</h3>
+              <ul className="space-y-2">
+                {g.itens.map((d) => {
+                  const on = d.id === atual;
+                  return (
+                    <li key={d.id}>
+                      <button
+                        type="button"
+                        onClick={() => onEscolher(d.id)}
+                        aria-pressed={on}
+                        className={`shadow-hard-sm flex w-full items-center gap-3 rounded-md border-2 border-ink px-4 py-2.5 text-left active:translate-x-[1px] active:translate-y-[1px] active:shadow-none ${
+                          on ? "bg-mustard" : "bg-card"
+                        }`}
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block font-serif text-[15px] font-semibold italic text-ink">{d.nome}</span>
+                          <span className="block text-[11px] text-ink/75">{resumoDesafio(d)}</span>
+                        </span>
+                        {on && <span className="font-display text-sm text-ink">✓</span>}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+        </div>
+      </div>
+    </Portal>
+  );
+}
+
 /** Bottom sheet "Escolher modelo": grade 2 colunas de miniaturas 9:16. */
 function SheetModelos({
+  modelos,
   atual,
   onEscolher,
   onFechar,
   ...dados
 }: {
+  modelos: readonly { id: string; nome: string; tipo: string }[];
   atual: string;
   onEscolher: (id: string) => void;
   onFechar: () => void;
@@ -437,7 +602,7 @@ function SheetModelos({
           </div>
 
           <ul className="grid grid-cols-2 gap-3">
-            {MODELOS_CARTAZ.map((m) => {
+            {modelos.map((m) => {
               const on = m.id === atual;
               return (
                 <li key={m.id}>
@@ -452,7 +617,7 @@ function SheetModelos({
                         on ? "shadow-hard ring-4 ring-mustard" : "shadow-hard-sm"
                       }`}
                     >
-                      {m.tipo === "ilustrado" ? (
+                      {m.tipo !== "classico" ? (
                         // eslint-disable-next-line @next/next/no-img-element -- miniatura da mesma imagem do cartaz; já fica no cache pra troca
                         <img src={srcModelo(m.id)} alt="" loading="lazy" className="h-full w-full object-cover" />
                       ) : (

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 import CompartilharClient, { type PeriodoStats, type LivroCartaz } from "./compartilhar-client";
+import { carregarDesafiosDoCartaz } from "./desafios";
 import { addDaysToKey, fimDoMes, fracaoDaSessaoEntre, localDateKey, localHour, segundosPorDiaDaSessao, todayLocalDateKey } from "@/lib/date-br";
 
 const MESES = [
@@ -80,7 +81,7 @@ export default async function CompartilharPage() {
   const inicio = `${meses[0]!.id}-01`;
 
   const supabase = await createClient();
-  const [{ data: sessions }, { data: livrosRows }, { data: ratings }, { data: metaAno }, { data: terminos }] = await Promise.all([
+  const [{ data: sessions }, { data: livrosRows }, { data: ratings }, { data: metaAno }, { data: terminos }, desafios] = await Promise.all([
     supabase
       .from("sessions")
       .select("started_at, ended_at, duration_seconds, unit_start, unit_end, item_id")
@@ -108,6 +109,7 @@ export default async function CompartilharPage() {
       .select("item_id, finished_at")
       .eq("user_id", userId)
       .not("finished_at", "is", null),
+    carregarDesafiosDoCartaz(supabase, userId),
   ]);
 
   const rows = (sessions ?? []) as SessionRow[];
@@ -194,5 +196,5 @@ export default async function CompartilharPage() {
     };
   });
 
-  return <CompartilharClient periodos={periodos} todosLivros={todosLivros} />;
+  return <CompartilharClient periodos={periodos} todosLivros={todosLivros} desafios={desafios} />;
 }
