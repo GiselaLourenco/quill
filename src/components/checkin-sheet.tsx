@@ -265,6 +265,7 @@ export function CheckinSheet({
                   unidade="pages"
                   anterior={livro.paginaAtual}
                   total={livro.totalPaginas}
+                  livroJaRegistrado={livro.paginaAtual != null || livro.capituloAtual != null}
                   minutos={minutos}
                   variante="checkin"
                   rotulo="Página atual"
@@ -275,6 +276,7 @@ export function CheckinSheet({
                   unidade="chapters"
                   anterior={livro.capituloAtual}
                   total={livro.totalCapitulos}
+                  livroJaRegistrado={livro.paginaAtual != null || livro.capituloAtual != null}
                   minutos={minutos}
                   variante="checkin"
                   rotulo="Capítulo atual"

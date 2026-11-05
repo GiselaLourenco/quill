@@ -1216,6 +1216,7 @@ function TelaRegistro({
                   unidade={unidade}
                   anterior={unidade === "chapters" ? livro.capituloAtual : livro.paginaAtual}
                   percentualAnterior={anteriorPct}
+                  livroJaRegistrado={livro.paginaAtual != null || livro.capituloAtual != null}
                   total={unidade === "chapters" ? livro.totalCapitulos : livro.totalPaginas}
                   minutos={total}
                   variante="ler"

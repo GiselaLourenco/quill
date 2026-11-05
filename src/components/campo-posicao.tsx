@@ -64,6 +64,7 @@ export function CampoPosicao({
   rotulo,
   topo,
   percentualAnterior = null,
+  livroJaRegistrado = false,
   onChange,
 }: {
   unidade: UnidadeCampo;
@@ -71,6 +72,12 @@ export function CampoPosicao({
   anterior: number | null;
   /** Modo %: a posição anterior em % — a digitada na última sessão, ou a convertida das páginas. */
   percentualAnterior?: number | null;
+  /**
+   * O livro já tem posição registrada em outra unidade (ex.: sessões em páginas
+   * e agora a pessoa trocou pra capítulos). Aí não é a primeira vez do livro:
+   * não pergunta "comecei agora", só em que capítulo ela estava.
+   */
+  livroJaRegistrado?: boolean;
   /** Total da unidade (modo %: total de páginas, obrigatório). */
   total: number | null;
   /** Tempo da sessão — pro aviso de pulo improvável. */
@@ -90,7 +97,10 @@ export function CampoPosicao({
   const [valor, setValor] = useState<number | null>(
     variante === "ler" ? (anteriorDigitado ?? 0) : anteriorDigitado,
   );
-  const [inicio, setInicio] = useState<"agora" | "antes" | null>(null);
+  // Livro já registrado em outra unidade: "comecei agora" não faz sentido —
+  // já parte de "estava no cap. X".
+  const novaUnidade = primeira && livroJaRegistrado;
+  const [inicio, setInicio] = useState<"agora" | "antes" | null>(novaUnidade ? "antes" : null);
   const [antes, setAntes] = useState<number | null>(null);
   const [confirmado, setConfirmado] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -123,6 +133,8 @@ export function CampoPosicao({
   let bloqueio: string | null = null;
   if (informado && primeira && inicio == null) {
     bloqueio = "Conte se você começou o livro agora ou já vinha lendo.";
+  } else if (informado && novaUnidade && antes == null) {
+    bloqueio = `Conte ${pct ? "em quantos %" : `em que ${abrev}`} você estava antes desta sessão.`;
   } else if (informado && voltouDoInicio) {
     bloqueio = `Onde você parou não pode ser antes ${pct ? `de ${baseDigitada}%` : `da ${abrev} ${base}`}.`;
   } else if (informado && alertaPendente) {
@@ -161,7 +173,37 @@ export function CampoPosicao({
   const mostraConta = informado && analise && (!primeira || inicio != null) && !voltouDoInicio;
   const mostraPergunta = primeira && (variante === "ler" || informado);
 
-  const pergunta = mostraPergunta && (
+  const campoAntes = (
+    <input
+      type="text"
+      inputMode="numeric"
+      value={antes ?? ""}
+      placeholder="0"
+      onClick={(e) => e.stopPropagation()}
+      onChange={(e) => {
+        const n = limpar(e.target.value);
+        setAntes(n == null ? null : comTotal(n));
+      }}
+      aria-label={`${pct ? "Porcentagem" : unidade === "pages" ? "Página" : "Capítulo"} em que você estava antes desta sessão`}
+      className="ml-auto w-16 rounded-sm border-2 border-ink bg-card px-1.5 py-0.5 text-center font-display text-sm tabular-nums text-ink focus:outline-none"
+    />
+  );
+
+  const pergunta = mostraPergunta && novaUnidade ? (
+    <div className="rounded-md border-2 border-ink bg-card p-3">
+      <p className="text-[13px] font-semibold text-ink">
+        Primeira vez que você registra {pct ? "em %" : unidade === "pages" ? "páginas" : "capítulos"} neste livro.
+      </p>
+      <label className="mt-2 flex items-center gap-2 rounded-md border-2 border-ink bg-paper px-3 py-2 text-[14px] text-ink">
+        {pct ? "Antes desta sessão você estava em" : `Antes desta sessão você estava na ${abrev}`}
+        {campoAntes}
+        {pct && <span className="font-display text-sm">%</span>}
+      </label>
+      <p className="mt-2 font-serif text-[12px] italic text-ink-soft">
+        O que você leu antes fica fora das metas e conquistas.
+      </p>
+    </div>
+  ) : mostraPergunta && (
     <div className="rounded-md border-2 border-ink bg-card p-3">
       <p className="text-[13px] font-semibold text-ink">Primeira vez que você registra este livro.</p>
       <div className="mt-2 flex flex-col gap-2" role="radiogroup" aria-label="Quando você começou">
