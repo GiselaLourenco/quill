@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/lib/supabase/auth";
 import CompartilharClient, { type PeriodoStats, type LivroCartaz } from "./compartilhar-client";
-import { fimDoMes, fracaoDaSessaoEntre, localDateKey, localHour, segundosPorDiaDaSessao, todayLocalDateKey } from "@/lib/date-br";
+import { addDaysToKey, fimDoMes, fracaoDaSessaoEntre, localDateKey, localHour, segundosPorDiaDaSessao, todayLocalDateKey } from "@/lib/date-br";
 
 const MESES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -27,6 +27,7 @@ type LivroRow = {
   title: string | null;
   creator: string | null;
   status: string;
+  finished_at: string | null;
 };
 
 /** Últimos N meses (mais antigo primeiro), como chaves "AAAA-MM". */
@@ -40,6 +41,18 @@ function ultimosMeses(qtd: number): { id: string; ano: number; mes: number }[] {
     out.push({ id: `${d.getFullYear()}-${pad(d.getMonth() + 1)}`, ano: d.getFullYear(), mes: d.getMonth() });
   }
   return out;
+}
+
+/** Maior sequência de dias seguidos dentro do conjunto (só os dias dados). */
+function maiorSequencia(dias: Set<string>): number {
+  let maior = 0;
+  for (const dia of dias) {
+    if (dias.has(addDaysToKey(dia, -1))) continue;
+    let n = 1;
+    while (dias.has(addDaysToKey(dia, n))) n += 1;
+    maior = Math.max(maior, n);
+  }
+  return maior;
 }
 
 /** Hora em que a pessoa mais começa a ler — o "horário de ouro". */
@@ -68,7 +81,7 @@ export default async function CompartilharPage() {
   const inicio = `${meses[0]!.id}-01`;
 
   const supabase = await createClient();
-  const [{ data: sessions }, { data: livrosRows }, { data: ratings }] = await Promise.all([
+  const [{ data: sessions }, { data: livrosRows }, { data: ratings }, { data: metaAno }] = await Promise.all([
     supabase
       .from("sessions")
       .select("started_at, ended_at, duration_seconds, unit_start, unit_end, item_id")
@@ -78,10 +91,17 @@ export default async function CompartilharPage() {
     // Estante inteira — alimenta tanto o "livro do período" quanto a busca.
     supabase
       .from("media_items")
-      .select("id, title, creator, status")
+      .select("id, title, creator, status, finished_at")
       .eq("user_id", userId)
       .order("created_at", { ascending: false }),
     supabase.from("ratings").select("item_id, stars").eq("user_id", userId),
+    supabase
+      .from("goals")
+      .select("target_value")
+      .eq("user_id", userId)
+      .eq("type", "books_per_year")
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   const rows = (sessions ?? []) as SessionRow[];
@@ -98,6 +118,11 @@ export default async function CompartilharPage() {
   const livroPorId = new Map(livrosTodos.map((l) => [l.id, l]));
   const livrosFinalizados = livrosTodos.filter((l) => l.status === "finished").map(paraCartaz);
   const todosLivros = livrosTodos.map(paraCartaz);
+  const alvoAno = Number(metaAno?.target_value ?? 0);
+  // Livro terminado sem finished_at não entra (não dá pra saber o mês).
+  const terminadosComData = livrosTodos.filter(
+    (l): l is LivroRow & { finished_at: string } => l.status === "finished" && !!l.finished_at,
+  );
 
   const periodos: PeriodoStats[] = meses.map(({ id, ano, mes }) => {
     const doMes = rows.filter((s) => localDateKey(s.started_at).slice(0, 7) === id);
@@ -122,6 +147,15 @@ export default async function CompartilharPage() {
     );
     const diasLidos = dias.size;
     const diasNoMes = new Date(ano, mes + 1, 0).getDate();
+
+    const terminadosNoMes = terminadosComData.filter((l) => l.finished_at.slice(0, 7) === id);
+    const notas = terminadosNoMes
+      .map((l) => estrelasPorItem.get(l.id))
+      .filter((n): n is number => typeof n === "number" && n > 0);
+    // Meta do ano como estava no fim deste mês.
+    const terminadosNoAnoAteOMes = terminadosComData.filter(
+      (l) => l.finished_at.slice(0, 4) === String(ano) && l.finished_at.slice(0, 7) <= id,
+    ).length;
 
     // Livros com alguma atualização de leitura neste mês, da sessão mais
     // recente pra mais antiga. Sem nenhum, cai pros "terminei" — sempre tem
@@ -149,6 +183,11 @@ export default async function CompartilharPage() {
       temDados: doMes.length > 0,
       livros: livrosDoMes,
       livrosDeAtividade: idsComAtividade.length > 0,
+      numeros: { minutos: Math.round(segundos / 60), paginas, diasLidos },
+      livrosTerminados: terminadosNoMes.length,
+      notaMedia: notas.length > 0 ? notas.reduce((a, b) => a + b, 0) / notas.length : null,
+      meta: alvoAno > 0 ? { atual: terminadosNoAnoAteOMes, alvo: alvoAno } : null,
+      maiorSequencia: maiorSequencia(dias),
     };
   });
 

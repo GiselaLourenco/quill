@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { toPng } from "html-to-image";
 import { ComSpinner } from "@/components/carregando";
+import { Portal } from "@/components/portal";
+import { MODELOS_CARTAZ, MODELO_PADRAO, acharModelo, srcModelo, type ModeloCartaz } from "@/lib/compartilhar-modelos";
+import { CartazIlustrado } from "./cartaz-ilustrado";
 
 /** Formato Stories/Reels — o que o Instagram espera. */
 const LARGURA_STORY = 1080;
@@ -23,6 +26,15 @@ export type PeriodoStats = {
   livros: LivroCartaz[];
   /** `livros` veio de atividade real no mês (true) ou do fallback "terminei" (false). */
   livrosDeAtividade: boolean;
+  /** Os mesmos stats em número — os modelos ilustrados mostram "—" no lugar de zero. */
+  numeros: { minutos: number; paginas: number; diasLidos: number };
+  livrosTerminados: number;
+  /** Média das estrelas dos livros terminados no mês (só os avaliados). */
+  notaMedia: number | null;
+  /** Meta "livros no ano" como estava no fim do mês; null sem meta definida. */
+  meta: { atual: number; alvo: number } | null;
+  /** Maior sequência de dias seguidos dentro do mês. */
+  maiorSequencia: number;
 };
 
 export type LivroCartaz = {
@@ -31,6 +43,40 @@ export type LivroCartaz = {
   autor: string;
   nota: number | null;
 };
+
+/**
+ * Último modelo escolhido, no localStorage — reabre a tela nele. Lido por
+ * `useSyncExternalStore` (o servidor renderiza o padrão).
+ */
+const CHAVE_MODELO = "quill:compartilhar:modelo";
+const ouvintesModelo = new Set<() => void>();
+/** Fallback quando o storage falha — senão a troca não teria efeito. */
+let memoriaModelo: string | null = null;
+
+function assinarModelo(aviso: () => void) {
+  ouvintesModelo.add(aviso);
+  return () => {
+    ouvintesModelo.delete(aviso);
+  };
+}
+
+function lerModelo() {
+  try {
+    return window.localStorage.getItem(CHAVE_MODELO) ?? MODELO_PADRAO;
+  } catch {
+    return MODELO_PADRAO;
+  }
+}
+
+function salvarModelo(id: string) {
+  try {
+    window.localStorage.setItem(CHAVE_MODELO, id);
+  } catch {
+    // Sem storage (aba anônima, bloqueado): vale só nesta visita.
+  }
+  memoriaModelo = id;
+  for (const aviso of ouvintesModelo) aviso();
+}
 
 /** Sem acento e sem caixa — "machado" acha "Machado de Assis". */
 const normalizar = (t: string) =>
@@ -51,6 +97,13 @@ export default function CompartilharClient({
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const cartazRef = useRef<HTMLDivElement>(null);
+  const [escolhendoModelo, setEscolhendoModelo] = useState(false);
+  const modeloId = useSyncExternalStore(
+    assinarModelo,
+    () => memoriaModelo ?? lerModelo(),
+    () => MODELO_PADRAO,
+  );
+  const modelo = acharModelo(modeloId);
 
   // Trocar de período troca a lista sugerida — o livro escolhido some do
   // painel se não pertencer mais a ela, então volta pro 1º da nova lista.
@@ -79,6 +132,10 @@ export default function CompartilharClient({
     setSalvando(true);
     setErro(null);
     try {
+      // A ilustração e as fontes precisam estar prontas, senão o PNG sai sem fundo.
+      const imagens = [...cartazRef.current.querySelectorAll("img")];
+      await Promise.all(imagens.map((img) => img.decode().catch(() => undefined)));
+      await document.fonts?.ready;
       const dataUrl = await toPng(cartazRef.current, {
         width: LARGURA_STORY,
         height: ALTURA_STORY,
@@ -128,7 +185,36 @@ export default function CompartilharClient({
         <h1 className="font-display text-lg uppercase leading-none tracking-tight text-ink">
           Compartilhar metas
         </h1>
+        <button
+          type="button"
+          onClick={() => setEscolhendoModelo(true)}
+          aria-label="Escolher modelo do cartaz"
+          aria-haspopup="dialog"
+          className="shadow-hard-sm ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-md border-2 border-ink bg-mustard text-ink active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+        >
+          {/* camadas */}
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M12 3 2 8l10 5 10-5-10-5z" />
+            <path d="m2 13 10 5 10-5" />
+            <path d="m2 17.5 10 5 10-5" />
+          </svg>
+        </button>
       </header>
+
+      {escolhendoModelo && (
+        <SheetModelos
+          atual={modelo.id}
+          onEscolher={(id) => {
+            salvarModelo(id);
+            setEscolhendoModelo(false);
+          }}
+          onFechar={() => setEscolhendoModelo(false)}
+          periodo={periodo}
+          livro={livro}
+          mes={mes}
+          ano={ano}
+        />
+      )}
 
       {/* seletor de período */}
       <div className="mb-5 flex items-center justify-between rounded-md border-2 border-ink bg-card px-2 py-2 shadow-hard-sm">
@@ -157,7 +243,10 @@ export default function CompartilharClient({
 
       {/* cartaz visível — responsivo */}
       <div className="shadow-hard mx-auto w-full max-w-sm overflow-hidden rounded-2xl border-2 border-ink">
-        <Cartaz periodo={periodo} livro={livro} mes={mes} ano={ano} />
+        {/* `key` remonta na troca: a entrada curta roda de novo e o esqueleto volta até a nova imagem carregar. */}
+        <div key={modelo.id} className="animate-cartaz-entra">
+          <CartazDoModelo modelo={modelo} periodo={periodo} livro={livro} mes={mes} ano={ano} />
+        </div>
       </div>
 
       {/*
@@ -168,16 +257,21 @@ export default function CompartilharClient({
       */}
       <div aria-hidden className="pointer-events-none fixed left-[-20000px] top-0 h-0 overflow-hidden">
         <div ref={cartazRef} style={{ width: LARGURA_STORY, height: ALTURA_STORY }}>
-          <div
-            style={{
-              width: LARGURA_BASE,
-              height: LARGURA_BASE * (16 / 9),
-              transform: `scale(${LARGURA_STORY / LARGURA_BASE})`,
-              transformOrigin: "top left",
-            }}
-          >
-            <Cartaz periodo={periodo} livro={livro} mes={mes} ano={ano} />
-          </div>
+          {modelo.tipo === "ilustrado" ? (
+            // Fontes em `cqw`: desenhado direto em 1080 de largura, sem ampliar.
+            <CartazIlustrado modelo={modelo} periodo={periodo} livro={livro} mes={mes} ano={ano} />
+          ) : (
+            <div
+              style={{
+                width: LARGURA_BASE,
+                height: LARGURA_BASE * (16 / 9),
+                transform: `scale(${LARGURA_STORY / LARGURA_BASE})`,
+                transformOrigin: "top left",
+              }}
+            >
+              <Cartaz periodo={periodo} livro={livro} mes={mes} ano={ano} />
+            </div>
+          )}
         </div>
       </div>
 
@@ -294,6 +388,123 @@ export default function CompartilharClient({
         </svg>
       </button>
     </div>
+  );
+}
+
+function CartazDoModelo({
+  modelo,
+  ...dados
+}: {
+  modelo: ModeloCartaz;
+  periodo: PeriodoStats;
+  livro: LivroCartaz | undefined;
+  mes: string | undefined;
+  ano: string | undefined;
+}) {
+  return modelo.tipo === "ilustrado" ? <CartazIlustrado modelo={modelo} {...dados} /> : <Cartaz {...dados} />;
+}
+
+/** Bottom sheet "Escolher modelo": grade 2 colunas de miniaturas 9:16. */
+function SheetModelos({
+  atual,
+  onEscolher,
+  onFechar,
+  ...dados
+}: {
+  atual: string;
+  onEscolher: (id: string) => void;
+  onFechar: () => void;
+  periodo: PeriodoStats;
+  livro: LivroCartaz | undefined;
+  mes: string | undefined;
+  ano: string | undefined;
+}) {
+  return (
+    <Portal>
+      <div className="fixed inset-0 z-40 flex justify-center" role="dialog" aria-modal="true" aria-label="Escolher modelo">
+        <button type="button" aria-label="Fechar" onClick={onFechar} className="absolute inset-0 bg-ink/40" />
+        <div className="shadow-hard relative mt-auto max-h-[85dvh] w-full max-w-[390px] overflow-y-auto border-x-2 border-t-2 border-ink bg-paper p-5 pb-8">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="font-display text-lg uppercase leading-none tracking-tight text-ink">Escolher modelo</h2>
+            <button
+              type="button"
+              onClick={onFechar}
+              aria-label="Fechar"
+              className="shadow-hard-sm flex h-8 w-8 items-center justify-center border-2 border-ink bg-card font-display text-sm text-ink active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+            >
+              ✕
+            </button>
+          </div>
+
+          <ul className="grid grid-cols-2 gap-3">
+            {MODELOS_CARTAZ.map((m) => {
+              const on = m.id === atual;
+              return (
+                <li key={m.id}>
+                  <button
+                    type="button"
+                    onClick={() => onEscolher(m.id)}
+                    aria-pressed={on}
+                    className="block w-full text-left"
+                  >
+                    <span
+                      className={`relative block aspect-[9/16] overflow-hidden rounded-lg border-2 border-ink ${
+                        on ? "shadow-hard ring-4 ring-mustard" : "shadow-hard-sm"
+                      }`}
+                    >
+                      {m.tipo === "ilustrado" ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- miniatura da mesma imagem do cartaz; já fica no cache pra troca
+                        <img src={srcModelo(m.id)} alt="" loading="lazy" className="h-full w-full object-cover" />
+                      ) : (
+                        <MiniaturaClassico {...dados} />
+                      )}
+                      {on && (
+                        <span className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-ink bg-mustard font-display text-xs text-ink">
+                          ✓
+                        </span>
+                      )}
+                    </span>
+                    <span className="mt-1.5 block truncate text-center font-display text-[10px] uppercase tracking-wider text-ink">
+                      {m.nome}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </div>
+    </Portal>
+  );
+}
+
+/** O clássico é desenhado em 384px; aqui ele é reduzido pra caber na célula. */
+function MiniaturaClassico(dados: {
+  periodo: PeriodoStats;
+  livro: LivroCartaz | undefined;
+  mes: string | undefined;
+  ano: string | undefined;
+}) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [escala, setEscala] = useState(0.4);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const medir = () => setEscala(el.clientWidth / LARGURA_BASE);
+    medir();
+    const obs = new ResizeObserver(medir);
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  return (
+    <span ref={ref} className="pointer-events-none block h-full w-full" aria-hidden>
+      <span
+        className="block"
+        style={{ width: LARGURA_BASE, transform: `scale(${escala})`, transformOrigin: "top left" }}
+      >
+        <Cartaz {...dados} />
+      </span>
+    </span>
   );
 }
 

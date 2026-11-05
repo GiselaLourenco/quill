@@ -295,3 +295,21 @@ export function EsqueletoGenerico() {
     </Pulso>
   );
 }
+
+// ---- Compartilhar ---------------------------------------------------------
+
+/** Cartaz 9:16 enquanto a ilustração do modelo carrega. Cobre o pai inteiro. */
+export function EsqueletoCartaz() {
+  return (
+    <Pulso className="absolute inset-0 flex flex-col gap-[5%] bg-paper p-[7%]">
+      <Bloco className="mx-auto h-[11%] w-3/5" />
+      <Bloco className="h-[22%] rounded-2xl" />
+      <div className="grid h-[24%] grid-cols-2 gap-[5%]">
+        {Array.from({ length: 4 }, (_, i) => (
+          <Bloco key={i} />
+        ))}
+      </div>
+      <Bloco className="h-[14%]" />
+    </Pulso>
+  );
+}

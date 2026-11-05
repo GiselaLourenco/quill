@@ -46,6 +46,25 @@
   --font-display: var(--font-archivo-black);
   --font-serif: var(--font-fraunces);
   --font-sans: var(--font-inter);
+
+  /* Troca de modelo no Compartilhar: entrada curta do cartaz novo. */
+  --animate-cartaz-entra: cartaz-entra 240ms ease-out;
+  @keyframes cartaz-entra {
+    from {
+      opacity: 0;
+      transform: scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-cartaz-entra {
+    animation: none;
+  }
 }
 
 body {
