@@ -27,7 +27,6 @@ type LivroRow = {
   title: string | null;
   creator: string | null;
   status: string;
-  finished_at: string | null;
 };
 
 /** Últimos N meses (mais antigo primeiro), como chaves "AAAA-MM". */
@@ -81,7 +80,7 @@ export default async function CompartilharPage() {
   const inicio = `${meses[0]!.id}-01`;
 
   const supabase = await createClient();
-  const [{ data: sessions }, { data: livrosRows }, { data: ratings }, { data: metaAno }] = await Promise.all([
+  const [{ data: sessions }, { data: livrosRows }, { data: ratings }, { data: metaAno }, { data: terminos }] = await Promise.all([
     supabase
       .from("sessions")
       .select("started_at, ended_at, duration_seconds, unit_start, unit_end, item_id")
@@ -91,7 +90,7 @@ export default async function CompartilharPage() {
     // Estante inteira — alimenta tanto o "livro do período" quanto a busca.
     supabase
       .from("media_items")
-      .select("id, title, creator, status, finished_at")
+      .select("id, title, creator, status")
       .eq("user_id", userId)
       .order("created_at", { ascending: false }),
     supabase.from("ratings").select("item_id, stars").eq("user_id", userId),
@@ -102,6 +101,13 @@ export default async function CompartilharPage() {
       .eq("type", "books_per_year")
       .limit(1)
       .maybeSingle(),
+    // Toda leitura terminada conta — a releitura também, no mês em que
+    // terminou. Mesma fonte de Metas e Retrospectiva.
+    supabase
+      .from("finished_readings")
+      .select("item_id, finished_at")
+      .eq("user_id", userId)
+      .not("finished_at", "is", null),
   ]);
 
   const rows = (sessions ?? []) as SessionRow[];
@@ -119,10 +125,7 @@ export default async function CompartilharPage() {
   const livrosFinalizados = livrosTodos.filter((l) => l.status === "finished").map(paraCartaz);
   const todosLivros = livrosTodos.map(paraCartaz);
   const alvoAno = Number(metaAno?.target_value ?? 0);
-  // Livro terminado sem finished_at não entra (não dá pra saber o mês).
-  const terminadosComData = livrosTodos.filter(
-    (l): l is LivroRow & { finished_at: string } => l.status === "finished" && !!l.finished_at,
-  );
+  const terminadosComData = (terminos ?? []) as { item_id: string; finished_at: string }[];
 
   const periodos: PeriodoStats[] = meses.map(({ id, ano, mes }) => {
     const doMes = rows.filter((s) => localDateKey(s.started_at).slice(0, 7) === id);
@@ -150,7 +153,7 @@ export default async function CompartilharPage() {
 
     const terminadosNoMes = terminadosComData.filter((l) => l.finished_at.slice(0, 7) === id);
     const notas = terminadosNoMes
-      .map((l) => estrelasPorItem.get(l.id))
+      .map((t) => estrelasPorItem.get(t.item_id))
       .filter((n): n is number => typeof n === "number" && n > 0);
     // Meta do ano como estava no fim deste mês.
     const terminadosNoAnoAteOMes = terminadosComData.filter(
