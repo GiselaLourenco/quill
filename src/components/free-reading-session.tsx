@@ -37,14 +37,26 @@ export type BookOption = CoverFields & {
   percentualAtual?: number | null;
   totalPaginas: number | null;
   totalCapitulos: number | null;
+  /** A sessão mais recente do livro foi em capítulos — a tela volta a abrir em Caps. */
+  ultimaEmCapitulos?: boolean;
 };
+
+/** Capítulo estimado pela página (pág. 48 de 686 num livro de 38 caps → cap. 3). */
+const capituloDaPagina = (pagina: number, totalPaginas: number, totalCapitulos: number) =>
+  Math.min(totalCapitulos, Math.round((pagina / totalPaginas) * totalCapitulos));
+
+/** Página estimada pelo capítulo — a conta inversa da de cima. */
+const paginaDoCapitulo = (cap: number, totalPaginas: number, totalCapitulos: number) =>
+  Math.min(totalPaginas, Math.round((cap / totalCapitulos) * totalPaginas));
 
 /**
  * Abre na última unidade usada nesse livro: % se a sessão mais recente foi em
  * %; capítulos se o livro só tem capítulos; senão páginas.
  */
 const unidadeDoLivro = (l: BookOption | null): UnidadeCampo =>
-  l && l.percentualAtual != null && l.totalPaginas
+  l && l.ultimaEmCapitulos && l.capituloAtual != null
+    ? "chapters"
+    : l && l.percentualAtual != null && l.totalPaginas
     ? "percent"
     : l && l.paginaAtual == null && l.capituloAtual != null
       ? "chapters"
@@ -723,6 +735,73 @@ function CaixaNota({
  * Modo % sem total de páginas: o % precisa de uma base, então a caixa pede o
  * total ali mesmo (e grava no livro) em vez de mandar a pessoa pra ficha.
  */
+function PedirTotalCapitulos({
+  topo,
+  onSalvar,
+  onNaoSei,
+}: {
+  topo: ReactNode;
+  onSalvar: (total: number) => Promise<string | null>;
+  onNaoSei: () => void;
+}) {
+  const [valor, setValor] = useState("");
+  const [erro, setErro] = useState<string | null>(null);
+  const [salvando, startSalvar] = useTransition();
+  const n = Number(valor);
+  const salvar = () => {
+    if (!Number.isInteger(n) || n <= 0) {
+      setErro("Informe quantos capítulos o livro tem.");
+      return;
+    }
+    startSalvar(async () => {
+      setErro(null);
+      const e = await onSalvar(n);
+      if (e) setErro(e);
+    });
+  };
+  return (
+    <div className="shadow-hard-sm rounded-md border-2 border-ink bg-mustard p-3">
+      {topo}
+      <p className="mt-3 text-[13px] font-semibold text-ink">Quantos capítulos tem esse livro?</p>
+      <p className="mt-0.5 text-[12px] text-ink/70">
+        Fica salvo no livro. Com o total, a gente acha o seu capítulo pela página.
+      </p>
+      <div className="mt-2 flex gap-2">
+        <input
+          type="text"
+          inputMode="numeric"
+          enterKeyHint="done"
+          value={valor}
+          placeholder="ex.: 38"
+          onChange={(e) => {
+            setValor(e.target.value.replace(/[^0-9]/g, "").slice(0, 4));
+            setErro(null);
+          }}
+          onKeyDown={(e) => e.key === "Enter" && salvar()}
+          aria-label="Total de capítulos do livro"
+          className="shadow-hard-sm min-w-0 flex-1 rounded-md border-2 border-ink bg-card px-3 py-2 font-display text-lg tabular-nums text-ink focus:outline-none"
+        />
+        <button
+          type="button"
+          disabled={salvando}
+          onClick={salvar}
+          className="shadow-hard-sm rounded-md border-2 border-ink bg-ink px-4 font-display text-[12px] uppercase tracking-wide text-paper disabled:opacity-40"
+        >
+          <ComSpinner ocupado={salvando}>Salvar</ComSpinner>
+        </button>
+      </div>
+      {erro && <p className="mt-2 text-[12px] font-medium text-coral">{erro}</p>}
+      <button
+        type="button"
+        onClick={onNaoSei}
+        className="mt-2 text-[12px] font-semibold text-ink underline underline-offset-2"
+      >
+        Não sei o total
+      </button>
+    </div>
+  );
+}
+
 function PedirTotalPaginas({
   topo,
   onSalvar,
@@ -836,6 +915,10 @@ function TelaRegistro({
   const unidadeMetrica: SessionUnit = unidade === "chapters" ? "chapters" : "pages";
   // Total de páginas informado aqui mesmo (pra liberar o %) — vale já nesta tela.
   const [totaisInformados, setTotaisInformados] = useState<Record<string, number>>({});
+  // Total de capítulos informado aqui (ao trocar pra Caps num livro já
+  // registrado em páginas) e os livros em que a pessoa disse "não sei".
+  const [capsInformados, setCapsInformados] = useState<Record<string, number>>({});
+  const [semTotalCaps, setSemTotalCaps] = useState<Set<string>>(new Set());
   // O que o campo "Onde você parou?" calculou (posição, quanto conta, avisos).
   const [posicao, setPosicao] = useState<EstadoPosicao>(ESTADO_POSICAO_VAZIO);
   // `total` é sempre minuto — é o que a sessão grava. A unidade só muda como o
@@ -862,15 +945,31 @@ function TelaRegistro({
   const [salvando, startSave] = useTransition();
 
   const livroAchado = disponiveis.find((l) => l.id === livroId) ?? null;
-  const livroBase =
-    livroAchado && totaisInformados[livroAchado.id]
-      ? { ...livroAchado, totalPaginas: totaisInformados[livroAchado.id] }
-      : livroAchado;
+  const livroBase = livroAchado && {
+    ...livroAchado,
+    totalPaginas: totaisInformados[livroAchado.id] ?? livroAchado.totalPaginas,
+    totalCapitulos: capsInformados[livroAchado.id] ?? livroAchado.totalCapitulos,
+  };
   const livro =
     livroBase && relidos.has(livroBase.id)
       ? { ...livroBase, status: "reading", paginaAtual: 0, capituloAtual: 0, percentualAtual: null }
       : livroBase;
   const quantidade = livro ? posicao.delta : 0;
+  // Sessão em capítulos num livro com os dois totais: a página anda junto,
+  // estimada pelo capítulo — metas por página e previsão de término não
+  // param. Só pra frente: a estimativa nunca recua a página registrada.
+  const paginaEstimada =
+    livro &&
+    unidade === "chapters" &&
+    posicao.posicao != null &&
+    posicao.delta > 0 &&
+    livro.totalPaginas &&
+    livro.totalCapitulos
+      ? (() => {
+          const p = paginaDoCapitulo(posicao.posicao, livro.totalPaginas, livro.totalCapitulos);
+          return p > (livro.paginaAtual ?? 0) ? p : null;
+        })()
+      : null;
 
   function escolherLivro(id: string | null) {
     setLivroId(id);
@@ -952,7 +1051,7 @@ function TelaRegistro({
         itemId: livroId,
         startedAt,
         durationSeconds: Math.max(60, total * 60),
-        pagina: livro && unidadeMetrica === "pages" ? posicao.posicao : null,
+        pagina: livro && unidadeMetrica === "pages" ? posicao.posicao : paginaEstimada,
         capitulo: livro && unidade === "chapters" ? posicao.posicao : null,
         paginaAntes: unidadeMetrica === "pages" ? posicao.antes : null,
         capituloAntes: unidade === "chapters" ? posicao.antes : null,
@@ -1206,17 +1305,65 @@ function TelaRegistro({
                   />
                 );
               }
+              // Trocou pra Caps num livro já registrado em páginas e sem total
+              // de capítulos: pede o total antes — com ele o app acha o
+              // capítulo pela página. "Não sei" segue sem estimativa.
+              if (
+                unidade === "chapters" &&
+                livro.capituloAtual == null &&
+                livro.paginaAtual != null &&
+                livro.totalPaginas &&
+                !livro.totalCapitulos &&
+                !semTotalCaps.has(livro.id)
+              ) {
+                return (
+                  <PedirTotalCapitulos
+                    key={livro.id}
+                    topo={seletor}
+                    onNaoSei={() => setSemTotalCaps((prev) => new Set(prev).add(livro.id))}
+                    onSalvar={async (n) => {
+                      if (!demo) {
+                        const r = await atualizarCampoLivro(livro.id, "capitulos", String(n));
+                        if (r.error) return r.error;
+                      }
+                      setCapsInformados((prev) => ({ ...prev, [livro.id]: n }));
+                      return null;
+                    }}
+                  />
+                );
+              }
+              const sugestaoCap =
+                unidade === "chapters" &&
+                livro.capituloAtual == null &&
+                livro.paginaAtual != null &&
+                livro.totalPaginas &&
+                livro.totalCapitulos
+                  ? capituloDaPagina(livro.paginaAtual, livro.totalPaginas, livro.totalCapitulos)
+                  : null;
               const anteriorPct =
                 unidade !== "percent" || livro.paginaAtual == null
                   ? null
                   : (livro.percentualAtual ?? percentualDaPagina(livro.paginaAtual, livro.totalPaginas!));
               return (
                 <CampoPosicao
-                  key={`${livro.id}:${unidade}:${relidos.has(livro.id)}:${livro.totalPaginas ?? ""}`}
+                  key={`${livro.id}:${unidade}:${relidos.has(livro.id)}:${livro.totalPaginas ?? ""}:${livro.totalCapitulos ?? ""}`}
                   unidade={unidade}
                   anterior={unidade === "chapters" ? livro.capituloAtual : livro.paginaAtual}
                   percentualAnterior={anteriorPct}
                   livroJaRegistrado={livro.paginaAtual != null || livro.capituloAtual != null}
+                  sugestaoAntes={
+                    sugestaoCap != null
+                      ? {
+                          valor: sugestaoCap,
+                          texto: `Pela pág. ${livro.paginaAtual}, você está por volta do cap. ${sugestaoCap} de ${livro.totalCapitulos}.`,
+                        }
+                      : null
+                  }
+                  rodape={
+                    paginaEstimada != null ? (
+                      <p className="text-right text-[11px] text-ink/70">a página vai para ≈ {paginaEstimada}</p>
+                    ) : null
+                  }
                   total={unidade === "chapters" ? livro.totalCapitulos : livro.totalPaginas}
                   minutos={total}
                   variante="ler"

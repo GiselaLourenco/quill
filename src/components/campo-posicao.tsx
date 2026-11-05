@@ -65,6 +65,8 @@ export function CampoPosicao({
   topo,
   percentualAnterior = null,
   livroJaRegistrado = false,
+  sugestaoAntes = null,
+  rodape,
   onChange,
 }: {
   unidade: UnidadeCampo;
@@ -78,6 +80,10 @@ export function CampoPosicao({
    * não pergunta "comecei agora", só em que capítulo ela estava.
    */
   livroJaRegistrado?: boolean;
+  /** Capítulo estimado pela página, já preenchido no "antes desta sessão". */
+  sugestaoAntes?: { valor: number; texto: string } | null;
+  /** Linha extra abaixo da conta (ex.: página estimada). */
+  rodape?: ReactNode;
   /** Total da unidade (modo %: total de páginas, obrigatório). */
   total: number | null;
   /** Tempo da sessão — pro aviso de pulo improvável. */
@@ -95,13 +101,15 @@ export function CampoPosicao({
   // No modo % o valor digitado (e o "estava em X") é %; nos outros, a própria posição.
   const anteriorDigitado = pct ? (anterior == null ? null : (percentualAnterior ?? 0)) : anterior;
   const [valor, setValor] = useState<number | null>(
-    variante === "ler" ? (anteriorDigitado ?? 0) : anteriorDigitado,
+    variante === "ler" ? (anteriorDigitado ?? (livroJaRegistrado ? sugestaoAntes?.valor : null) ?? 0) : anteriorDigitado,
   );
   // Livro já registrado em outra unidade: "comecei agora" não faz sentido —
   // já parte de "estava no cap. X".
   const novaUnidade = primeira && livroJaRegistrado;
   const [inicio, setInicio] = useState<"agora" | "antes" | null>(novaUnidade ? "antes" : null);
-  const [antes, setAntes] = useState<number | null>(null);
+  const [antes, setAntes] = useState<number | null>(
+    primeira && livroJaRegistrado ? (sugestaoAntes?.valor ?? null) : null,
+  );
   const [confirmado, setConfirmado] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -182,8 +190,12 @@ export function CampoPosicao({
       onClick={(e) => e.stopPropagation()}
       onChange={(e) => {
         const n = limpar(e.target.value);
-        setAntes(n == null ? null : comTotal(n));
+        const v = n == null ? null : comTotal(n);
+        setAntes(v);
+        // O stepper anda junto: onde parou nunca fica antes de onde estava.
+        if (v != null && (valor ?? 0) < v) setValor(v);
       }}
+      onFocus={(e) => e.target.select()}
       aria-label={`${pct ? "Porcentagem" : unidade === "pages" ? "Página" : "Capítulo"} em que você estava antes desta sessão`}
       className="ml-auto w-16 rounded-sm border-2 border-ink bg-card px-1.5 py-0.5 text-center font-display text-sm tabular-nums text-ink focus:outline-none"
     />
@@ -192,10 +204,13 @@ export function CampoPosicao({
   const pergunta = mostraPergunta && novaUnidade ? (
     <div className="rounded-md border-2 border-ink bg-card p-3">
       <p className="text-[13px] font-semibold text-ink">
-        Primeira vez que você registra {pct ? "em %" : unidade === "pages" ? "páginas" : "capítulos"} neste livro.
+        {sugestaoAntes?.texto ??
+          `Primeira vez que você registra ${pct ? "em %" : unidade === "pages" ? "páginas" : "capítulos"} neste livro.`}
       </p>
       <label className="mt-2 flex items-center gap-2 rounded-md border-2 border-ink bg-paper px-3 py-2 text-[14px] text-ink">
-        {pct ? "Antes desta sessão você estava em" : `Antes desta sessão você estava na ${abrev}`}
+        {pct
+          ? "Antes desta sessão você estava em"
+          : `Antes desta sessão você estava ${unidade === "chapters" ? "no" : "na"} ${abrev}`}
         {campoAntes}
         {pct && <span className="font-display text-sm">%</span>}
       </label>
@@ -389,6 +404,7 @@ export function CampoPosicao({
         )}
       </div>
       {conta}
+      {mostraConta && rodape}
       {bloqueioInline}
       {aviso}
       {terminaNota}

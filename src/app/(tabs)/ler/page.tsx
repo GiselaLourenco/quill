@@ -51,6 +51,16 @@ export default async function LerPage() {
     }
   }
 
+  // Unidade da sessão mais recente: em capítulos, a tela volta a abrir em Caps
+  // (mesmo que a sessão também tenha gravado a página estimada).
+  const ultimaPorItem = new Map<string, { caps: boolean; at: string }>();
+  for (const p of positions ?? []) {
+    const atual = ultimaPorItem.get(p.item_id as string);
+    if (!atual || (p.created_at as string) > atual.at) {
+      ultimaPorItem.set(p.item_id as string, { caps: p.chapter_end != null, at: p.created_at as string });
+    }
+  }
+
   const bookOptions: BookOption[] = (books ?? []).map((b) => ({
     id: b.id as string,
     title: (b.title as string) ?? "Sem título",
@@ -64,6 +74,7 @@ export default async function LerPage() {
     percentualAtual: percentualPorItem.get(b.id as string)?.pct ?? null,
     totalPaginas: (b.total_units as number | null) ?? null,
     totalCapitulos: (b.total_chapters as number | null) ?? null,
+    ultimaEmCapitulos: ultimaPorItem.get(b.id as string)?.caps ?? false,
   }));
 
   return (
