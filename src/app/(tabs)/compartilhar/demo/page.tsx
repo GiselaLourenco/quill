@@ -108,6 +108,7 @@ export default function CompartilharDemoPage() {
     numeros: { minutos: 0, paginas: 0, diasLidos: 0 },
     livrosTerminados: 0,
     notaMedia: null,
+    notaMediaAno: null,
     meta: null,
     maiorSequencia: 0,
   };

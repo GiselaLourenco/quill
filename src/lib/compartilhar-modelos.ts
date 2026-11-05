@@ -32,6 +32,8 @@ export type ModeloIlustrado = {
   ano?: Bloco;
   /** Ordem: minutos, páginas, dias lidos, horário de ouro. Com 3, sem horário de ouro. */
   stats?: readonly Area[];
+  /** Inclinação (graus) de cada área de `stats`, pra acompanhar placas tortas. */
+  giroStats?: readonly number[];
   /** Cartões de baixo da trilha: livros terminados, meta do ano, nota média, sequência. */
   extras?: readonly Area[];
   /** Cartão grande. `pautas` = y (%) das linhas desenhadas no papel, se houver. */
@@ -95,8 +97,10 @@ export const MODELOS_CARTAZ: readonly ModeloCartaz[] = [
     nome: "Trilha de outono",
     paleta: ["#8A3B12", "#F2C14E", "#F9E2B3"],
     titulo: { area: [24, 6, 52, 9.5], tinta: "escura" },
-    // Só o corpo das placas, sem as pontas de seta.
-    stats: [[57.5, 21.1, 29.5, 4.1], [57, 28.8, 33, 4.2], [58, 37.2, 32, 4.2], [60, 45.1, 31.5, 4]],
+    // Só o corpo das placas, sem as pontas de seta, centrado e inclinado
+    // como cada placa (medido na imagem). Um pouco abaixo do centro nas 3 de baixo, pra fugir do prego.
+    stats: [[60, 19.8, 28.2, 4.9], [52.9, 28.3, 32.6, 5.1], [59.5, 36.3, 27.6, 5.1], [55.8, 44.3, 30.8, 4.9]],
+    giroStats: [-5.1, -4.6, -4.1, -1.2],
     // Centralizados em cada cartão (a 2ª fileira começa em ~66%).
     extras: [[6.5, 56, 39.5, 7.8], [52.5, 56, 39.5, 7.8], [6.5, 67.4, 39.5, 8], [52.5, 67.4, 39.5, 8]],
     // À direita dos livros e da folha.

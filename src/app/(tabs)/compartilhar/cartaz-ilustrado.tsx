@@ -49,6 +49,8 @@ export function CartazIlustrado({
   ];
 
   const nota = periodo.notaMedia != null ? periodo.notaMedia.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) : null;
+  const notaAno =
+    periodo.notaMediaAno != null ? periodo.notaMediaAno.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) : null;
   const meta = periodo.meta;
   const mesMinusculo = mes?.toLowerCase() ?? "";
   const destaque =
@@ -64,9 +66,14 @@ export function CartazIlustrado({
         : { grande: "—", legenda: `nenhum livro terminado em ${mesMinusculo}`, legendaCurta: "livros terminados", rodape: null };
 
   const extras = [
-    { valor: periodo.livrosTerminados > 0 ? String(periodo.livrosTerminados) : "—", rotulo: "Livros terminados" },
+    { valor: String(periodo.livrosTerminados), rotulo: periodo.livrosTerminados === 1 ? "Livro terminado" : "Livros terminados" },
     { valor: meta ? `${meta.atual}/${meta.alvo}` : "—", rotulo: "Meta do ano" },
-    { valor: nota ? `★ ${nota}` : "—", rotulo: "Nota média" },
+    // Mês sem nota ainda: mostra a média do ano, em vez de um traço vazio.
+    nota
+      ? { valor: `★ ${nota}`, rotulo: "Nota média" }
+      : notaAno
+        ? { valor: `★ ${notaAno}`, rotulo: `Nota média ${ano ?? ""}`.trim() }
+        : { valor: "—", rotulo: "Nota média" },
     {
       valor: periodo.maiorSequencia > 0 ? String(periodo.maiorSequencia) : "—",
       rotulo: periodo.maiorSequencia === 1 ? "Dia seguido" : "Dias seguidos",
@@ -113,7 +120,14 @@ export function CartazIlustrado({
         {modelo.stats?.map((area, i) => {
           const s = stats[i]!;
           return (
-            <Caixa key={i} area={area} tinta="escura" base={7.5} contorno={contornos}>
+            <Caixa
+              key={i}
+              area={area}
+              tinta="escura"
+              base={7.5}
+              contorno={contornos}
+              estilo={modelo.giroStats?.[i] ? { transform: `rotate(${modelo.giroStats[i]}deg)` } : undefined}
+            >
               <p className="whitespace-nowrap font-display leading-none">{s.valor}</p>
               <p className="mt-[0.2em] font-sans text-[0.34em] font-bold uppercase leading-tight tracking-wide opacity-70">
                 {s.rotulo}

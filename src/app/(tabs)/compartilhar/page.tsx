@@ -158,9 +158,13 @@ export default async function CompartilharPage() {
       .map((t) => estrelasPorItem.get(t.item_id))
       .filter((n): n is number => typeof n === "number" && n > 0);
     // Meta do ano como estava no fim deste mês.
-    const terminadosNoAnoAteOMes = terminadosComData.filter(
+    const terminadosAnoAteOMes = terminadosComData.filter(
       (l) => l.finished_at.slice(0, 4) === String(ano) && l.finished_at.slice(0, 7) <= id,
-    ).length;
+    );
+    const terminadosNoAnoAteOMes = terminadosAnoAteOMes.length;
+    const notasAno = terminadosAnoAteOMes
+      .map((t) => estrelasPorItem.get(t.item_id))
+      .filter((n): n is number => typeof n === "number" && n > 0);
 
     // Livros com alguma atualização de leitura neste mês, da sessão mais
     // recente pra mais antiga. Sem nenhum, cai pros "terminei" — sempre tem
@@ -191,6 +195,7 @@ export default async function CompartilharPage() {
       numeros: { minutos: Math.round(segundos / 60), paginas, diasLidos },
       livrosTerminados: terminadosNoMes.length,
       notaMedia: notas.length > 0 ? notas.reduce((a, b) => a + b, 0) / notas.length : null,
+      notaMediaAno: notasAno.length > 0 ? notasAno.reduce((a, b) => a + b, 0) / notasAno.length : null,
       meta: alvoAno > 0 ? { atual: terminadosNoAnoAteOMes, alvo: alvoAno } : null,
       maiorSequencia: maiorSequencia(dias),
     };

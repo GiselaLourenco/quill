@@ -40,6 +40,8 @@ export type PeriodoStats = {
   livrosTerminados: number;
   /** Média das estrelas dos livros terminados no mês (só os avaliados). */
   notaMedia: number | null;
+  /** Média das notas dos livros terminados no ano até este mês. */
+  notaMediaAno: number | null;
   /** Meta "livros no ano" como estava no fim do mês; null sem meta definida. */
   meta: { atual: number; alvo: number } | null;
   /** Maior sequência de dias seguidos dentro do mês. */
