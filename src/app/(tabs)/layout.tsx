@@ -1,3 +1,4 @@
+import { AreaDaAba, NavegacaoPendenteProvider } from "@/components/navegacao-pendente";
 import { TabBar } from "@/components/tab-bar";
 
 export default function TabsLayout({
@@ -15,14 +16,18 @@ export default function TabsLayout({
     // a tela e o Chrome no Android alarga a área da barra fixa: ela sai
     // cortada à direita e embaixo. `clip` não cria rolador, então não quebra
     // os `sticky`.
+    <NavegacaoPendenteProvider>
     <div className="overflow-x-clip bg-paper">
       <div
         className="mx-auto flex min-h-dvh w-full max-w-[390px] flex-col bg-paper"
         style={{ paddingBottom: "var(--tabbar-h)" }}
       >
-        <main className="flex flex-1 flex-col">{children}</main>
+        <main className="flex flex-1 flex-col">
+          <AreaDaAba>{children}</AreaDaAba>
+        </main>
       </div>
       <TabBar />
     </div>
+    </NavegacaoPendenteProvider>
   );
 }

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Portal } from "@/components/portal";
+import { useNavegacaoPendente } from "@/components/navegacao-pendente";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -64,6 +65,7 @@ const TABS: TabItem[] = [
 
 export function TabBar() {
   const pathname = usePathname();
+  const { iniciar } = useNavegacaoPendente();
 
   return (
     // Portal pro body porque `fixed` não é garantia: basta um ancestral com
@@ -93,6 +95,11 @@ export function TabBar() {
               <Link
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
+                onClick={(e) => {
+                  // Nova aba/janela (ctrl, cmd, botão do meio) não troca esta tela.
+                  if (active || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                  iniciar(tab.href);
+                }}
                 className={
                   active
                     ? "flex h-14 flex-col items-center justify-center gap-0.5 rounded-md border-2 border-ink bg-navy px-1 text-paper shadow-hard-sm"

@@ -15,6 +15,13 @@ const nextConfig: NextConfig = {
     // 4,5 MB é o teto de corpo de requisição da Vercel; passar disso não
     // adianta, a plataforma corta antes.
     serverActions: { bodySizeLimit: "4.5mb" },
+    // O esqueleto (loading.tsx) só aparece na hora do toque se o Next já o
+    // tiver pré-carregado. Por padrão ele joga esse pré-carregamento fora
+    // depois de 5 min e não baixa de novo — quem ficava lendo numa tela mais
+    // que isso tocava na aba e esperava a ida até o servidor (~1,5 s) com a
+    // tela congelada. `static` vale só para o esqueleto das rotas dinâmicas
+    // (nenhum Link usa `prefetch={true}`); os dados continuam sempre frescos.
+    staleTimes: { static: 6 * 60 * 60 },
   },
   // A galeria de artes e o ícone do app leem /public direto do disco. Na
   // Vercel o `public` fica só no CDN, então sem isto a lista volta vazia em
