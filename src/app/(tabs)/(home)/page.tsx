@@ -241,21 +241,20 @@ async function carregarBase(supabase: Supabase, userId: string) {
   // seis padrão. Todas as contas ficam prontas aqui — são baratas em cima das
   // sessões já carregadas, e assim trocar a seleção não exige tocar na home.
   const doAno = todas.filter((s) => s.started_at && localDateKey(s.started_at).startsWith(String(anoAtual)));
-  const diasComLeituraAno = new Set(
-    [...segundosPorDia.keys()].filter((chave) => chave.startsWith(String(anoAtual))),
-  );
 
-  // Média de páginas por dia efetivamente lido (não por dia do calendário).
-  // Sessão que vira o ano reparte as páginas na proporção do tempo.
-  const paginasAno = todas.reduce(
-    (soma, s) =>
-      s.started_at
-        ? soma + paginasDa(s) * fracaoDaSessaoEntre(s, `${anoAtual}-01-01`, `${anoAtual}-12-31`)
-        : soma,
-    0,
-  );
-  const mediaPaginas =
-    diasComLeituraAno.size > 0 ? Math.round(paginasAno / diasComLeituraAno.size) : 0;
+  // Ritmo: páginas por hora efetivamente lida no ano. Só entram sessões com
+  // páginas registradas — sessão só de tempo (sem página inicial/final)
+  // derrubaria o ritmo sem ter lido "zero páginas" de verdade. Sessão que vira
+  // o ano reparte páginas e tempo na proporção do tempo.
+  let paginasAno = 0;
+  let segundosAno = 0;
+  for (const s of todas) {
+    if (!s.started_at || !s.item_id || s.unit_start == null || s.unit_end == null) continue;
+    const fracao = fracaoDaSessaoEntre(s, `${anoAtual}-01-01`, `${anoAtual}-12-31`);
+    paginasAno += paginasDa(s) * fracao;
+    segundosAno += (s.duration_seconds ?? 0) * fracao;
+  }
+  const ritmoPaginasHora = segundosAno > 0 ? Math.round((paginasAno / segundosAno) * 3600) : 0;
 
   // Tempo lido na semana corrente (a última do array de semanas).
   const minutosSemana = semanas[semanas.length - 1]!.dias.reduce((soma, d) => soma + d.min, 0);
@@ -291,7 +290,7 @@ async function carregarBase(supabase: Supabase, userId: string) {
 
   const stats: PillStats = {
     streak: streakCompleto.current,
-    pagesPerDay: mediaPaginas,
+    pagesPerHour: ritmoPaginasHora,
     preferredWeekday: diaPreferido,
     minutesThisWeek: minutosSemana,
     booksThisMonth: livrosNoMes ?? 0,

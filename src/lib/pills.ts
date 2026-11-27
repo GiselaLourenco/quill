@@ -10,7 +10,7 @@
  */
 export const PILL_CATALOG = [
   { key: "streak", label: "Sequência atual" },
-  { key: "pages_per_day", label: "Média de páginas / dia" },
+  { key: "pages_per_hour", label: "Ritmo (páginas / hora)" },
   { key: "preferred_weekday", label: "Dia da semana preferido" },
   { key: "minutes_this_week", label: "Tempo lido na semana" },
   { key: "books_this_month", label: "Livros no mês" },
@@ -30,7 +30,7 @@ export const MAX_PILLS = 6;
 /** As seis que a home mostrava antes de existir personalização. */
 export const DEFAULT_PILLS: PillKey[] = [
   "streak",
-  "pages_per_day",
+  "pages_per_hour",
   "preferred_weekday",
   "minutes_this_week",
   "books_this_month",
@@ -45,16 +45,35 @@ export function rotuloDaPill(key: PillKey): string {
   return PILL_CATALOG.find((p) => p.key === key)!.label;
 }
 
+/**
+ * Chaves que já existiram e foram trocadas. Quem tinha a antiga salva em
+ * `metrics_prefs` continua vendo a pílula no mesmo lugar, sem re-personalizar.
+ * - pages_per_day → pages_per_hour (nov/2026): a média por dia lido virou o
+ *   ritmo (páginas por hora efetivamente lida).
+ */
+const CHAVES_ANTIGAS: Record<string, PillKey> = {
+  pages_per_day: "pages_per_hour",
+};
+
 /** Preferência salva → lista válida. Sem escolha, cai nas seis padrão. */
 export function pillsEscolhidas(bruto: unknown): PillKey[] {
-  const lista = Array.isArray(bruto) ? bruto.filter((v): v is string => typeof v === "string") : [];
+  const lista = Array.isArray(bruto)
+    ? [
+        ...new Set(
+          bruto
+            .filter((v): v is string => typeof v === "string")
+            .map((v) => CHAVES_ANTIGAS[v] ?? v),
+        ),
+      ]
+    : [];
   const validas = lista.filter(isPillKey);
   return validas.length > 0 ? validas.slice(0, MAX_PILLS) : DEFAULT_PILLS;
 }
 
 export type PillStats = {
   streak: number;
-  pagesPerDay: number;
+  /** Páginas por hora efetivamente lida no ano (só sessões com páginas). */
+  pagesPerHour: number;
   /** Dia da semana com mais sessões no ano ("sábado"), ou null sem dado. */
   preferredWeekday: string | null;
   /** Minutos crus — `pillDisplay` decide a unidade (min ou horas). */
@@ -75,7 +94,7 @@ export type PillTone = "coral" | "paper" | "mustard" | "moss" | "navy" | "ink";
 /** Cor fixa por métrica: a mesma pílula não muda de cor ao trocar a seleção. */
 const TOM: Record<PillKey, PillTone> = {
   streak: "moss",
-  pages_per_day: "paper",
+  pages_per_hour: "paper",
   preferred_weekday: "navy",
   minutes_this_week: "ink",
   books_this_month: "mustard",
@@ -118,8 +137,8 @@ export function pillDisplay(key: PillKey, s: PillStats): PillView {
   switch (key) {
     case "streak":
       return { ...base, label: "Sequência", valor: String(s.streak), unidade: "dias" };
-    case "pages_per_day":
-      return { ...base, label: "Média/dia", valor: String(s.pagesPerDay), unidade: "pág" };
+    case "pages_per_hour":
+      return { ...base, label: "Ritmo", valor: String(s.pagesPerHour), unidade: "pág/hora" };
     case "preferred_weekday": {
       const dia = s.preferredWeekday;
       const valor = dia ? dia[0]!.toUpperCase() + dia.slice(1) : "—";
