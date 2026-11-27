@@ -10,7 +10,9 @@
  */
 export const PILL_CATALOG = [
   { key: "streak", label: "Sequência atual" },
-  { key: "pages_per_hour", label: "Ritmo (páginas / hora)" },
+  // `curto` é o nome na tela de personalizar; `label` (com a explicação) fica
+  // na lista "Pílulas do painel" do perfil.
+  { key: "pages_per_hour", label: "Ritmo (páginas / hora)", curto: "Ritmo" },
   { key: "preferred_weekday", label: "Dia da semana preferido" },
   { key: "minutes_this_week", label: "Tempo lido na semana" },
   { key: "books_this_month", label: "Livros no mês" },

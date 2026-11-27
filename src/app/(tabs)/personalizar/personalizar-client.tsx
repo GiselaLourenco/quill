@@ -51,7 +51,7 @@ export function PersonalizarClient({ inicial }: { inicial: PillKey[] }) {
               onChange={() => alternar(pill.key)}
               className="h-4 w-4 accent-moss-dark"
             />
-            <span className="text-sm">{pill.label}</span>
+            <span className="text-sm">{"curto" in pill ? pill.curto : pill.label}</span>
           </label>
         );
       })}
