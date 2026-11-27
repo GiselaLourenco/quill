@@ -108,6 +108,7 @@ export default async function DesafioDetalhePage({
       p.id as string,
       {
         nome: nomeExibicao(p.display_name as string | null, p.username as string | null),
+        username: (p.username as string | null) ?? null,
         avatarUrl: (p.avatar_url as string | null) ?? null,
         avatarZoom: (p.avatar_zoom as number | null) ?? 100,
         avatarBg: (p.avatar_bg as string | null) ?? AVATAR_FUNDO_PADRAO,
@@ -116,7 +117,7 @@ export default async function DesafioDetalhePage({
   );
 
   const perfilDe = (uid: string) =>
-    perfilPorId.get(uid) ?? { nome: "membro", avatarUrl: null, avatarZoom: 100, avatarBg: AVATAR_FUNDO_PADRAO };
+    perfilPorId.get(uid) ?? { nome: "membro", username: null as string | null, avatarUrl: null, avatarZoom: 100, avatarBg: AVATAR_FUNDO_PADRAO };
 
   // Ranking
   const scores = computeScores(
@@ -149,6 +150,7 @@ export default async function DesafioDetalhePage({
         posicao: ordenados.findIndex(([, s]) => s === score) + 1,
         userId: uid,
         nome: perfil.nome,
+        username: perfil.username,
         avatarUrl: perfil.avatarUrl,
         avatarZoom: perfil.avatarZoom,
         avatarBg: perfil.avatarBg,

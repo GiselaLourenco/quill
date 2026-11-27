@@ -32,7 +32,7 @@ function pad2(n: number): string {
 
 type Avatar = { avatarUrl: string | null; avatarZoom: number; avatarBg: string };
 type SemanaItem = { chave: string; data: number; label: string; estado: "vazio" | "feito" | "hoje" | "hoje-feito" };
-type RankingItem = Avatar & { posicao: number; userId: string; nome: string; metrica: string; ehVoce: boolean };
+type RankingItem = Avatar & { posicao: number; userId: string; nome: string; username?: string | null; metrica: string; ehVoce: boolean };
 
 type Group = {
   id: string; nome: string; metric: string; unit: string;
@@ -623,6 +623,11 @@ function PodioColuna({ membro }: { membro: RankingItem }) {
         />
         {destaque && <span className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-45 border-2 border-ink bg-coral" />}
       </div>
+      {membro.username && (
+        <span className="-mt-1 mb-2 block max-w-full truncate px-1 font-sans text-[11px] text-ink-soft">
+          @{membro.username}
+        </span>
+      )}
       <div className={`flex w-full flex-col items-center justify-center border-2 border-ink shadow-hard-sm ${altura} ${bg}`}>
         <span className="font-display text-[11px] uppercase leading-none text-ink">{posicao}º</span>
         <span className="mt-0.5 font-display text-[9px] uppercase tracking-widest text-ink-soft">{membro.metrica}</span>
