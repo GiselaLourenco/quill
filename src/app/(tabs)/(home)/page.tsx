@@ -243,18 +243,20 @@ async function carregarBase(supabase: Supabase, userId: string) {
   const doAno = todas.filter((s) => s.started_at && localDateKey(s.started_at).startsWith(String(anoAtual)));
 
   // Ritmo: páginas por hora efetivamente lida no ano. Só entram sessões com
-  // páginas registradas — sessão só de tempo (sem página inicial/final)
-  // derrubaria o ritmo sem ter lido "zero páginas" de verdade. Sessão que vira
-  // o ano reparte páginas e tempo na proporção do tempo.
+  // páginas E tempo registrados — sessão só de tempo derrubaria o ritmo, e
+  // sessão sem tempo somaria páginas lidas "em zero segundos". Sem nenhuma
+  // sessão assim no ano, a pílula mostra "—" em vez de inventar um número.
+  // Sessão que vira o ano reparte páginas e tempo na proporção do tempo.
   let paginasAno = 0;
   let segundosAno = 0;
   for (const s of todas) {
     if (!s.started_at || !s.item_id || s.unit_start == null || s.unit_end == null) continue;
+    if (!s.duration_seconds || s.duration_seconds <= 0) continue;
     const fracao = fracaoDaSessaoEntre(s, `${anoAtual}-01-01`, `${anoAtual}-12-31`);
     paginasAno += paginasDa(s) * fracao;
     segundosAno += (s.duration_seconds ?? 0) * fracao;
   }
-  const ritmoPaginasHora = segundosAno > 0 ? Math.round((paginasAno / segundosAno) * 3600) : 0;
+  const ritmoPaginasHora = segundosAno > 0 ? Math.round((paginasAno / segundosAno) * 3600) : null;
 
   // Tempo lido na semana corrente (a última do array de semanas).
   const minutosSemana = semanas[semanas.length - 1]!.dias.reduce((soma, d) => soma + d.min, 0);

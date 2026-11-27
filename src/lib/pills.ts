@@ -74,8 +74,8 @@ export function pillsEscolhidas(bruto: unknown): PillKey[] {
 
 export type PillStats = {
   streak: number;
-  /** Páginas por hora efetivamente lida no ano (só sessões com páginas). */
-  pagesPerHour: number;
+  /** Páginas por hora lida no ano (só sessões com páginas e tempo); null sem dado. */
+  pagesPerHour: number | null;
   /** Dia da semana com mais sessões no ano ("sábado"), ou null sem dado. */
   preferredWeekday: string | null;
   /** Minutos crus — `pillDisplay` decide a unidade (min ou horas). */
@@ -140,7 +140,12 @@ export function pillDisplay(key: PillKey, s: PillStats): PillView {
     case "streak":
       return { ...base, label: "Sequência", valor: String(s.streak), unidade: "dias" };
     case "pages_per_hour":
-      return { ...base, label: "Ritmo", valor: String(s.pagesPerHour), unidade: "pág/hora" };
+      return {
+        ...base,
+        label: "Ritmo",
+        valor: s.pagesPerHour == null ? "—" : String(s.pagesPerHour),
+        unidade: "pág/hora",
+      };
     case "preferred_weekday": {
       const dia = s.preferredWeekday;
       const valor = dia ? dia[0]!.toUpperCase() + dia.slice(1) : "—";
