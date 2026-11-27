@@ -213,8 +213,15 @@ export function computeReadingStats(sessions: SessionForStats[]): ReadingStats {
 
   const daysRead = days.size;
   const pagesPerDay = daysRead > 0 ? Math.round(paginasNoApp / daysRead) : 0;
+  // Ritmo só com sessões que têm tempo: registro manual sem cronômetro
+  // somaria páginas lidas "em zero segundos".
+  const comTempo = lidas.filter(
+    (s) => (s.duration_seconds ?? 0) > 0 && s.unit_start != null && s.unit_end != null,
+  );
+  const paginasComTempo = comTempo.reduce((soma, s) => soma + Math.max(0, s.unit_end! - s.unit_start!), 0);
+  const segundosComTempo = comTempo.reduce((soma, s) => soma + (s.duration_seconds ?? 0), 0);
   const pagesPerHour =
-    totalSeconds > 0 ? Math.round((paginasNoApp / totalSeconds) * 3600) : 0;
+    segundosComTempo > 0 ? Math.round((paginasComTempo / segundosComTempo) * 3600) : 0;
 
   return { totalSeconds, daysRead, currentPage, pagesPerDay, pagesPerHour };
 }

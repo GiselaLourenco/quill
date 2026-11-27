@@ -37,6 +37,9 @@ export function analisarPosicao(input: {
   // Só páginas: capítulo varia demais de tamanho pra ter um ritmo "normal".
   else if (
     unidade === "pages" &&
+    // Sem tempo informado (registro manual sem cronômetro) não há ritmo pra
+    // comparar — não dá pra chamar de "pulo".
+    minutos > 0 &&
     delta > PULO_MIN_PAGINAS &&
     delta > PULO_PAGINAS_POR_MINUTO * Math.max(1, minutos)
   ) {

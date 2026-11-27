@@ -147,7 +147,8 @@ export function computeSpeedPagesPerHour(sessions: SessionRow[]): number {
   let totalPages = 0;
   let totalSeconds = 0;
   for (const s of sessions) {
-    if (s.item_id && s.unit_start != null && s.unit_end != null) {
+    // Sem tempo registrado (manual sem cronômetro) não entra no ritmo.
+    if (s.item_id && s.unit_start != null && s.unit_end != null && (s.duration_seconds ?? 0) > 0) {
       totalPages += Math.max(0, s.unit_end - s.unit_start);
       totalSeconds += s.duration_seconds ?? 0;
     }

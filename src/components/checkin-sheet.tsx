@@ -64,7 +64,9 @@ export function CheckinSheet({
   const [livroId, setLivroId] = useState<string>(livros[0]?.id ?? "manual");
   // `minutos` continua sendo a verdade — é o que vira `durationSeconds`. A
   // unidade só muda como o número é mostrado e digitado.
-  const [minutos, setMinutos] = useState(30);
+  // Começa em 0 e é opcional: sem tempo, o check-in conta pela posição do
+  // livro e fica fora do ritmo e das horas (nada de tempo inventado).
+  const [minutos, setMinutos] = useState(0);
   const [unidade, setUnidade] = useState<UnidadeTempo>("min");
   // "Onde você parou?" igual ao da aba Ler: uma posição só, em páginas,
   // capítulos ou %, e o app faz a conta com a posição anterior do livro.
@@ -108,7 +110,8 @@ export function CheckinSheet({
           return p > (livro.paginaAtual ?? 0) ? p : null;
         })()
       : null;
-  const podeSalvar = minutos > 0 && !salvando;
+  // Precisa de alguma coisa lida: tempo, ou a posição de um livro.
+  const podeSalvar = !salvando && (minutos > 0 || (!semLivro && posicao.posicao != null));
 
   function salvar() {
     if (!podeSalvar) return;
@@ -239,7 +242,7 @@ export function CheckinSheet({
                 htmlFor="checkin-minutos"
                 className="mb-2 block font-display text-[10px] uppercase tracking-widest text-ink"
               >
-                Tempo lido
+                Tempo lido <span className="normal-case tracking-normal text-ink-soft">(opcional)</span>
               </label>
               {/* Número e unidade em cima, atalhos embaixo: com o seletor de
                   unidade na mesma linha, os três presets não cabiam num

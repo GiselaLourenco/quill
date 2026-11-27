@@ -292,7 +292,9 @@ export function FreeReadingSession({
 
   function abrirManual() {
     setStartedAt(new Date().toISOString());
-    setMinutosSessao(30);
+    // Registro manual nasce sem tempo: quem não cronometrou não deve gravar um
+    // tempo inventado (era o "30 min" padrão inflando ritmo e horas).
+    setMinutosSessao(0);
     setOrigem("manual");
     setFase("registro");
   }
@@ -1043,7 +1045,9 @@ function TelaRegistro({
       const resultado = await createSession({
         itemId: livroId,
         startedAt,
-        durationSeconds: Math.max(60, total * 60),
+        // Manual sem tempo grava 0 (fica fora do ritmo e das horas). Com
+        // tempo, mínimo de 1 min como antes.
+        durationSeconds: origem === "manual" && total <= 0 ? 0 : Math.max(60, total * 60),
         pagina: livro && unidadeMetrica === "pages" ? posicao.posicao : paginaEstimada,
         capitulo: livro && unidade === "chapters" ? posicao.posicao : null,
         paginaAntes: unidadeMetrica === "pages" ? posicao.antes : null,
@@ -1365,7 +1369,7 @@ function TelaRegistro({
         )}
 
         {/* 03 — Tempo */}
-        <Passo numero={numeroPasso("tempo")} titulo="Por quanto tempo?">
+        <Passo numero={numeroPasso("tempo")} titulo={origem === "manual" ? "Por quanto tempo? (opcional)" : "Por quanto tempo?"}>
           <div className="grid grid-cols-4 gap-2">
             {(unidadeTempo === "h" ? PRESETS_H : PRESETS_MIN).map((p) => (
               <button
@@ -1395,7 +1399,7 @@ function TelaRegistro({
                   const limpo = e.target.value.replace(",", ".").replace(/[^0-9.]/g, "");
                   setTotal(minutosDoValor(Number(limpo) || 0, unidadeTempo));
                 }}
-                onBlur={() => setTotal((t) => Math.max(1, t))}
+                onBlur={() => setTotal((t) => Math.max(origem === "timer" ? 1 : 0, t))}
                 aria-label={`Tempo lido em ${unidadeTempo === "h" ? "horas" : "minutos"}`}
                 className="w-16 bg-transparent text-center font-serif text-3xl font-bold focus:outline-none"
               />
@@ -1426,7 +1430,7 @@ function TelaRegistro({
           <p className="mt-2 text-center text-[11px] text-ink-soft">
             {origem === "timer"
               ? "tempo medido pelo cronômetro — toque para ajustar"
-              : "toque no número para digitar quanto tempo você leu"}
+              : "não cronometrou? pode deixar em 0 — a leitura conta do mesmo jeito"}
           </p>
         </Passo>
 
@@ -1632,8 +1636,14 @@ function TelaSalvo({
         ✓ sessão salva
       </span>
       <h1 className="mt-3 font-display text-3xl leading-tight">
-        +{horas > 0 ? `${horas}h ` : ""}
-        {mins} min registrados!
+        {resumo.minutos > 0 ? (
+          <>
+            +{horas > 0 ? `${horas}h ` : ""}
+            {mins} min registrados!
+          </>
+        ) : (
+          "Leitura registrada!"
+        )}
       </h1>
       <p className="mt-2 text-sm text-ink-soft">
         {resumo.titulo}
